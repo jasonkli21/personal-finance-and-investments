@@ -14,6 +14,8 @@
     "format": "pnpm --filter web format && uv run --directory services/api --locked ruff format .",
     "typecheck": "pnpm --filter web typecheck && uv run --directory services/api --locked mypy app tests",
     "test": "pnpm test:web && uv run --directory services/api --locked pytest -q",
+    "openapi:export": "uv run --directory services/api --locked python -m app.export_openapi",
+    "api:generate": "pnpm openapi:export && pnpm --filter web generate:api",
     "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build:web"
   }
 }

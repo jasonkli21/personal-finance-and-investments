@@ -93,11 +93,11 @@ The following is a **logical design**; create exact migrations incrementally. In
 
 | Table / concept | Representative fields and invariants |
 | --- | --- |
-| `accounts` | `id`, name, account_type, base_currency, active, source_type; account identity is independent of brokerage |
+| `accounts` | `id`, name, account_type, base_currency, active, source_type, current manual-position revision; account identity is independent of brokerage |
 | `issuers` | `id`, normalized_name; optional company rollup for multiple share classes |
 | `securities` | `id`, security_type (equity/etf/cash/other), display_ticker, name, issuer_id nullable, currency; stable internal ID |
 | `security_identifiers` | security_id, namespace (ticker+exchange / ISIN / CUSIP / provider-specific), identifier, valid_from/to, source; constrain scoped collisions |
-| `position_snapshots` | `id`, account_id, snapshot_date, import_id, valuation_source, accepted_at; one accepted effective snapshot per account/date/source policy |
+| `position_snapshots` | `id`, account_id, snapshot_date, source, revision, import_id, valuation_source, accepted_at; one accepted effective snapshot per account/date/source policy |
 | `position_snapshot_lines` | snapshot_id, security_id or unresolved_ref, quantity `NUMERIC`, reported_value nullable, reported_price nullable, currency, original_row_ref |
 | `quotes` | security_id, as_of, price `NUMERIC`, currency, provider, fetched_at, market_status; keyed with provider/as-of granularity |
 | `fund_snapshots` | fund_security_id, as_of, source, source_url, fetched_at, parser_version, completeness/status, raw_file_id |
@@ -155,7 +155,7 @@ portfolio_weight(x) = exposure_value(x) / portfolio_nav
 - `GET /market-data/quotes/status`
 - Later: transactions, categories, tax-lot simulation, research, async job status.
 
-Avoid API-generated recommendations or direct execution endpoints. Use pagination for large holdings tables and version response envelopes for derived metrics and source-quality disclosures.
+The Stage 0 implementation exposes account create/list/patch, bounded local security resolution, and account-scoped manual position GET/PUT. Manual replacement compares a per-account revision counter, keeps dated snapshots, and marks a previous effective date superseded. Financial values cross OpenAPI as strings; manual price date is the snapshot effective date. Avoid API-generated recommendations or direct execution endpoints. Use pagination for large holdings tables and version response envelopes for derived metrics and source-quality disclosures.
 
 ## 7. Background work, caching and offline operation
 

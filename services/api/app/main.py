@@ -3,11 +3,14 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session, sessionmaker
 
+from app.api.routes import router as api_router
 from app.config import load_settings
 from app.db.engine import DatabaseEngineFactory
 
@@ -19,6 +22,9 @@ class HealthResponse(BaseModel):
 def create_app(*, engine: Engine | None = None) -> FastAPI:
     settings = load_settings()
     database_engine = engine or DatabaseEngineFactory.create(settings)
+    session_factory: sessionmaker[Session] = sessionmaker(
+        bind=database_engine, expire_on_commit=False
+    )
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -31,6 +37,14 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
         title="Portfolio Intelligence API", version="0.1.0", lifespan=lifespan
     )
     app.state.database_engine = database_engine
+    app.state.session_factory = session_factory
+    app.include_router(api_router)
+
+    @app.exception_handler(SQLAlchemyError)
+    def database_error_handler(
+        _request: Request, _exc: SQLAlchemyError
+    ) -> JSONResponse:
+        return JSONResponse(status_code=503, content={"detail": "Database unavailable"})
 
     @app.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:

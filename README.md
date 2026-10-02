@@ -1,6 +1,6 @@
 # Portfolio Intelligence
 
-This repository contains the Stage 0.1 local scaffold, Stage 0.2 development quality tooling, Stage 0.3 core PostgreSQL schema, and Stage 0.4 Aurora DSQL engine/migration/retry boundary for the planned portfolio application. Product requirements and later work packages are in [`docs/README.md`](docs/README.md). Account and manual-position APIs/UI are the next work package; imports and exposure calculations are not implemented yet.
+This repository contains the Stage 0.1 local scaffold, Stage 0.2 development quality tooling, Stage 0.3 core schema, Stage 0.4 Aurora DSQL engine/migration/retry boundary, and Stage 0.5 account/manual-position slice for the planned portfolio application. Product requirements and later work packages are in [`docs/README.md`](docs/README.md). The synthetic offline demo is the next work package; imports and exposure calculations are not implemented yet.
 
 ## Requirements
 
@@ -16,6 +16,7 @@ From the repository root:
 ```sh
 cp .env.example .env
 docker compose up --build -d
+uv run --directory services/api --locked alembic upgrade head
 pnpm install --frozen-lockfile
 pnpm dev:web
 ```
@@ -30,6 +31,8 @@ curl http://127.0.0.1:8000/health/ready
 ```
 
 `/health` checks the API process. `/health/ready` runs `SELECT 1` against the configured database backend and returns HTTP 503 if it cannot connect. Compose publishes PostgreSQL and the API only on `127.0.0.1`; the API binds inside its container so Compose can reach it. The sample credentials are for isolated local development only.
+
+Generate the exported FastAPI schema and TypeScript types after changing routes with `pnpm api:generate`.
 
 The web page checks readiness immediately, then polls every 5 seconds. Each request has a 2-second timeout; failed checks show `unavailable`, and later successful checks restore `ready`. The current interval and timeout are defaults in `apps/web/src/readiness.ts`.
 
@@ -47,17 +50,21 @@ pnpm check
 
 `pnpm check` runs ESLint and Ruff, Prettier and Ruff formatting checks, strict TypeScript and mypy checks, Vitest and pytest, then the production web build. It exits on the first failed check. Run `pnpm format` to apply formatting, or run `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`, and `pnpm build:web` separately. The ordinary tests use synthetic data and mocked database connections; these quality checks need no running containers or credentials. The opt-in schema integration test is skipped unless `TEST_DATABASE_URL` is set.
 
-The API tests cover `/health`, OpenAPI generation, database failure reporting, explicit backend and DSQL role validation, engine TLS/pool configuration, official DSQL dialect compilation, migration-plan resumption, and capped OCC retry. The web tests cover proxy port configuration and readiness timeouts, recovery, status changes, non-overlapping requests, and cleanup. The Compose services and Vite-to-API readiness proxy were smoke-tested with PostgreSQL 16 on 2026-10-01. A real DSQL suite is skipped unless `RUN_DSQL_INTEGRATION=1` and `DSQL_TEST_CLUSTER=disposable` are set.
+The API tests cover health/readiness, account and manual-position routes, revision conflicts, generated OpenAPI, explicit backend and DSQL role validation, engine TLS/pool configuration, dialect compilation, migration-plan resumption, and capped OCC retry. The web tests cover proxy port configuration and readiness timeouts, recovery, status changes, non-overlapping requests, and cleanup. The Compose services and Vite-to-API readiness proxy were smoke-tested with PostgreSQL 16 on 2026-10-01. A real DSQL suite is skipped unless `RUN_DSQL_INTEGRATION=1` and `DSQL_TEST_CLUSTER=disposable` are set.
+
+The latest `pnpm check` passed on 2026-10-02: 7 Vitest tests, 30 pytest tests, and a successful web build. Three database integration tests were skipped (one requires PostgreSQL 16 and two require a disposable DSQL cluster). Alembic generated PostgreSQL upgrade SQL offline; the new migration has not yet run against a live PostgreSQL 16 test database.
 
 ## Database schema
 
-The core schema is managed by Alembic. With Compose PostgreSQL running, apply the local migration with:
+The core schema is managed by Alembic. With Compose PostgreSQL running, apply the local migrations with:
 
 ```sh
 uv run --directory services/api --locked alembic upgrade head
 ```
 
 Export `DATABASE_URL` (using `postgresql+psycopg://`) or the `DATABASE_*` connection fields to choose local PostgreSQL. The opt-in PostgreSQL schema test uses `TEST_DATABASE_URL` and checks UUID, decimal, JSONB, provenance, uniqueness, and FK behavior.
+
+Migration `0002_position_snapshot_revision` adds a per-account compare-and-swap counter and a manual-snapshot revision. It is separate from the already-applied `0001` migration. DSQL applies each `ALTER TABLE` statement in its own DDL transaction.
 
 Aurora DSQL uses the official `aurora-dsql-sqlalchemy` dialect and Python connector. Set `DATABASE_BACKEND=aurora_dsql`, `AWS_REGION`, `AURORA_DSQL_CLUSTER_ENDPOINT`, and `AURORA_DSQL_DB_USER`; obtain AWS credentials through the standard AWS credential chain or workload role. DSQL rejects `DATABASE_URL`. Schema migration also requires a separate `AURORA_DSQL_MIGRATION_DB_USER` role. Apply the versioned DSQL plan with:
 
@@ -71,9 +78,9 @@ The GitHub Actions workflow in `.github/workflows/quality.yml` installs locked d
 
 ## Layout and next work
 
-- `apps/web`: React, TypeScript, Vite, and Tailwind scaffold.
-- `services/api`: FastAPI process, selected-backend readiness probe, and smoke tests.
+- `apps/web`: React, TypeScript, Vite, Tailwind, generated OpenAPI schema, and account/position workflow.
+- `services/api`: FastAPI routes/domains, selected-backend readiness probe, and tests.
 - `compose.yaml`: local PostgreSQL 16 and API containers.
 - `docs/05-roadmap.md`: staged implementation plan.
 
-Aurora DSQL configuration keys in `.env.example` are placeholders and are not needed for local development. The current plan, verification status, checked package versions and AWS references are recorded in [`docs/07-aurora-dsql-compatibility.md`](docs/07-aurora-dsql-compatibility.md). The next planned package is Stage 0.5 account and manual-position API/UI.
+Aurora DSQL configuration keys in `.env.example` are placeholders and are not needed for local development. The current plan, verification status, checked package versions and AWS references are recorded in [`docs/07-aurora-dsql-compatibility.md`](docs/07-aurora-dsql-compatibility.md). The next planned package is Stage 0.6 synthetic offline demo.

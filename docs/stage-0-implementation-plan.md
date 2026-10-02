@@ -1,7 +1,7 @@
 # Stage 0 implementation plan
 
-**Status:** S0.4 local DSQL boundary implemented; live DSQL remains unverified
-**Updated:** 2026-10-01  
+**Status:** S0.5 account/manual-position slice implemented; S0.6 demo pending; live DSQL remains unverified
+**Updated:** 2026-10-02
 **Roadmap coverage:** Work packages 0.1–0.6
 
 This is the execution plan for the local foundation: a reproducible application with a persisted manual holding and an independently testable production database boundary. Read [the docs index](README.md), [product specification](01-product-spec.md), [architecture](02-architecture.md), and [DSQL contract](07-aurora-dsql-compatibility.md) first. Those requirements take precedence over proposed implementation names here.
@@ -196,6 +196,8 @@ S0.4 has a local contract/tooling deliverable and a separate credentialed execut
 **Out of scope:** application deployment, production financial data, multi-region clusters, and treating a local PostgreSQL pass as cloud evidence.
 
 **S0.4 delivery evidence (2026-10-01):** `DatabaseEngineFactory` uses the official `aurora-dsql-sqlalchemy` 1.3.0 dialect/connector with token-on-connect, `verify-full` TLS, separate app and migration roles, bounded pooling, and a 3,000-second recycle. The versioned DSQL core plan uses seven single-statement table DDL transactions, four asynchronous index DDL transactions with `sys.wait_for_job`, and standalone ledger DML. Local tests check configuration, official dialect compilation, migration step boundaries/resumption, and capped retry. The real DSQL integration suite is explicitly opt-in for a disposable cluster and was not run; production remains blocked pending that evidence.
+
+**S0.5 delivery evidence (2026-10-02):** Added Alembic revision `0002_position_snapshot_revision` and its two single-statement DSQL `ALTER TABLE` steps. Accounts keep a compare-and-swap revision counter; dated manual snapshots have a revision, and replacing a snapshot either updates that effective date or marks the prior accepted date superseded. Account create/list/edit/archive, bounded local security lookup, snapshot retrieval/replacement and safe conflict/validation errors are exposed under `/v1`. `pnpm api:generate` exports FastAPI OpenAPI and regenerates the web TypeScript schema. The UI uses TanStack Query, string financial inputs, account-scoped editing, source/date/quality labels, missing-price state and stale-revision reload behavior. Synthetic API tests exercise independent accounts, same-security holdings, cash balances, decimals, invalid/unknown securities, archived accounts, missing prices, dated revisions and stale writes. `pnpm check` passed on 2026-10-02 (7 Vitest tests, 30 pytest tests, web build); three opt-in database tests were skipped (one PostgreSQL and two DSQL). Alembic generated the PostgreSQL upgrade SQL offline, but no Docker client or `TEST_DATABASE_URL` was available to execute the fresh PostgreSQL 16 migration. Live DSQL remains unverified.
 
 ### S0.5 — Deliver account and manual-position API/UI
 

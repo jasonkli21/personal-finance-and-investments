@@ -1,7 +1,7 @@
 # Personal Finance & Portfolio Intelligence — Docs
 
-**Status:** Stage 0.4 local DSQL boundary implemented; live DSQL unverified
-**Last reviewed:** 2026-10-01  
+**Status:** Stage 0.5 local manual-position slice implemented; live DSQL unverified
+**Last reviewed:** 2026-10-02
 **Databases:** PostgreSQL 16 local/personal; Aurora DSQL required for production  
 **Deployment:** local indefinitely; AWS deployment optional until ready, with production targeting DSQL  
 **Cost target:** zero recurring charges for the local MVP; no automatic use of paid API tiers
@@ -70,7 +70,7 @@ Task IDs follow roadmap packages (`S0.3` corresponds to 0.3); dotted subtask suf
 
 ## Current implementation and next task
 
-Stage 0.1 source and lockfiles are present. The web build, API tests, PostgreSQL 16 and API Compose startup, and Vite-to-API readiness proxy passed locally on 2026-10-01. Stage 0.2 adds Ruff, strict mypy, ESLint, Prettier, strict TypeScript, Vitest, and a shared `pnpm check` command. The local quality gate passed, and a temporary failing test confirmed that it exits unsuccessfully. Stage 0.3 adds SQLAlchemy/Alembic mappings and a PostgreSQL migration for issuers and aliases, accounts, securities, quotes, and owned position snapshots/lines. Its fresh migration and synthetic persistence/constraint checks passed on PostgreSQL 16 on 2026-10-01. Stage 0.4 adds a separate official DSQL engine, checksummed/resumable migration runner, IAM/TLS configuration, bounded OCC retry, and an explicitly gated real-cluster suite. Local checks pass; no real DSQL cluster was available, so DSQL remains unverified. The next planned work is **Stage 0 / Work Package 0.5** from `docs/05-roadmap.md`.
+Stage 0.1 source and lockfiles are present. The web build, API tests, PostgreSQL 16 and API Compose startup, and Vite-to-API readiness proxy passed locally on 2026-10-01. Stage 0.2 adds Ruff, strict mypy, ESLint, Prettier, strict TypeScript, Vitest, and a shared `pnpm check` command. The local quality gate passed, and a temporary failing test confirmed that it exits unsuccessfully. Stage 0.3 adds SQLAlchemy/Alembic mappings and a PostgreSQL migration for issuers and aliases, accounts, securities, quotes, and owned position snapshots/lines. Its fresh migration and synthetic persistence/constraint checks passed on PostgreSQL 16 on 2026-10-01. Stage 0.4 adds a separate official DSQL engine, checksummed/resumable migration runner, IAM/TLS configuration, bounded OCC retry, and an explicitly gated real-cluster suite. Stage 0.5 adds account and manual-position routes, revision-safe replacements, OpenAPI-generated TypeScript schemas, and the local entry/reload UI. The 2026-10-02 quality run passed (7 Vitest tests, 30 pytest tests, successful web build); one PostgreSQL and two DSQL database tests were skipped, and live DSQL remains unverified. The next planned work is **Stage 0 / Work Package 0.6** from `docs/05-roadmap.md`.
 
 ## Documentation maintenance
 

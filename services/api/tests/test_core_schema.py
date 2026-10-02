@@ -132,6 +132,17 @@ def test_core_schema_migration_and_round_trip() -> None:
         assert row.quantity == Decimal("1.2500000000")
         assert row.fixture == "true"
 
+        snapshot_revision = connection.execute(
+            text(
+                "SELECT a.current_position_revision, p.revision "
+                "FROM accounts a JOIN position_snapshots p "
+                "ON p.account_id = a.id WHERE a.id = :account_id"
+            ),
+            {"account_id": account_id},
+        ).one()
+        assert snapshot_revision.current_position_revision == 0
+        assert snapshot_revision.revision == 1
+
         # Preserve source rows with no resolved security and unusual quantities.
         unresolved_id = uuid4()
         connection.execute(

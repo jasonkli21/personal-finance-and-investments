@@ -72,6 +72,9 @@ class Account(TimestampMixin, Base):
     account_type: Mapped[str] = mapped_column(String(40), nullable=False)
     base_currency: Mapped[str] = mapped_column(String(3), nullable=False)
     active: Mapped[bool] = mapped_column(nullable=False, default=True)
+    current_position_revision: Mapped[int] = mapped_column(
+        nullable=False, default=0, server_default="0"
+    )
     source_type: Mapped[str] = mapped_column(
         String(40), nullable=False, default="manual"
     )
@@ -148,6 +151,7 @@ class PositionSnapshot(TimestampMixin, Base):
     source: Mapped[str] = mapped_column(String(100), nullable=False)
     valuation_source: Mapped[str | None] = mapped_column(String(100))
     status: Mapped[str] = mapped_column(String(24), nullable=False, default="accepted")
+    revision: Mapped[int] = mapped_column(nullable=False, default=1, server_default="1")
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

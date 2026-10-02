@@ -10,7 +10,7 @@ from typing import Literal
 
 from sqlalchemy import Engine, text
 
-StepKind = Literal["table", "index"]
+StepKind = Literal["table", "index", "alter"]
 
 
 @dataclass(frozen=True)
@@ -246,7 +246,39 @@ CORE_SCHEMA = DsqlMigration(
     ),
 )
 
-DSQL_MIGRATIONS = (CORE_SCHEMA,)
+POSITION_SNAPSHOT_REVISION = DsqlMigration(
+    revision="0002_position_snapshot_revision",
+    steps=(
+        DsqlMigrationStep(
+            "add_account_current_position_revision",
+            "alter",
+            "ALTER TABLE accounts ADD COLUMN current_position_revision integer "
+            "NOT NULL DEFAULT 0",
+            "accounts.current_position_revision",
+            """SELECT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = current_schema()
+                  AND table_name = 'accounts'
+                  AND column_name = 'current_position_revision'
+            )""",
+        ),
+        DsqlMigrationStep(
+            "add_position_snapshot_revision",
+            "alter",
+            "ALTER TABLE position_snapshots ADD COLUMN revision integer "
+            "NOT NULL DEFAULT 1",
+            "position_snapshots.revision",
+            """SELECT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_schema = current_schema()
+                  AND table_name = 'position_snapshots'
+                  AND column_name = 'revision'
+            )""",
+        ),
+    ),
+)
+
+DSQL_MIGRATIONS = (CORE_SCHEMA, POSITION_SNAPSHOT_REVISION)
 LEDGER_DDL = """CREATE TABLE IF NOT EXISTS dsql_schema_migration_steps (
     revision varchar(128) NOT NULL,
     step_key varchar(128) NOT NULL,
@@ -289,6 +321,10 @@ def validate_migration_plan(migrations: tuple[DsqlMigration, ...]) -> None:
                 raise MigrationPlanError(
                     f"{step.key} is not an asynchronous index step"
                 )
+            if step.kind == "alter" and not step.statement.lstrip().upper().startswith(
+                "ALTER TABLE"
+            ):
+                raise MigrationPlanError(f"{step.key} is not an ALTER TABLE step")
             if not step.ready_check:
                 raise MigrationPlanError(f"{step.key} has no completion check")
 
