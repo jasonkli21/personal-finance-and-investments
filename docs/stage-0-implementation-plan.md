@@ -1,6 +1,6 @@
 # Stage 0 implementation plan
 
-**Status:** S0.1–S0.6 code delivered; Stage 0 local exit gate incomplete pending PostgreSQL 16 verification and review fixes; live DSQL remains unverified
+**Status:** S0.1–S0.6 delivered; Stage 0 local exit gate passed on PostgreSQL 16.15; live DSQL remains unverified
 **Updated:** 2026-10-02
 **Roadmap coverage:** Work packages 0.1–0.6
 
@@ -210,6 +210,8 @@ The DSQL completion contract also includes checks not covered by the original tw
 
 **S0.6 delivery evidence (2026-10-02):** Demo records are created only by running `python -m app.demo_seed` while `DEMO_MODE=true`; configuration rejects DSQL, arbitrary hosts, and a database URL in demo mode. Stable UUIDv5 identities, dated synthetic quotes/snapshots, and synthetic source/quality labels make a second seed a no-op; it does not update any existing fixture row. `--reset-demo` is destructive only to the fixed demo IDs and refuses if demo account snapshots include non-seed line sources or the synthetic securities are referenced by non-demo accounts, quotes, or securities. It deletes only demo fixture data. The UI labels demo accounts. Synthetic position and illustrative fund-holdings CSVs, expected Decimal totals, and a future document-fixture specification live in `fixtures/stage-0/`; no CSV/PDF parser was added. The startup, migration, seed, check and reset commands are in the root README. The browser transcript and local quality results are in [`stage-0-demo-transcript.md`](stage-0-demo-transcript.md). No schema migration or provider integration was required. PostgreSQL runtime and live DSQL evidence remain distinct and are not inferred from SQLite/unit/UI smoke checks.
 
+**Stage 0 PostgreSQL exit evidence (2026-10-02):** Installed PostgreSQL 16.15 as an isolated local test runtime and ran `TEST_DATABASE_URL=postgresql+psycopg://postgres@127.0.0.1:55432/portfolio_stage0_gate uv run --directory services/api --locked pytest -q`: **50 passed, 3 skipped**. The two opt-in schema tests ran against the disposable PG16 database. Fresh migration and populated `0002 → head` upgrade both passed, including snapshot preservation, a subsequent replacement and rollback. The first run exposed that Alembic's default `VARCHAR(32)` version ledger could not store revision `0003_immutable_position_revisions_and_identifiers`; `alembic/env.py` now creates or widens this PostgreSQL bookkeeping column to 128 characters before applying migrations. The subsequent aggregate `pnpm check` passed (8 Vitest, 48 pytest, 5 PostgreSQL/DSQL tests skipped, generated API freshness, lint, formatting, type checks and web build). This local exit gate does not imply a successful remote CI run or a live DSQL result.
+
 ### S0.5 — Deliver account and manual-position API/UI
 
 **Dependencies:** S0.3; S0.4's local engine/transaction contract.  
@@ -276,6 +278,6 @@ Before declaring the **local** foundation complete, verify all local acceptance 
 5. Are migrations immutable/versioned and DSQL-specific execution/retry boundaries explicit?
 6. Is live DSQL evidence either recorded accurately or clearly marked unverified?
 
-Stage 1 local work can proceed only after PostgreSQL 16 fresh/populated-upgrade tests, manual replacement/rollback, draft conflict behavior, and generated-contract freshness pass. The DSQL path is a separately gated package. **Production readiness additionally requires the expanded real S0.4 checks and the later feature-specific DSQL suite.**
+Stage 1 local work may proceed after PostgreSQL 16 fresh/populated-upgrade tests, manual replacement/rollback, draft conflict behavior, and generated-contract freshness pass. These local checks passed on 2026-10-02; the DSQL path remains a separately gated package. **Production readiness additionally requires the expanded real S0.4 checks and the later feature-specific DSQL suite.**
 
-**Implementation handoff:** link the actual commands, migration ledger, accepted decisions, fixture expectations, generated client procedure, and local/cloud evidence in the docs index. This plan authorizes planning only; it does not record future tasks as completed.
+**Implementation handoff:** link the actual commands, migration ledger, accepted decisions, fixture expectations, generated client procedure, and local/cloud evidence in the docs index. Stage 0 local prerequisites are now verified; Stage 1 delivery remains separate from this plan.

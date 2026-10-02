@@ -2,7 +2,7 @@ from logging.config import fileConfig
 from os import environ
 
 from alembic.util import CommandError
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config, inspect, pool
 
 from alembic import context
 from app.db.models import Base
@@ -18,6 +18,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
+_ALEMBIC_VERSION_LENGTH = 128
 
 
 def database_url() -> str:
@@ -61,6 +62,29 @@ def run_migrations_online() -> None:
     connectable = engine_from_config(
         section, prefix="sqlalchemy.", poolclass=pool.NullPool
     )
+    # Alembic's default version table uses VARCHAR(32), which is too short for
+    # the descriptive revision identifiers in this repository. Create or widen
+    # the PostgreSQL bookkeeping table before Alembic applies any migrations.
+    with connectable.begin() as connection:
+        inspector = inspect(connection)
+        if inspector.has_table("alembic_version"):
+            version_column = next(
+                column
+                for column in inspector.get_columns("alembic_version")
+                if column["name"] == "version_num"
+            )
+            current_length = getattr(version_column["type"], "length", None)
+            if current_length is not None and current_length < _ALEMBIC_VERSION_LENGTH:
+                connection.exec_driver_sql(
+                    "ALTER TABLE alembic_version "
+                    f"ALTER COLUMN version_num TYPE VARCHAR({_ALEMBIC_VERSION_LENGTH})"
+                )
+        else:
+            connection.exec_driver_sql(
+                "CREATE TABLE alembic_version ("
+                f"version_num VARCHAR({_ALEMBIC_VERSION_LENGTH}) NOT NULL, "
+                "CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num))"
+            )
     with connectable.connect() as connection:
         context.configure(
             connection=connection,

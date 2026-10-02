@@ -1,6 +1,6 @@
 # Personal Finance & Portfolio Intelligence — Docs
 
-**Status:** Stage 0 code through S0.6 delivered; local exit gate incomplete pending PostgreSQL 16 runtime verification and review fixes; live DSQL unverified
+**Status:** Stage 0 local exit gate complete; Stage 1 implementation in progress; live DSQL unverified
 **Last reviewed:** 2026-10-02
 **Databases:** PostgreSQL 16 local/personal; Aurora DSQL required for production  
 **Deployment:** local indefinitely; AWS deployment optional until ready, with production targeting DSQL  
@@ -72,7 +72,7 @@ Stage 1 was reviewed against Stage 0 commit `81b220e` on 2026-10-02. Its plan no
 
 ## Current implementation and next task
 
-Stage 0.1–0.6 code is present, including the local stack, SQLAlchemy/Alembic schema, DSQL boundary, manual account/position workflow, and explicit synthetic demo seeding. The 2026-10-02 local `pnpm check` passed (8 Vitest, 45 pytest passed, 5 PostgreSQL/DSQL integration tests skipped, and a successful web build). The latest PostgreSQL migrations and manual replacement workflow have not yet been exercised against PostgreSQL 16. The Stage 0 local exit gate is therefore **incomplete** until fresh and populated-upgrade PostgreSQL 16 tests pass in CI. The SQLite-backed browser transcript is in [`stage-0-demo-transcript.md`](stage-0-demo-transcript.md); SQLite is not PostgreSQL evidence. Live DSQL remains unverified and production-blocked. Finish the Stage 0 remediation and verification checklist in [`stage-0-implementation-plan.md`](stage-0-implementation-plan.md) before beginning Stage 1.
+Stage 0.1–0.6 code is present, including the local stack, SQLAlchemy/Alembic schema, DSQL boundary, manual account/position workflow, and explicit synthetic demo seeding. On 2026-10-02, `pnpm check` passed (8 Vitest, 48 pytest passed, 5 PostgreSQL/DSQL integration tests skipped, and a successful web build). The actual PostgreSQL 16.15 suite also passed (50 pytest passed, including fresh migration and populated `0002 → head` upgrade, replacement/history/rollback; 3 DSQL tests skipped). Those runs exposed and fixed the Alembic version-ledger width for the long 0003 revision ID. Stage 0's local exit gate is complete. The SQLite-backed browser transcript is in [`stage-0-demo-transcript.md`](stage-0-demo-transcript.md); SQLite is not PostgreSQL evidence. Live DSQL remains unverified and production-blocked.
 
 ## Documentation maintenance
 
