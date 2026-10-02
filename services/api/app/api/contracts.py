@@ -349,3 +349,110 @@ class FundSnapshotRead(BaseModel):
     recognized_weight: str
     warnings: list[str]
     row_count: int
+
+
+class ReportCreate(BaseModel):
+    account_ids: list[UUID] = Field(default_factory=list, max_length=500)
+    as_of: datetime | None = None
+    include_archived: bool = False
+
+    @field_validator("as_of")
+    @classmethod
+    def timezone_required(cls, value: datetime | None) -> datetime | None:
+        if value is not None and (value.tzinfo is None or value.utcoffset() is None):
+            raise ValueError("Use a timestamp with timezone")
+        return value
+
+
+class ReportSummary(BaseModel):
+    id: UUID
+    calculation_version: str
+    input_hash: str
+    generated_at: datetime
+    valuation_at: datetime
+    account_ids: list[UUID]
+    reporting_currency: str
+    included_valued_nav: str
+    total_portfolio_nav: str | None
+    nav_status: str
+    percentages_available: bool
+    security_coverage: str | None
+    issuer_coverage: str | None
+    attribution_numerator: str
+    issuer_attribution_numerator: str
+    issuer_unmapped_value: str
+    coverage_denominator: str
+    categories: dict[str, str]
+    reconciled: bool
+    warnings: list[str]
+
+
+class ReportContribution(BaseModel):
+    account_id: str
+    account_name: str
+    owned_label: str
+    label: str
+    category: str
+    amount: str
+    weight: str | None
+    position_id: str
+    position_snapshot_id: str
+    position_as_of: str
+    position_source: str
+    position_quality: str
+    security_id: str | None
+    issuer_id: str | None
+    quote_id: str | None
+    quote_as_of: str | None
+    quote_source: str | None
+    quality_status: str
+    fund_snapshot_id: str | None
+    fund_as_of: str | None
+    fund_fetched_at: str | None
+    fund_source: str | None
+    fund_source_url: str | None
+    fund_quality: str | None
+    fund_stale: bool
+
+
+class ExposureRowRead(BaseModel):
+    id: str
+    label: str
+    direct: str
+    indirect: str
+    total: str
+    percentage: str | None
+    included_valued_percentage: str | None
+
+
+class OwnedReportLine(BaseModel):
+    position_id: str
+    account_id: str
+    account_name: str
+    position_snapshot_id: str
+    position_revision: int
+    position_as_of: str
+    position_source: str
+    position_quality: str
+    security_id: str | None
+    security_type: str
+    label: str
+    quantity: str
+    price: str | None
+    value: str | None
+    currency: str
+    status: str
+    quote_id: str | None
+    quote_as_of: str | None
+    quote_source: str | None
+    quality_status: str
+    stale: bool
+
+
+class ReportPage(BaseModel):
+    calculation_id: UUID
+    view: str
+    total_rows: int
+    offset: int
+    limit: int
+    rows: list[OwnedReportLine | ExposureRowRead]

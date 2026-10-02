@@ -27,6 +27,7 @@ from app.db.models import (
     ImportReviewEvent,
     ImportRow,
     Issuer,
+    IssuerMappingEvent,
     PositionSnapshot,
     PositionSnapshotLine,
     PrivateFile,
@@ -135,6 +136,8 @@ def _parse_csv(
             "price",
             "currency",
             "asset_type",
+            "account",
+            "as_of",
         }:
             raise InvalidCsv("Column mapping contains an unsupported field")
         mapped = {key: value for key, value in mapping.items() if value}
@@ -205,6 +208,18 @@ def _new_file(
 def _match_security(
     session: Session, identifier: str | None, name: str | None
 ) -> Security | None:
+    if identifier and identifier.casefold().startswith("cash:"):
+        matches_cash = list(
+            session.scalars(
+                select(Security)
+                .where(
+                    Security.security_type == "cash",
+                    Security.currency == identifier.split(":", 1)[1].upper(),
+                )
+                .limit(2)
+            )
+        )
+        return matches_cash[0] if len(matches_cash) == 1 else None
     if identifier:
         normalized = identifier.strip().upper()
         matches = list(
@@ -384,7 +399,13 @@ def create_position_import(
     batches = _batch_rows(parsed_rows)
     file_key, digest = file_store.put(content)
     identity_hash = _canonical_hash(
-        ["positions", str(account_id), effective_date.isoformat(), digest]
+        [
+            "positions",
+            str(account_id),
+            effective_date.isoformat(),
+            source_label.strip(),
+            digest,
+        ]
     )
     interpretation_hash = _canonical_hash([_PARSER_VERSION, clean_mapping])
     payload_hash = _canonical_hash(
@@ -410,18 +431,19 @@ def create_position_import(
                 raise ImportConflict(
                     "Idempotency key was already used with a different payload."
                 )
-            return existing_key.id, existing_key.status == "published"
+            return existing_key.id, existing_key.status != "staging"
 
         prior_same = session.scalar(
             select(ImportAttempt)
             .where(
                 ImportAttempt.identity_hash == identity_hash,
                 ImportAttempt.interpretation_hash == interpretation_hash,
+                ImportAttempt.status.not_in(("cancelled", "replaced")),
             )
             .order_by(ImportAttempt.created_at)
         )
         if prior_same is not None:
-            return prior_same.id, True
+            return prior_same.id, prior_same.status != "staging"
 
         prior_interpretation = session.scalar(
             select(ImportAttempt)
@@ -445,6 +467,15 @@ def create_position_import(
             raise ImportAccountConflict(
                 "Account positions changed before import review began."
             )
+        for raw in parsed_rows:
+            account_value = raw.get(clean_mapping.get("account", "account"), "").strip()
+            date_value = raw.get(clean_mapping.get("as_of", "as_of"), "").strip()
+            if account_value and account_value not in {account.name, str(account.id)}:
+                raise InvalidCsv("CSV contains another account; split it before review")
+            if date_value and date_value != effective_date.isoformat():
+                raise InvalidCsv(
+                    "CSV contains another effective date; split it before review"
+                )
         private_file = _new_file(
             session,
             key=file_key,
@@ -686,6 +717,13 @@ def correct_import_row(
         raise ImportConflict("Only an import under review can be corrected.")
     if attempt.review_revision != correction.expected_review_revision:
         raise ImportRevisionConflict
+    before = {
+        "security_id": str(row.security_id),
+        "quantity": str(row.normalized_quantity),
+        "price": str(row.normalized_price),
+        "currency": row.currency,
+        "excluded": row.excluded,
+    }
     new_revision = attempt.review_revision + 1
     now = utc_now()
     advanced = session.execute(
@@ -757,7 +795,17 @@ def correct_import_row(
             review_revision=new_revision,
             action="correct_row",
             reason=correction.reason,
-            change_payload={"row_number": row.row_number},
+            change_payload={
+                "row_number": row.row_number,
+                "before": before,
+                "after": {
+                    "security_id": str(row.security_id),
+                    "quantity": str(row.normalized_quantity),
+                    "price": str(row.normalized_price),
+                    "currency": row.currency,
+                    "excluded": row.excluded,
+                },
+            },
             created_at=utc_now(),
         )
     )
@@ -844,7 +892,7 @@ def publish_position_import(
                 [],
             )
         if (
-            attempt.status != "review"
+            attempt.status not in {"review", "publishing"}
             or attempt.review_revision != expected_review_revision
         ):
             raise ImportRevisionConflict
@@ -855,6 +903,12 @@ def publish_position_import(
         if blockers:
             raise ImportBlocked(
                 f"{len(blockers)} row(s) need correction or explicit exclusion."
+            )
+        if len(rows) != attempt.row_count or any(
+            row.security_id is None for row in rows
+        ):
+            raise ImportBlocked(
+                "Every source position must be resolved before publication"
             )
         publish_rows = [row for row in rows if not row.excluded]
         if not publish_rows:
@@ -1092,6 +1146,8 @@ def publish_position_import(
         )
         if getattr(published, "rowcount", None) != 1:
             raise ImportRevisionConflict
+        if not account.active:
+            raise ImportAccountConflict("Archived accounts cannot publish imports")
         if account.current_position_revision != expected_account_revision:
             raise ImportAccountConflict(
                 "Account changed while the import was being staged."
@@ -1115,6 +1171,7 @@ def publish_position_import(
             .where(
                 Account.id == account_id,
                 Account.current_position_revision == expected_account_revision,
+                Account.active.is_(True),
             )
             .values(
                 current_position_revision=expected_account_revision + 1,
@@ -1177,6 +1234,16 @@ def security_create(session: Session, data: Any) -> Security:
     )
     session.add(security)
     session.flush()
+    if data.issuer_id is not None:
+        session.add(
+            IssuerMappingEvent(
+                id=uuid4(),
+                security_id=security.id,
+                previous_issuer_id=None,
+                issuer_id=data.issuer_id,
+                reason="Reviewed during local catalog creation",
+            )
+        )
     if data.identifier_namespace and data.identifier_value:
         value = data.identifier_value.strip()
         session.add(
@@ -1212,9 +1279,22 @@ def assign_security_issuer(
     if issuer_id is not None and session.get(Issuer, issuer_id) is None:
         raise ImportNotFound("Issuer not found.")
     previous = security.issuer_id
+    moved = session.execute(
+        update(Security)
+        .where(
+            Security.id == security_id,
+            Security.issuer_id == expected_issuer_id
+            if expected_issuer_id is not None
+            else Security.issuer_id.is_(None),
+        )
+        .values(issuer_id=issuer_id)
+        .execution_options(synchronize_session=False)
+    )
+    if getattr(moved, "rowcount", 0) != 1:
+        raise ImportRevisionConflict
     security.issuer_id = issuer_id
     session.add(
-        __import__("app.db.models", fromlist=["IssuerMappingEvent"]).IssuerMappingEvent(
+        IssuerMappingEvent(
             id=uuid4(),
             security_id=security_id,
             previous_issuer_id=previous,
@@ -1236,7 +1316,9 @@ def record_manual_quote(session: Session, data: Any) -> Quote:
     if data.as_of.date() > date.today():
         raise ImportBlocked("Future quote observations are not accepted.")
     try:
-        price = _decimal(data.price, required=True, nonnegative=True)
+        price = _decimal(
+            data.price, required=True, nonnegative=True, integral_digits=14
+        )
     except ValueError as exc:
         raise ImportBlocked(str(exc)) from exc
     quote = Quote(

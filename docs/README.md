@@ -1,6 +1,6 @@
 # Personal Finance & Portfolio Intelligence — Docs
 
-**Status:** Stage 0 local exit gate complete; Stage 1 implementation in progress; live DSQL unverified
+**Status:** Stage 0 local exit gate complete; Stage 1 local MVP complete; live DSQL unverified
 **Last reviewed:** 2026-10-02
 **Databases:** PostgreSQL 16 local/personal; Aurora DSQL required for production  
 **Deployment:** local indefinitely; AWS deployment optional until ready, with production targeting DSQL  
@@ -38,7 +38,7 @@ The plans below expand the roadmap into execution backlogs using the phase-plan 
 
 Task IDs follow roadmap packages (`S0.3` corresponds to 0.3); dotted subtask suffixes split a package into smaller slices. `S3.R` is the Stage 3 completion/evaluation task, not a new product stage. Dependency order takes precedence over numeric order. Stage 4 may follow Stage 1; research requires reliable portfolio data and only consumes later history/jobs when those features are available. Local completion never substitutes for the real-DSQL production gate.
 
-Stage 1 was reviewed against Stage 0 commit `81b220e` on 2026-10-02. Its plan now specifies deterministic selection/financial policies, catalog creation from an empty database, review correction/cancellation, bounded atomic publication, durable frozen reports, private-input checks, and three major implementation commits (S1.1, S1.2, S1.3). The implementing agent must first close the Stage 0 PostgreSQL 16 gate; these plan updates do not claim that gate or Stage 1 is complete. The optional quote integration and credentialed production DSQL checks remain separate from local MVP completion.
+Stage 1 was reviewed against Stage 0 commit `81b220e` on 2026-10-02. Its plan now specifies deterministic selection/financial policies, catalog creation from an empty database, review correction/cancellation, bounded atomic publication, durable frozen reports, private-input checks, and three major implementation commits (S1.1, S1.2, S1.3). The PostgreSQL 16 prerequisite and all three local packages are now delivered; [Stage 1 release evidence](stage-1-release.md) records observed checks, commands and limitations. The optional quote integration and credentialed production DSQL checks remain separate from local MVP completion.
 
 ## Product principles
 

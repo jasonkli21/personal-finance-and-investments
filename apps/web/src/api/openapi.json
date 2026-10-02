@@ -136,6 +136,63 @@
         "title": "ErrorResponse",
         "type": "object"
       },
+      "ExposureRowRead": {
+        "properties": {
+          "direct": {
+            "title": "Direct",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "included_valued_percentage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Included Valued Percentage"
+          },
+          "indirect": {
+            "title": "Indirect",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "percentage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percentage"
+          },
+          "total": {
+            "title": "Total",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "direct",
+          "indirect",
+          "total",
+          "percentage",
+          "included_valued_percentage"
+        ],
+        "title": "ExposureRowRead",
+        "type": "object"
+      },
       "FundCorrection": {
         "properties": {
           "asset_type": {
@@ -949,6 +1006,161 @@
         "title": "OwnedPortfolioRead",
         "type": "object"
       },
+      "OwnedReportLine": {
+        "properties": {
+          "account_id": {
+            "title": "Account Id",
+            "type": "string"
+          },
+          "account_name": {
+            "title": "Account Name",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "position_as_of": {
+            "title": "Position As Of",
+            "type": "string"
+          },
+          "position_id": {
+            "title": "Position Id",
+            "type": "string"
+          },
+          "position_quality": {
+            "title": "Position Quality",
+            "type": "string"
+          },
+          "position_revision": {
+            "title": "Position Revision",
+            "type": "integer"
+          },
+          "position_snapshot_id": {
+            "title": "Position Snapshot Id",
+            "type": "string"
+          },
+          "position_source": {
+            "title": "Position Source",
+            "type": "string"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "quality_status": {
+            "title": "Quality Status",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "string"
+          },
+          "quote_as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote As Of"
+          },
+          "quote_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Id"
+          },
+          "quote_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Source"
+          },
+          "security_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Security Id"
+          },
+          "security_type": {
+            "title": "Security Type",
+            "type": "string"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "position_id",
+          "account_id",
+          "account_name",
+          "position_snapshot_id",
+          "position_revision",
+          "position_as_of",
+          "position_source",
+          "position_quality",
+          "security_id",
+          "security_type",
+          "label",
+          "quantity",
+          "price",
+          "value",
+          "currency",
+          "status",
+          "quote_id",
+          "quote_as_of",
+          "quote_source",
+          "quality_status",
+          "stale"
+        ],
+        "title": "OwnedReportLine",
+        "type": "object"
+      },
       "OwnedValuationLine": {
         "properties": {
           "allocation_percent": {
@@ -1387,6 +1599,446 @@
           "quality_status"
         ],
         "title": "QuoteRead",
+        "type": "object"
+      },
+      "ReportContribution": {
+        "properties": {
+          "account_id": {
+            "title": "Account Id",
+            "type": "string"
+          },
+          "account_name": {
+            "title": "Account Name",
+            "type": "string"
+          },
+          "amount": {
+            "title": "Amount",
+            "type": "string"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "fund_as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund As Of"
+          },
+          "fund_fetched_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Fetched At"
+          },
+          "fund_quality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Quality"
+          },
+          "fund_snapshot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Snapshot Id"
+          },
+          "fund_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Source"
+          },
+          "fund_source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Source Url"
+          },
+          "fund_stale": {
+            "title": "Fund Stale",
+            "type": "boolean"
+          },
+          "issuer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "owned_label": {
+            "title": "Owned Label",
+            "type": "string"
+          },
+          "position_as_of": {
+            "title": "Position As Of",
+            "type": "string"
+          },
+          "position_id": {
+            "title": "Position Id",
+            "type": "string"
+          },
+          "position_quality": {
+            "title": "Position Quality",
+            "type": "string"
+          },
+          "position_snapshot_id": {
+            "title": "Position Snapshot Id",
+            "type": "string"
+          },
+          "position_source": {
+            "title": "Position Source",
+            "type": "string"
+          },
+          "quality_status": {
+            "title": "Quality Status",
+            "type": "string"
+          },
+          "quote_as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote As Of"
+          },
+          "quote_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Id"
+          },
+          "quote_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Source"
+          },
+          "security_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Security Id"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          }
+        },
+        "required": [
+          "account_id",
+          "account_name",
+          "owned_label",
+          "label",
+          "category",
+          "amount",
+          "weight",
+          "position_id",
+          "position_snapshot_id",
+          "position_as_of",
+          "position_source",
+          "position_quality",
+          "security_id",
+          "issuer_id",
+          "quote_id",
+          "quote_as_of",
+          "quote_source",
+          "quality_status",
+          "fund_snapshot_id",
+          "fund_as_of",
+          "fund_fetched_at",
+          "fund_source",
+          "fund_source_url",
+          "fund_quality",
+          "fund_stale"
+        ],
+        "title": "ReportContribution",
+        "type": "object"
+      },
+      "ReportCreate": {
+        "properties": {
+          "account_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Account Ids",
+            "type": "array"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "include_archived": {
+            "default": false,
+            "title": "Include Archived",
+            "type": "boolean"
+          }
+        },
+        "title": "ReportCreate",
+        "type": "object"
+      },
+      "ReportPage": {
+        "properties": {
+          "calculation_id": {
+            "format": "uuid",
+            "title": "Calculation Id",
+            "type": "string"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "rows": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/OwnedReportLine"
+                },
+                {
+                  "$ref": "#/components/schemas/ExposureRowRead"
+                }
+              ]
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "total_rows": {
+            "title": "Total Rows",
+            "type": "integer"
+          },
+          "view": {
+            "title": "View",
+            "type": "string"
+          }
+        },
+        "required": [
+          "calculation_id",
+          "view",
+          "total_rows",
+          "offset",
+          "limit",
+          "rows"
+        ],
+        "title": "ReportPage",
+        "type": "object"
+      },
+      "ReportSummary": {
+        "properties": {
+          "account_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Account Ids",
+            "type": "array"
+          },
+          "attribution_numerator": {
+            "title": "Attribution Numerator",
+            "type": "string"
+          },
+          "calculation_version": {
+            "title": "Calculation Version",
+            "type": "string"
+          },
+          "categories": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "object"
+          },
+          "coverage_denominator": {
+            "title": "Coverage Denominator",
+            "type": "string"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "included_valued_nav": {
+            "title": "Included Valued Nav",
+            "type": "string"
+          },
+          "input_hash": {
+            "title": "Input Hash",
+            "type": "string"
+          },
+          "issuer_attribution_numerator": {
+            "title": "Issuer Attribution Numerator",
+            "type": "string"
+          },
+          "issuer_coverage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Coverage"
+          },
+          "issuer_unmapped_value": {
+            "title": "Issuer Unmapped Value",
+            "type": "string"
+          },
+          "nav_status": {
+            "title": "Nav Status",
+            "type": "string"
+          },
+          "percentages_available": {
+            "title": "Percentages Available",
+            "type": "boolean"
+          },
+          "reconciled": {
+            "title": "Reconciled",
+            "type": "boolean"
+          },
+          "reporting_currency": {
+            "title": "Reporting Currency",
+            "type": "string"
+          },
+          "security_coverage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Security Coverage"
+          },
+          "total_portfolio_nav": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Portfolio Nav"
+          },
+          "valuation_at": {
+            "format": "date-time",
+            "title": "Valuation At",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "calculation_version",
+          "input_hash",
+          "generated_at",
+          "valuation_at",
+          "account_ids",
+          "reporting_currency",
+          "included_valued_nav",
+          "total_portfolio_nav",
+          "nav_status",
+          "percentages_available",
+          "security_coverage",
+          "issuer_coverage",
+          "attribution_numerator",
+          "issuer_attribution_numerator",
+          "issuer_unmapped_value",
+          "coverage_denominator",
+          "categories",
+          "reconciled",
+          "warnings"
+        ],
+        "title": "ReportSummary",
         "type": "object"
       },
       "SecurityCreate": {
@@ -2997,6 +3649,374 @@
           }
         },
         "summary": "Get Owned Portfolio"
+      }
+    },
+    "/v1/portfolio/reports": {
+      "post": {
+        "operationId": "create_v1_portfolio_reports_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReportCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create"
+      }
+    },
+    "/v1/portfolio/reports/{identifier}": {
+      "get": {
+        "operationId": "summary_v1_portfolio_reports__identifier__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Identifier",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Summary"
+      }
+    },
+    "/v1/portfolio/reports/{identifier}/breakdown/{target}": {
+      "get": {
+        "operationId": "breakdown_v1_portfolio_reports__identifier__breakdown__target__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Identifier",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "target",
+            "required": true,
+            "schema": {
+              "title": "Target",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "level",
+            "required": false,
+            "schema": {
+              "default": "security",
+              "enum": [
+                "security",
+                "issuer",
+                "category"
+              ],
+              "title": "Level",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ReportContribution"
+                  },
+                  "title": "Response Breakdown V1 Portfolio Reports  Identifier  Breakdown  Target  Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Breakdown"
+      }
+    },
+    "/v1/portfolio/reports/{identifier}/export": {
+      "get": {
+        "operationId": "export_v1_portfolio_reports__identifier__export_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Identifier",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": false,
+            "schema": {
+              "default": "security",
+              "enum": [
+                "owned",
+                "security",
+                "issuer"
+              ],
+              "title": "View",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 200,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 100,
+              "title": "Source",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export"
+      }
+    },
+    "/v1/portfolio/reports/{identifier}/rows": {
+      "get": {
+        "operationId": "rows_v1_portfolio_reports__identifier__rows_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identifier",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Identifier",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": false,
+            "schema": {
+              "default": "security",
+              "enum": [
+                "owned",
+                "security",
+                "issuer"
+              ],
+              "title": "View",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 200,
+              "title": "Q",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 100,
+              "title": "Source",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "value",
+              "enum": [
+                "label",
+                "value"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "descending",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Descending",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReportPage"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rows"
       }
     },
     "/v1/securities": {

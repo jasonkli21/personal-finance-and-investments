@@ -25,6 +25,13 @@ export default function FundWorkspace() {
   const [page, setPage] = useState(0)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<Record<string, string>>({})
+  const [baseRevisions, setBaseRevisions] = useState<Record<string, number>>({})
+  function captureBase(rowId: string) {
+    setBaseRevisions((previous) => ({
+      ...previous,
+      [rowId]: previous[rowId] ?? review.data?.review_revision ?? 0,
+    }))
+  }
   const [weights, setWeights] = useState<Record<string, string>>({})
   const review = useQuery({
     queryKey: ['fund-review', importId],
@@ -58,14 +65,22 @@ export default function FundWorkspace() {
     },
     onSuccess: (result) => {
       setImportId(result.id)
+      setBaseRevisions({})
+      setWeights({})
+      setSelected({})
       setPage(0)
       setError('')
     },
     onError: (e) => setError(e.message),
   })
   const accept = useMutation({
-    mutationFn: () =>
-      publishFundImport(importId, review.data?.review_revision ?? 0),
+    mutationFn: () => {
+      if (Object.keys(baseRevisions).length)
+        throw new Error(
+          'Save corrections or discard fund drafts before accepting.',
+        )
+      return publishFundImport(importId, review.data?.review_revision ?? 0)
+    },
     onSuccess: refresh,
     onError: (e) => setError(e.message),
   })
@@ -85,12 +100,22 @@ export default function FundWorkspace() {
       weightValue: string
     }) =>
       correctFundRow(importId, rowId, {
-        expected_review_revision: review.data?.review_revision ?? 0,
+        expected_review_revision:
+          baseRevisions[rowId] ?? review.data?.review_revision ?? 0,
         reason: 'Reviewed in composition table',
         ...(security ? { security_id: security } : {}),
         ...(weightValue ? { weight: weightValue } : {}),
       }),
-    onSuccess: refresh,
+    onSuccess: async (_result, { rowId }) => {
+      const remove = <T,>(values: Record<string, T>) =>
+        Object.fromEntries(
+          Object.entries(values).filter(([key]) => key !== rowId),
+        )
+      setBaseRevisions(remove)
+      setWeights(remove)
+      setSelected(remove)
+      await refresh()
+    },
     onError: (e) => setError(e.message),
   })
   return (
@@ -108,6 +133,9 @@ export default function FundWorkspace() {
             aria-label="Fund composition security"
             value={fund}
             onChange={(e) => {
+              setBaseRevisions({})
+              setWeights({})
+              setSelected({})
               setFund(e.target.value)
               setImportId('')
             }}
@@ -223,12 +251,13 @@ export default function FundWorkspace() {
                         <select
                           aria-label={`Resolve fund row ${row.row_number}`}
                           value={selected[row.id] ?? row.security_id ?? ''}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            captureBase(row.id)
                             setSelected({
                               ...selected,
                               [row.id]: e.target.value,
                             })
-                          }
+                          }}
                         >
                           <option value="">Keep unresolved</option>
                           {catalog.data?.map((s) => (
@@ -243,9 +272,10 @@ export default function FundWorkspace() {
                           aria-label={`Correct fund weight ${row.row_number}`}
                           placeholder="Decimal weight"
                           value={weights[row.id] ?? ''}
-                          onChange={(e) =>
+                          onChange={(e) => {
+                            captureBase(row.id)
                             setWeights({ ...weights, [row.id]: e.target.value })
-                          }
+                          }}
                         />
                         <button
                           disabled={
@@ -276,6 +306,16 @@ export default function FundWorkspace() {
             onClick={() => setPage(page + 1)}
           >
             Next fund rows
+          </button>
+          <button
+            onClick={() => {
+              setBaseRevisions({})
+              setWeights({})
+              setSelected({})
+              void refresh()
+            }}
+          >
+            Discard fund drafts and reload review
           </button>
           <button
             disabled={accept.isPending || review.data.status !== 'review'}

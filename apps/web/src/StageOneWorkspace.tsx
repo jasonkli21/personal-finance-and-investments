@@ -107,7 +107,13 @@ export default function StageOneWorkspace({
   const [rowDrafts, setRowDrafts] = useState<
     Record<
       string,
-      { securityId: string; quantity: string; price: string; currency: string }
+      {
+        securityId: string
+        quantity: string
+        price: string
+        currency: string
+        reviewRevision: number
+      }
     >
   >({})
   const [issuerName, setIssuerName] = useState('')
@@ -178,6 +184,7 @@ export default function StageOneWorkspace({
     },
     onSuccess: async (result) => {
       setImportId(result.id)
+      setRowDrafts({})
       setPage(0)
       setNotice(
         result.duplicate
@@ -200,9 +207,10 @@ export default function StageOneWorkspace({
         quantity: row.normalized_quantity ?? row.raw_quantity ?? '',
         price: row.normalized_price ?? row.raw_price ?? '',
         currency: row.currency ?? row.raw_currency ?? 'USD',
+        reviewRevision: review?.review_revision ?? 0,
       }
       return correctImportRow(importId, row.id, {
-        expected_review_revision: review.review_revision,
+        expected_review_revision: draft.reviewRevision,
         reason: excluded
           ? 'Explicitly excluded during review'
           : 'Corrected during row review',
@@ -213,7 +221,12 @@ export default function StageOneWorkspace({
         ...(excluded === undefined ? {} : { excluded }),
       })
     },
-    onSuccess: async () => {
+    onSuccess: async (_result, { row }) => {
+      setRowDrafts((current) =>
+        Object.fromEntries(
+          Object.entries(current).filter(([key]) => key !== row.id),
+        ),
+      )
       await queryClient.invalidateQueries({
         queryKey: ['import-review', importId],
       })
@@ -226,6 +239,10 @@ export default function StageOneWorkspace({
   const publishMutation = useMutation({
     mutationFn: () => {
       if (!review) throw new Error('Load an import review first.')
+      if (Object.keys(rowDrafts).length)
+        throw new Error(
+          'Save corrections or discard row drafts before publishing.',
+        )
       return publishImport(importId, review.review_revision)
     },
     onSuccess: async () => {
@@ -348,6 +365,7 @@ export default function StageOneWorkspace({
         quantity: row.normalized_quantity ?? row.raw_quantity ?? '',
         price: row.normalized_price ?? row.raw_price ?? '',
         currency: row.currency ?? row.raw_currency ?? 'USD',
+        reviewRevision: review?.review_revision ?? 0,
       }
     )
   }
@@ -364,7 +382,7 @@ export default function StageOneWorkspace({
       )}
 
       {accountId && (
-        <Section title="Owned portfolio value">
+        <Section title="Snapshot-date owned value">
           {ownedQuery.isPending ? (
             <p className="text-sm text-slate-600">Loading dated valuation…</p>
           ) : ownedQuery.data ? (
@@ -382,9 +400,11 @@ export default function StageOneWorkspace({
                   </p>
                 </div>
                 <p className="max-w-xl text-xs text-slate-500">
-                  Total value and percentages are withheld when a held row is
-                  unpriced, stale, foreign currency, or signed. Owned positions
-                  remain separate from any future derived exposure.
+                  This editor inspects prices at the position snapshot date. Use
+                  Portfolio reports above for a current or historical frozen
+                  valuation. Total value and percentages are withheld when a
+                  held row is unpriced, stale, foreign currency, or signed.
+                  Owned positions remain separate from derived exposure.
                 </p>
               </div>
               {ownedQuery.data.lines.length > 0 && (
@@ -876,6 +896,17 @@ export default function StageOneWorkspace({
                   })}
                 </div>
                 <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRowDrafts({})
+                      void queryClient.invalidateQueries({
+                        queryKey: ['import-review', importId],
+                      })
+                    }}
+                  >
+                    Discard row drafts and reload review
+                  </button>
                   <button
                     className="rounded-lg bg-emerald-700 px-4 py-2.5 font-semibold text-white disabled:opacity-50"
                     type="button"

@@ -267,3 +267,49 @@ def test_correction_invalidates_approval_cancel_cannot_publish(client: Any) -> N
         browser.post(endpoint, json={"expected_review_revision": 3}).status_code == 409
     )
     assert browser.get(f"/v1/funds/{fund}/snapshots").json() == []
+
+
+def test_interrupted_publication_is_hidden_then_resumes(
+    client: Any, monkeypatch: Any
+) -> None:
+    from functools import partial
+    from uuid import UUID
+
+    from app.domains import funds
+
+    browser, engine = client
+    fund = catalog(browser, "RECOVERY")
+    content = b"ticker,weight,type\n" + b"\n".join(
+        f"UNKNOWN{i},0,other".encode() for i in range(502)
+    )
+    attempt = upload(browser, fund, content)
+    from app.db.transactions import run_database_unit
+
+    original = run_database_unit
+    completed = 0
+
+    def interrupted(factory: Any, operation: Any) -> Any:
+        nonlocal completed
+        if completed == 1:
+            raise RuntimeError("Synthetic interruption between batches")
+        result = original(factory, operation)
+        if isinstance(operation, partial):
+            completed += 1
+        return result
+
+    with monkeypatch.context() as patch:
+        patch.setattr(funds, "run_database_unit", interrupted)
+        with pytest.raises(RuntimeError, match="interruption"):
+            funds.publish(browser.app.state.session_factory, UUID(attempt["id"]), 1)
+    assert browser.get(f"/v1/funds/{fund}/snapshots").json() == []
+    with Session(engine) as session:
+        assert (
+            session.scalar(select(__import__("sqlalchemy").func.count(FundLine.id)))
+            == 200
+        )
+    response = browser.post(
+        f"/v1/fund-imports/{attempt['id']}/publish",
+        json={"expected_review_revision": 1},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["row_count"] == 502

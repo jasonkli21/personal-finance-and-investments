@@ -56,3 +56,10 @@ jobs:
           uv sync --directory services/api --locked
       - name: Lint, formatting, types, tests, and web build
         run: pnpm check
+      - name: Install browser for offline journey
+        run: pnpm --filter web exec playwright install --with-deps chromium
+      - name: Offline Stage 1 browser journey
+        env:
+          E2E_DISPOSABLE_DATABASE: '1'
+          E2E_DATABASE_URL: postgresql+psycopg://portfolio:test-only@127.0.0.1:5432/portfolio_browser_test
+        run: pnpm test:e2e

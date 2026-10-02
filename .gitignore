@@ -11,3 +11,7 @@ dist/
 .ruff_cache/
 .mypy_cache/
 coverage/
+
+.pnpm-store/
+playwright-report/
+test-results/

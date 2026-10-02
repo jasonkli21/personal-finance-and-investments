@@ -1,6 +1,6 @@
 # Stage 1 implementation plan
 
-**Status:** Proposed execution backlog, not implemented  
+**Status:** Local Stage 1 implemented; see [release evidence](stage-1-release.md). Live DSQL remains unverified.
 **Updated:** 2026-10-02 — reviewed against Stage 0 commit `81b220e`
 **Roadmap coverage:** 1.1 Owned positions/valuation; 1.2 ETF composition; 1.3 Look-through/dashboard
 

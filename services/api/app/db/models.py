@@ -512,3 +512,17 @@ class FundLine(Base):
     raw_identifier: Mapped[str | None] = mapped_column(String(2000))
     raw_name: Mapped[str | None] = mapped_column(String(2000))
     match_status: Mapped[str] = mapped_column(String(24), nullable=False)
+
+
+class Calculation(Base):
+    """Private immutable report identity; snapshots remain financial truth."""
+
+    __tablename__ = "portfolio_calculations"
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    storage_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    input_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    calculation_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )

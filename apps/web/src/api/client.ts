@@ -279,3 +279,49 @@ export async function correctFundRow(
     }),
   )
 }
+
+export async function createReport(
+  input: components['schemas']['ReportCreate'],
+) {
+  return unwrap(await api.POST('/v1/portfolio/reports', { body: input }))
+}
+export async function fetchReport(id: string) {
+  return unwrap(
+    await api.GET('/v1/portfolio/reports/{identifier}', {
+      params: { path: { identifier: id } },
+    }),
+  )
+}
+export async function fetchReportRows(
+  id: string,
+  view: 'owned' | 'security' | 'issuer',
+  offset: number,
+  q: string,
+  source: string,
+  sort: 'label' | 'value',
+  descending: boolean,
+) {
+  return unwrap(
+    await api.GET('/v1/portfolio/reports/{identifier}/rows', {
+      params: {
+        path: { identifier: id },
+        query: { view, offset, limit: 50, q, source, sort, descending },
+      },
+    }),
+  )
+}
+export async function fetchBreakdown(
+  id: string,
+  target: string,
+  level: 'security' | 'issuer' | 'category',
+  offset: number,
+) {
+  return unwrap(
+    await api.GET('/v1/portfolio/reports/{identifier}/breakdown/{target}', {
+      params: {
+        path: { identifier: id, target },
+        query: { level, offset, limit: 50 },
+      },
+    }),
+  )
+}

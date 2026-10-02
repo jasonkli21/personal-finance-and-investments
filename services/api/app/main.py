@@ -45,6 +45,9 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
     from app.api.fund_routes import router as fund_router
 
     app.include_router(fund_router)
+    from app.api.report_routes import router as report_router
+
+    app.include_router(report_router)
 
     @app.exception_handler(SQLAlchemyError)
     def database_error_handler(

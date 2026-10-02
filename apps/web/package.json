@@ -8,20 +8,23 @@
     "generate:api": "openapi-typescript src/api/openapi.json -o src/api/schema.d.ts && prettier --write src/api/schema.d.ts",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "lint": "eslint src test vite.config.ts vitest.config.ts eslint.config.js --max-warnings 0",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"test/**/*.test.ts\" \"*.{json,ts,js,html}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"test/**/*.test.ts\" \"*.{json,ts,js,html}\"",
+    "lint": "eslint src test vite.config.ts vitest.config.ts eslint.config.js --max-warnings 0 e2e playwright.config.ts",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"test/**/*.test.ts\" \"*.{json,ts,js,html}\" \"e2e/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"test/**/*.test.ts\" \"*.{json,ts,js,html}\" \"e2e/**/*.ts\"",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.104.0",
+    "@tanstack/react-table": "^8.21.3",
     "openapi-fetch": "^0.17.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^24.19.0",
     "@types/react": "^19.0.0",

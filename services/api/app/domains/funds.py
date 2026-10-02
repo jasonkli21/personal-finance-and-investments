@@ -414,7 +414,13 @@ def publish(factory: sessionmaker[Session], import_id: UUID, revision: int) -> U
                     r.normalized_weight or Decimal(0)
                     for r in rows
                     if r.security_id
-                    and classify(r.raw_asset_type or "other") == "equity"
+                    and (
+                        r.diagnostics.get("reviewed_class")
+                        or classify(r.raw_asset_type or "other")
+                    )
+                    == "equity"
+                    and (matched := session.get(Security, r.security_id)) is not None
+                    and matched.security_type == "equity"
                 ),
                 Decimal(0),
             )

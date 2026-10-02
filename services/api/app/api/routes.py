@@ -423,13 +423,9 @@ def post_publish_import(
         attempt = session.get(ImportAttempt, import_id)
         if snapshot is None or attempt is None or attempt.account_id is None:
             raise HTTPException(status_code=404, detail="Published snapshot not found.")
-        envelope = portfolio.read_positions(session, attempt.account_id)
-        if envelope.snapshot is None or envelope.snapshot.id != snapshot_id:
-            raise HTTPException(
-                status_code=409,
-                detail="Published snapshot is not the selected account revision.",
-            )
-        return envelope.snapshot
+        return portfolio._as_read(
+            snapshot, portfolio._snapshot_lines(session, snapshot_id)
+        )
 
 
 @router.put("/accounts/{account_id}/positions", response_model=PositionSnapshotRead)

@@ -313,6 +313,91 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/portfolio/reports': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Create */
+    post: operations['create_v1_portfolio_reports_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/portfolio/reports/{identifier}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Summary */
+    get: operations['summary_v1_portfolio_reports__identifier__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/portfolio/reports/{identifier}/breakdown/{target}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Breakdown */
+    get: operations['breakdown_v1_portfolio_reports__identifier__breakdown__target__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/portfolio/reports/{identifier}/export': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Export */
+    get: operations['export_v1_portfolio_reports__identifier__export_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/portfolio/reports/{identifier}/rows': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Rows */
+    get: operations['rows_v1_portfolio_reports__identifier__rows_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/securities': {
     parameters: {
       query?: never
@@ -411,6 +496,23 @@ export interface components {
     ErrorResponse: {
       /** Detail */
       detail: string
+    }
+    /** ExposureRowRead */
+    ExposureRowRead: {
+      /** Direct */
+      direct: string
+      /** Id */
+      id: string
+      /** Included Valued Percentage */
+      included_valued_percentage: string | null
+      /** Indirect */
+      indirect: string
+      /** Label */
+      label: string
+      /** Percentage */
+      percentage: string | null
+      /** Total */
+      total: string
     }
     /** FundCorrection */
     FundCorrection: {
@@ -670,6 +772,51 @@ export interface components {
       /** Total Usd */
       total_usd: string | null
     }
+    /** OwnedReportLine */
+    OwnedReportLine: {
+      /** Account Id */
+      account_id: string
+      /** Account Name */
+      account_name: string
+      /** Currency */
+      currency: string
+      /** Label */
+      label: string
+      /** Position As Of */
+      position_as_of: string
+      /** Position Id */
+      position_id: string
+      /** Position Quality */
+      position_quality: string
+      /** Position Revision */
+      position_revision: number
+      /** Position Snapshot Id */
+      position_snapshot_id: string
+      /** Position Source */
+      position_source: string
+      /** Price */
+      price: string | null
+      /** Quality Status */
+      quality_status: string
+      /** Quantity */
+      quantity: string
+      /** Quote As Of */
+      quote_as_of: string | null
+      /** Quote Id */
+      quote_id: string | null
+      /** Quote Source */
+      quote_source: string | null
+      /** Security Id */
+      security_id: string | null
+      /** Security Type */
+      security_type: string
+      /** Stale */
+      stale: boolean
+      /** Status */
+      status: string
+      /** Value */
+      value: string | null
+    }
     /** OwnedValuationLine */
     OwnedValuationLine: {
       /** Allocation Percent */
@@ -833,6 +980,146 @@ export interface components {
       security_id: string
       /** Source */
       source: string
+    }
+    /** ReportContribution */
+    ReportContribution: {
+      /** Account Id */
+      account_id: string
+      /** Account Name */
+      account_name: string
+      /** Amount */
+      amount: string
+      /** Category */
+      category: string
+      /** Fund As Of */
+      fund_as_of: string | null
+      /** Fund Fetched At */
+      fund_fetched_at: string | null
+      /** Fund Quality */
+      fund_quality: string | null
+      /** Fund Snapshot Id */
+      fund_snapshot_id: string | null
+      /** Fund Source */
+      fund_source: string | null
+      /** Fund Source Url */
+      fund_source_url: string | null
+      /** Fund Stale */
+      fund_stale: boolean
+      /** Issuer Id */
+      issuer_id: string | null
+      /** Label */
+      label: string
+      /** Owned Label */
+      owned_label: string
+      /** Position As Of */
+      position_as_of: string
+      /** Position Id */
+      position_id: string
+      /** Position Quality */
+      position_quality: string
+      /** Position Snapshot Id */
+      position_snapshot_id: string
+      /** Position Source */
+      position_source: string
+      /** Quality Status */
+      quality_status: string
+      /** Quote As Of */
+      quote_as_of: string | null
+      /** Quote Id */
+      quote_id: string | null
+      /** Quote Source */
+      quote_source: string | null
+      /** Security Id */
+      security_id: string | null
+      /** Weight */
+      weight: string | null
+    }
+    /** ReportCreate */
+    ReportCreate: {
+      /** Account Ids */
+      account_ids?: string[]
+      /** As Of */
+      as_of?: string | null
+      /**
+       * Include Archived
+       * @default false
+       */
+      include_archived: boolean
+    }
+    /** ReportPage */
+    ReportPage: {
+      /**
+       * Calculation Id
+       * Format: uuid
+       */
+      calculation_id: string
+      /** Limit */
+      limit: number
+      /** Offset */
+      offset: number
+      /** Rows */
+      rows: (
+        | components['schemas']['OwnedReportLine']
+        | components['schemas']['ExposureRowRead']
+      )[]
+      /** Total Rows */
+      total_rows: number
+      /** View */
+      view: string
+    }
+    /** ReportSummary */
+    ReportSummary: {
+      /** Account Ids */
+      account_ids: string[]
+      /** Attribution Numerator */
+      attribution_numerator: string
+      /** Calculation Version */
+      calculation_version: string
+      /** Categories */
+      categories: {
+        [key: string]: string
+      }
+      /** Coverage Denominator */
+      coverage_denominator: string
+      /**
+       * Generated At
+       * Format: date-time
+       */
+      generated_at: string
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Included Valued Nav */
+      included_valued_nav: string
+      /** Input Hash */
+      input_hash: string
+      /** Issuer Attribution Numerator */
+      issuer_attribution_numerator: string
+      /** Issuer Coverage */
+      issuer_coverage: string | null
+      /** Issuer Unmapped Value */
+      issuer_unmapped_value: string
+      /** Nav Status */
+      nav_status: string
+      /** Percentages Available */
+      percentages_available: boolean
+      /** Reconciled */
+      reconciled: boolean
+      /** Reporting Currency */
+      reporting_currency: string
+      /** Security Coverage */
+      security_coverage: string | null
+      /** Total Portfolio Nav */
+      total_portfolio_nav: string | null
+      /**
+       * Valuation At
+       * Format: date-time
+       */
+      valuation_at: string
+      /** Warnings */
+      warnings: string[]
     }
     /** SecurityCreate */
     SecurityCreate: {
@@ -1941,6 +2228,180 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  create_v1_portfolio_reports_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReportCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReportSummary']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  summary_v1_portfolio_reports__identifier__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        identifier: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReportSummary']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  breakdown_v1_portfolio_reports__identifier__breakdown__target__get: {
+    parameters: {
+      query?: {
+        level?: 'security' | 'issuer' | 'category'
+        offset?: number
+        limit?: number
+      }
+      header?: never
+      path: {
+        identifier: string
+        target: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReportContribution'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  export_v1_portfolio_reports__identifier__export_get: {
+    parameters: {
+      query?: {
+        view?: 'owned' | 'security' | 'issuer'
+        q?: string
+        source?: string
+      }
+      header?: never
+      path: {
+        identifier: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': unknown
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  rows_v1_portfolio_reports__identifier__rows_get: {
+    parameters: {
+      query?: {
+        view?: 'owned' | 'security' | 'issuer'
+        offset?: number
+        limit?: number
+        q?: string
+        source?: string
+        sort?: 'label' | 'value'
+        descending?: boolean
+      }
+      header?: never
+      path: {
+        identifier: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReportPage']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
         }
       }
     }

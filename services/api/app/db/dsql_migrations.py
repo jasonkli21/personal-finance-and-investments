@@ -1331,12 +1331,46 @@ STAGE1_FUND_COMPOSITIONS = DsqlMigration(
     ),
 )
 
+TABLE_COLUMNS["portfolio_calculations"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("storage_key", "character varying", "NO", 100, None, None),
+    ("content_hash", "character varying", "NO", 64, None, None),
+    ("input_hash", "character varying", "NO", 64, None, None),
+    ("calculation_version", "character varying", "NO", 80, None, None),
+    ("generated_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["portfolio_calculations"] = (
+    ("portfolio_calculations_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+)
+STAGE1_REPORTS = DsqlMigration(
+    "0006_portfolio_reports",
+    (
+        DsqlMigrationStep(
+            "create_portfolio_calculations",
+            "table",
+            """CREATE TABLE portfolio_calculations (
+        id uuid NOT NULL,
+        storage_key varchar(100) NOT NULL,
+        content_hash varchar(64) NOT NULL,
+        input_hash varchar(64) NOT NULL,
+        calculation_version varchar(80) NOT NULL,
+        generated_at timestamptz NOT NULL,
+        CONSTRAINT portfolio_calculations_pkey PRIMARY KEY (id)
+    )""",
+            "portfolio_calculations",
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :object_name)",
+        ),
+    ),
+)
+
 DSQL_MIGRATIONS = (
     CORE_SCHEMA,
     POSITION_SNAPSHOT_REVISION,
     IMMUTABLE_POSITION_REVISIONS_AND_IDENTIFIERS,
     STAGE1_POSITION_IMPORTS,
     STAGE1_FUND_COMPOSITIONS,
+    STAGE1_REPORTS,
 )
 LEDGER_DDL = """CREATE TABLE IF NOT EXISTS dsql_schema_migration_steps (
     revision varchar(128) NOT NULL,

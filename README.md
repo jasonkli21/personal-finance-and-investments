@@ -1,6 +1,6 @@
 # Portfolio Intelligence
 
-This repository contains the Stage 0 local foundation through S0.6: local tooling/schema, the Aurora DSQL boundary, account/manual-position workflow, and an explicit synthetic offline demo. Product requirements and later work packages are in [`docs/README.md`](docs/README.md). CSV imports and exposure calculations are not implemented yet.
+Stage 1 delivers reviewed position/fund imports, dated owned valuation, reconciled one-level ETF exposure, issuer rollups, frozen reports, drill-down and CSV export. It works locally with PostgreSQL 16 and no provider keys. Start with [`docs/stage-1-release.md`](docs/stage-1-release.md) for the workflow, verification and limits; requirements and future work remain in [`docs/README.md`](docs/README.md). Production Aurora DSQL remains unverified.
 
 ## Requirements
 
@@ -32,7 +32,7 @@ curl http://127.0.0.1:8000/health/ready
 
 `/health` checks the API process. `/health/ready` runs `SELECT 1` against the configured database backend and returns HTTP 503 if it cannot connect. Compose publishes PostgreSQL and the API only on `127.0.0.1`; the API binds inside its container so Compose can reach it. The sample credentials are for isolated local development only.
 
-The first bootstrap downloads the locked Node/Python dependencies and PostgreSQL image. Once installed and the synthetic catalog is seeded, the app runtime makes no market-data, bank, model, or other provider calls and works offline. Ordinary API startup and migrations create an empty security catalog; the manual-position screen needs the explicit synthetic demo seed below, or user-added catalog data, before a security can be selected.
+The first bootstrap downloads the locked Node/Python dependencies and PostgreSQL image. Once installed and the synthetic catalog is seeded, the app runtime makes no market-data, bank, model, or other provider calls and works offline. Ordinary startup and migrations create an empty catalog. Add securities and reviewed issuer links using the Local security and issuer catalog form, or explicitly seed the synthetic demo below.
 
 Generate the exported FastAPI schema and TypeScript types after changing routes with `pnpm api:generate`. `pnpm check` regenerates both into a temporary directory and fails if either committed contract is stale.
 
@@ -67,7 +67,7 @@ pnpm check
 
 `pnpm check` first regenerates OpenAPI and TypeScript contracts into a temporary directory and fails if the committed generated files differ. It then runs ESLint and Ruff, Prettier and Ruff formatting checks, strict TypeScript and mypy checks, Vitest and pytest, then the production web build. Run `pnpm api:generate` to refresh contracts. The ordinary tests use synthetic data; PostgreSQL schema tests run when `TEST_DATABASE_URL` is set. GitHub Actions provides a disposable PostgreSQL 16 service for every quality run.
 
-The API tests cover health/readiness, account and manual-position routes, stale two-client writes after refetch, immutable replacement history, arithmetic overflow/rounding/rollback, scoped identifier and alias identities, generated OpenAPI freshness, explicit backend and DSQL role validation, engine TLS/pool configuration, schema-drift rejection, migration-plan resumption, and capped OCC retry. Ordinary GitHub Actions CI provisions PostgreSQL 16 and runs fresh install plus populated `0001 → head` upgrade/manual replacement checks. A real DSQL suite remains gated on `RUN_DSQL_INTEGRATION=1` and `DSQL_TEST_CLUSTER=disposable`.
+The API tests cover health/readiness, account and manual-position routes, stale two-client writes after refetch, immutable replacement history, arithmetic overflow/rounding/rollback, scoped identifier and alias identities, generated OpenAPI freshness, explicit backend and DSQL role validation, engine TLS/pool configuration, schema-drift rejection, migration-plan resumption, and capped OCC retry. Ordinary GitHub Actions CI provisions PostgreSQL 16 and runs fresh install plus populated `0002 → head` upgrade/manual replacement checks. A real DSQL suite remains gated on `RUN_DSQL_INTEGRATION=1` and `DSQL_TEST_CLUSTER=disposable`.
 
 On 2026-10-02, the Stage 0 PostgreSQL 16 runtime suite passed locally against PostgreSQL 16.15: 50 passed and 3 DSQL tests skipped. It exercised a fresh install, a populated `0002 → head` upgrade, preserved snapshot history, subsequent replacement and rollback. Run that gate against a disposable PostgreSQL 16 database with `TEST_DATABASE_URL=postgresql+psycopg://... uv run --directory services/api --locked pytest -q`. The S0.6 SQLite-backed browser/API transcript is in [`docs/stage-0-demo-transcript.md`](docs/stage-0-demo-transcript.md); SQLite is not PostgreSQL or DSQL evidence. Live DSQL remains unverified.
 
