@@ -1,6 +1,6 @@
 # Personal Finance & Portfolio Intelligence — Docs
 
-**Status:** Stage 0 local exit gate complete; Stage 1 local MVP complete; Stage 2 in progress; live DSQL unverified
+**Status:** Stage 0 local exit gate complete; Stage 1 local MVP complete; Stage 2 in progress; Stage 3 in progress; live DSQL unverified
 **Last reviewed:** 2026-10-02
 **Databases:** PostgreSQL 16 local/personal; Aurora DSQL required for production  
 **Deployment:** local indefinitely; AWS deployment optional until ready, with production targeting DSQL  
@@ -34,6 +34,7 @@ The plans below expand the roadmap into execution backlogs using the phase-plan 
 | [`stage-1-implementation-plan.md`](stage-1-implementation-plan.md) | 1.1–1.3: reviewed position/fund CSVs, valuation, reconciled exposure and export; first local MVP |
 | [`stage-2-implementation-plan.md`](stage-2-implementation-plan.md) | 2.1–2.6: private statement review, OCR/local fallback, transactions, finance, optional sync and durable jobs |
 | [`stage-3-implementation-plan.md`](stage-3-implementation-plan.md) | 3.1–3.5: history/returns, supplied tax lots, hypothetical sale/exposure and planning comparisons |
+| [`stage-3-release.md`](stage-3-release.md) | Actual Stage 3 package status, methodology choices, commands and verification limits |
 | [`stage-4-implementation-plan.md`](stage-4-implementation-plan.md) | 4.1–4.6: optional authenticated AWS/DSQL deployment, cost gates, real-cluster tests and portable recovery |
 | [`stage-5-implementation-plan.md`](stage-5-implementation-plan.md) | 5.1–5.6: public filings/facts, portfolio/thesis context, shared personal-AI retrieval and cited research and optional monitoring |
 
@@ -75,7 +76,7 @@ Stage 1 was reviewed against Stage 0 commit `81b220e` on 2026-10-02. Its plan no
 
 ## Current implementation and next task
 
-Stage 1.1–1.3 is delivered at `f75e101`, `9053d1f`, and `0874f21`: reviewed CSV positions, generic/iShares CSV and SPDR XLSX fund compositions, dated manual/cached quotes, one-level exposure/issuer views and frozen report export. Stage 2 implementation is underway: the first slice privately stores text-layer brokerage PDFs and routes extracted rows through Stage 1's reviewed position import. The rest of Stage 2 remains in progress or gated; the exact delivered scope is recorded in [Stage 2 release notes](stage-2-release.md). The disabled `PersonalAIClient` seam remains inactive; no live upstream service calls occur. Historical checks below remain historical; see the Stage 1 release for its full-suite evidence.
+Stage 1.1–1.3 is delivered at `f75e101`, `9053d1f`, and `0874f21`: reviewed CSV positions, generic/iShares CSV and SPDR XLSX fund compositions, dated manual/cached quotes, one-level exposure/issuer views and frozen report export. Stage 2 implementation is underway: private text-layer brokerage PDF preview, partial reviewed transaction and finance summaries, and local jobs are present; its remaining acceptance work is recorded in [Stage 2 release notes](stage-2-release.md). Stage 3 has started with the S3.1 historical event/performance slice; its current limits are recorded in [Stage 3 release status](stage-3-release.md). The disabled `PersonalAIClient` seam remains inactive; no live upstream service calls occur. Historical checks below remain historical; see the Stage 1 release for its full-suite evidence.
 
 Stage 0.1–0.6 code is present, including the local stack, SQLAlchemy/Alembic schema, DSQL boundary, manual account/position workflow, and explicit synthetic demo seeding. On 2026-10-02, `pnpm check` passed (8 Vitest, 48 pytest passed, 5 PostgreSQL/DSQL integration tests skipped, and a successful web build). The actual PostgreSQL 16.15 suite also passed (50 pytest passed, including fresh migration and populated `0002 → head` upgrade, replacement/history/rollback; 3 DSQL tests skipped). Those runs exposed and fixed the Alembic version-ledger width for the long 0003 revision ID. Stage 0's local exit gate is complete. The SQLite-backed browser transcript is in [`stage-0-demo-transcript.md`](stage-0-demo-transcript.md); SQLite is not PostgreSQL evidence. Live DSQL remains unverified and production-blocked.
 

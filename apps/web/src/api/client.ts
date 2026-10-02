@@ -572,3 +572,63 @@ export async function fetchBreakdown(
     }),
   )
 }
+
+export async function createInvestmentEvent(
+  input: components['schemas']['InvestmentEventCreate'],
+) {
+  return unwrap(await api.POST('/v1/portfolio/history/events', { body: input }))
+}
+
+export async function fetchPortfolioHistory(input: {
+  accountId: string
+  startDate: string
+  endDate: string
+}) {
+  return unwrap(
+    await api.GET('/v1/portfolio/history', {
+      params: {
+        query: {
+          account_id: input.accountId,
+          start_date: input.startDate,
+          end_date: input.endDate,
+        },
+      },
+    }),
+  )
+}
+
+export async function fetchPortfolioPerformance(input: {
+  accountId: string
+  startDate: string
+  endDate: string
+}) {
+  return unwrap(
+    await api.GET('/v1/portfolio/performance', {
+      params: {
+        query: {
+          account_id: input.accountId,
+          start_date: input.startDate,
+          end_date: input.endDate,
+        },
+      },
+    }),
+  )
+}
+
+export async function fetchHistoryReconciliation(input: {
+  accountId: string
+  startDate: string
+  endDate: string
+}) {
+  return unwrap(
+    await api.GET('/v1/portfolio/history/reconcile', {
+      params: {
+        query: {
+          account_id: input.accountId,
+          start_date: input.startDate,
+          end_date: input.endDate,
+        },
+      },
+    }),
+  )
+}

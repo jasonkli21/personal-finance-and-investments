@@ -273,6 +273,48 @@ class PositionSnapshotLine(Base):
     )
 
 
+class InvestmentEvent(TimestampMixin, Base):
+    """Source-backed investment event; never inferred from snapshot differences."""
+
+    __tablename__ = "investment_events"
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_investment_event_idempotency"),
+        Index("ix_investment_events_account_date", "account_id", "effective_date"),
+        Index("ix_investment_events_security_date", "security_id", "effective_date"),
+        CheckConstraint(
+            "event_type IN ('buy', 'sell', 'dividend', 'fee', 'deposit', "
+            "'withdrawal', 'transfer_in', 'transfer_out', 'split', 'adjustment', "
+            "'other')",
+            name="ck_investment_event_type",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    account_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("accounts.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    security_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("securities.id", ondelete="RESTRICT")
+    )
+    event_type: Mapped[str] = mapped_column(String(24), nullable=False)
+    effective_date: Mapped[date] = mapped_column(Date, nullable=False)
+    quantity_delta: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
+    cash_amount: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    is_external_flow: Mapped[bool] = mapped_column(nullable=False, default=False)
+    source_label: Mapped[str] = mapped_column(String(100), nullable=False)
+    source_event_id: Mapped[str | None] = mapped_column(String(200))
+    evidence_ref: Mapped[str | None] = mapped_column(String(500))
+    quality_status: Mapped[str] = mapped_column(String(24), nullable=False)
+    review_status: Mapped[str] = mapped_column(String(24), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    raw_values: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), nullable=False, default=dict
+    )
+
+
 class PrivateFile(TimestampMixin, Base):
     """A private local file and its content identity; bytes stay outside SQL."""
 

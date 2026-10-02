@@ -144,6 +144,44 @@ def test_core_schema_migration_and_round_trip() -> None:
         assert row.quantity == Decimal("1.2500000000")
         assert row.fixture == "true"
 
+        event_id = uuid4()
+        connection.execute(
+            text(
+                "INSERT INTO investment_events "
+                "(id, account_id, security_id, event_type, effective_date, "
+                "quantity_delta, cash_amount, currency, is_external_flow, "
+                "source_label, source_event_id, evidence_ref, quality_status, "
+                "review_status, idempotency_key, raw_values, created_at, updated_at) "
+                "VALUES (:id, :account_id, :security_id, 'buy', :effective_date, "
+                ":quantity_delta, :cash_amount, 'USD', false, 'fixture', 'buy-1', "
+                "'synthetic statement / page 1', 'reported', 'reviewed', :key, "
+                'CAST(\'{"raw_quantity":"0.25"}\' AS jsonb), :now, :now)'
+            ),
+            {
+                "id": event_id,
+                "account_id": account_id,
+                "security_id": security_id,
+                "effective_date": date(2026, 1, 2),
+                "quantity_delta": Decimal("0.2500000000"),
+                "cash_amount": Decimal("-24.6900000000"),
+                "key": f"synthetic-event-{event_id}",
+                "now": now,
+            },
+        )
+        event = connection.execute(
+            text(
+                "SELECT event_type, quantity_delta, cash_amount, is_external_flow, "
+                "raw_values ->> 'raw_quantity' AS raw_quantity "
+                "FROM investment_events WHERE id = :id"
+            ),
+            {"id": event_id},
+        ).one()
+        assert event.event_type == "buy"
+        assert event.quantity_delta == Decimal("0.2500000000")
+        assert event.cash_amount == Decimal("-24.6900000000")
+        assert event.is_external_flow is False
+        assert event.raw_quantity == "0.25"
+
         snapshot_revision = connection.execute(
             text(
                 "SELECT a.current_position_revision, p.revision "

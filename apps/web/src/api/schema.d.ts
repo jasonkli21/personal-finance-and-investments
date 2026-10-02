@@ -468,6 +468,57 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/portfolio/history': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Portfolio History */
+    get: operations['get_portfolio_history_v1_portfolio_history_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/portfolio/history/events': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Post Investment Event */
+    post: operations['post_investment_event_v1_portfolio_history_events_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/portfolio/history/reconcile': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get History Reconciliation */
+    get: operations['get_history_reconciliation_v1_portfolio_history_reconcile_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/portfolio/owned/{account_id}': {
     parameters: {
       query?: never
@@ -477,6 +528,23 @@ export interface paths {
     }
     /** Get Owned Portfolio */
     get: operations['get_owned_portfolio_v1_portfolio_owned__account_id__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/portfolio/performance': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Portfolio Performance */
+    get: operations['get_portfolio_performance_v1_portfolio_performance_get']
     put?: never
     post?: never
     delete?: never
@@ -1149,6 +1217,58 @@ export interface components {
       /** Status */
       status: string
     }
+    /** HistoryReconciliationRead */
+    HistoryReconciliationRead: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Differences */
+      differences: components['schemas']['ReconciliationDifference'][]
+      /**
+       * End Date
+       * Format: date
+       */
+      end_date: string
+      /** Gaps */
+      gaps: string[]
+      /** Methodology */
+      methodology?: string | null
+      /**
+       * Start Date
+       * Format: date
+       */
+      start_date: string
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'matched' | 'discrepancy' | 'unavailable'
+    }
+    /** HistorySnapshotRead */
+    HistorySnapshotRead: {
+      /** Accepted At */
+      accepted_at: string | null
+      /**
+       * Effective Date
+       * Format: date
+       */
+      effective_date: string
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Line Count */
+      line_count: number
+      /** Revision */
+      revision: number
+      /** Source */
+      source: string
+      /** Status */
+      status: string
+    }
     /** ImportAction */
     ImportAction: {
       /** Expected Review Revision */
@@ -1283,6 +1403,108 @@ export interface components {
       security_id: string | null
       /** Security Label */
       security_label: string | null
+    }
+    /** InvestmentEventCreate */
+    InvestmentEventCreate: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Cash Amount */
+      cash_amount?: string | null
+      /** Currency */
+      currency: string
+      /**
+       * Effective Date
+       * Format: date
+       */
+      effective_date: string
+      /**
+       * Event Type
+       * @enum {string}
+       */
+      event_type:
+        | 'buy'
+        | 'sell'
+        | 'dividend'
+        | 'fee'
+        | 'deposit'
+        | 'withdrawal'
+        | 'transfer_in'
+        | 'transfer_out'
+        | 'split'
+        | 'adjustment'
+        | 'other'
+      /** Evidence Ref */
+      evidence_ref?: string | null
+      /** Idempotency Key */
+      idempotency_key: string
+      /**
+       * Quality Status
+       * @default reported
+       * @enum {string}
+       */
+      quality_status: 'reported' | 'manual' | 'estimated' | 'unknown'
+      /** Quantity Delta */
+      quantity_delta?: string | null
+      /** Raw Values */
+      raw_values?: {
+        [key: string]: unknown
+      }
+      /** Security Id */
+      security_id?: string | null
+      /** Source Event Id */
+      source_event_id?: string | null
+      /** Source Label */
+      source_label: string
+    }
+    /** InvestmentEventRead */
+    InvestmentEventRead: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Cash Amount */
+      cash_amount: string | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Currency */
+      currency: string
+      /**
+       * Effective Date
+       * Format: date
+       */
+      effective_date: string
+      /** Event Type */
+      event_type: string
+      /** Evidence Ref */
+      evidence_ref: string | null
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Idempotency Key */
+      idempotency_key: string
+      /** Is External Flow */
+      is_external_flow: boolean
+      /** Quality Status */
+      quality_status: string
+      /** Quantity Delta */
+      quantity_delta: string | null
+      /** Review Status */
+      review_status: string
+      /** Security Id */
+      security_id: string | null
+      /** Source Event Id */
+      source_event_id: string | null
+      /** Source Label */
+      source_label: string
     }
     /** IssuerAssignment */
     IssuerAssignment: {
@@ -1509,6 +1731,77 @@ export interface components {
       /** Value Currency */
       value_currency: string | null
     }
+    /** PortfolioHistoryRead */
+    PortfolioHistoryRead: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /**
+       * End Date
+       * Format: date
+       */
+      end_date: string
+      /** Events */
+      events: components['schemas']['InvestmentEventRead'][]
+      /** Methodology */
+      methodology: string
+      /** Snapshots */
+      snapshots: components['schemas']['HistorySnapshotRead'][]
+      /**
+       * Start Date
+       * Format: date
+       */
+      start_date: string
+    }
+    /** PortfolioPerformanceRead */
+    PortfolioPerformanceRead: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Beginning Value */
+      beginning_value: string | null
+      /** Currency */
+      currency: string
+      /** Diagnostics */
+      diagnostics: string[]
+      /**
+       * End Date
+       * Format: date
+       */
+      end_date: string
+      /** Ending Value */
+      ending_value: string | null
+      /** External Flow Count */
+      external_flow_count: number
+      /** Methodology Version */
+      methodology_version: string
+      /** Money Weighted Return */
+      money_weighted_return: string | null
+      /** Money Weighted Status */
+      money_weighted_status: string
+      /** Observation Count */
+      observation_count: number
+      /** Observed Dates */
+      observed_dates: string[]
+      /**
+       * Start Date
+       * Format: date
+       */
+      start_date: string
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'available' | 'unavailable'
+      /** Time Weighted Method */
+      time_weighted_method: string
+      /** Time Weighted Return */
+      time_weighted_return: string | null
+    }
     /** PositionInput */
     PositionInput: {
       /** Currency */
@@ -1632,6 +1925,22 @@ export interface components {
       security_id: string
       /** Source */
       source: string
+    }
+    /** ReconciliationDifference */
+    ReconciliationDifference: {
+      /** Difference */
+      difference: string
+      /** Expected Quantity */
+      expected_quantity: string
+      /**
+       * Security Id
+       * Format: uuid
+       */
+      security_id: string
+      /** Snapshot Quantity */
+      snapshot_quantity: string
+      /** Ticker */
+      ticker: string | null
     }
     /** ReportContribution */
     ReportContribution: {
@@ -3862,6 +4171,105 @@ export interface operations {
       }
     }
   }
+  get_portfolio_history_v1_portfolio_history_get: {
+    parameters: {
+      query: {
+        account_id: string
+        start_date: string
+        end_date: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PortfolioHistoryRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  post_investment_event_v1_portfolio_history_events_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['InvestmentEventCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['InvestmentEventRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_history_reconciliation_v1_portfolio_history_reconcile_get: {
+    parameters: {
+      query: {
+        account_id: string
+        start_date: string
+        end_date: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HistoryReconciliationRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   get_owned_portfolio_v1_portfolio_owned__account_id__get: {
     parameters: {
       query?: {
@@ -3918,6 +4326,39 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  get_portfolio_performance_v1_portfolio_performance_get: {
+    parameters: {
+      query: {
+        account_id: string
+        start_date: string
+        end_date: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PortfolioPerformanceRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
         }
       }
     }

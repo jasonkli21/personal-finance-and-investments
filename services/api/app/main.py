@@ -78,8 +78,10 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
 
     app.include_router(fund_router)
     from app.api.report_routes import router as report_router
+    from app.api.stage3_history_routes import router as stage3_history_router
 
     app.include_router(report_router)
+    app.include_router(stage3_history_router)
 
     @app.exception_handler(SQLAlchemyError)
     def database_error_handler(

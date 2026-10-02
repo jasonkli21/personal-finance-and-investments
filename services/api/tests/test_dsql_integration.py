@@ -42,7 +42,7 @@ def _open_engines() -> tuple[Engine, Engine]:
 
 def test_real_dsql_migration_and_synthetic_persistence() -> None:
     migration_engine, app_engine = _open_engines()
-    issuer_id, account_id, security_id, quote_id = [uuid4() for _ in range(4)]
+    issuer_id, account_id, security_id, quote_id, event_id = [uuid4() for _ in range(5)]
     now = datetime(2026, 10, 1, tzinfo=UTC)
     schema_ready = False
     try:
@@ -107,6 +107,43 @@ def test_real_dsql_migration_and_synthetic_persistence() -> None:
             assert saved.price == Decimal("123.4567890123")
             assert saved.kind == "synthetic"
 
+            connection.execute(
+                text(
+                    "INSERT INTO investment_events "
+                    "(id, account_id, security_id, event_type, effective_date, "
+                    "quantity_delta, cash_amount, currency, is_external_flow, "
+                    "source_label, source_event_id, evidence_ref, quality_status, "
+                    "review_status, idempotency_key, raw_values, created_at, "
+                    "updated_at) "
+                    "VALUES (:id, :account, :security, 'buy', :date, :quantity, "
+                    ":cash, 'USD', false, 'fixture', 'dsql-buy-1', 'page 1', "
+                    "'reported', 'reviewed', :key, CAST(:raw AS jsonb), :now, :now)"
+                ),
+                {
+                    "id": event_id,
+                    "account": account_id,
+                    "security": security_id,
+                    "date": date(2026, 1, 2),
+                    "quantity": Decimal("0.25"),
+                    "cash": Decimal("-30.86"),
+                    "key": f"synthetic-event-{event_id}",
+                    "raw": '{"quantity":"0.25"}',
+                    "now": now,
+                },
+            )
+            saved_event = connection.execute(
+                text(
+                    "SELECT quantity_delta, cash_amount, is_external_flow, "
+                    "raw_values ->> 'quantity' AS quantity FROM investment_events "
+                    "WHERE id = :id"
+                ),
+                {"id": event_id},
+            ).one()
+            assert saved_event.quantity_delta == Decimal("0.2500000000")
+            assert saved_event.cash_amount == Decimal("-30.8600000000")
+            assert saved_event.is_external_flow is False
+            assert saved_event.quantity == "0.25"
+
         with pytest.raises(SQLAlchemyError):
             with app_engine.begin() as connection:
                 connection.execute(
@@ -120,6 +157,10 @@ def test_real_dsql_migration_and_synthetic_persistence() -> None:
     finally:
         if schema_ready:
             with app_engine.begin() as connection:
+                connection.execute(
+                    text("DELETE FROM investment_events WHERE id = :id"),
+                    {"id": event_id},
+                )
                 connection.execute(
                     text("DELETE FROM quotes WHERE id = :id"), {"id": quote_id}
                 )

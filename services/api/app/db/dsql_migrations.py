@@ -1796,6 +1796,62 @@ TABLE_CONSTRAINTS["jobs"] = (
         ("foreignkey(input_file_id)referencesprivate_files(id)ondelete restrict",),
     ),
 )
+TABLE_COLUMNS["investment_events"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("account_id", "uuid", "NO", None, None, None),
+    ("security_id", "uuid", "YES", None, None, None),
+    ("event_type", "character varying", "NO", 24, None, None),
+    ("effective_date", "date", "NO", None, None, None),
+    ("quantity_delta", "numeric", "YES", None, 28, 10),
+    ("cash_amount", "numeric", "YES", None, 28, 10),
+    ("currency", "character varying", "NO", 3, None, None),
+    ("is_external_flow", "boolean", "NO", None, None, None),
+    ("source_label", "character varying", "NO", 100, None, None),
+    ("source_event_id", "character varying", "YES", 200, None, None),
+    ("evidence_ref", "character varying", "YES", 500, None, None),
+    ("quality_status", "character varying", "NO", 24, None, None),
+    ("review_status", "character varying", "NO", 24, None, None),
+    ("idempotency_key", "character varying", "NO", 128, None, None),
+    ("raw_values", "jsonb", "NO", None, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+    ("updated_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["investment_events"] = (
+    ("investment_events_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    (
+        "ck_investment_event_type",
+        "CHECK",
+        (
+            "event_type",
+            "buy",
+            "sell",
+            "dividend",
+            "fee",
+            "deposit",
+            "withdrawal",
+            "transfer_in",
+            "transfer_out",
+            "split",
+            "adjustment",
+            "other",
+        ),
+    ),
+    (
+        "investment_events_account_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(account_id)referencesaccounts(id)ondelete restrict",),
+    ),
+    (
+        "investment_events_security_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(security_id)referencessecurities(id)ondelete restrict",),
+    ),
+    (
+        "uq_investment_event_idempotency",
+        "UNIQUE",
+        ("unique(idempotency_key)",),
+    ),
+)
 
 STAGE2_TRANSACTIONS = DsqlMigration(
     "0008_stage2_transactions",
@@ -2215,6 +2271,69 @@ DSQL_MIGRATIONS = (
                 "SELECT true",
                 expected_index_table="jobs",
                 expected_index_columns=("status", "run_after", "created_at"),
+            ),
+        ),
+    ),
+    DsqlMigration(
+        "0012_stage3_investment_events",
+        (
+            DsqlMigrationStep(
+                "create_investment_events",
+                "table",
+                """CREATE TABLE investment_events (
+                    id uuid NOT NULL,
+                    account_id uuid NOT NULL,
+                    security_id uuid,
+                    event_type varchar(24) NOT NULL,
+                    effective_date date NOT NULL,
+                    quantity_delta numeric(28, 10),
+                    cash_amount numeric(28, 10),
+                    currency varchar(3) NOT NULL,
+                    is_external_flow boolean NOT NULL,
+                    source_label varchar(100) NOT NULL,
+                    source_event_id varchar(200),
+                    evidence_ref varchar(500),
+                    quality_status varchar(24) NOT NULL,
+                    review_status varchar(24) NOT NULL,
+                    idempotency_key varchar(128) NOT NULL,
+                    raw_values jsonb NOT NULL,
+                    created_at timestamptz NOT NULL,
+                    updated_at timestamptz NOT NULL,
+                    CONSTRAINT investment_events_pkey PRIMARY KEY (id),
+                    CONSTRAINT ck_investment_event_type CHECK
+                        (event_type IN ('buy', 'sell', 'dividend', 'fee', 'deposit',
+                        'withdrawal', 'transfer_in', 'transfer_out', 'split',
+                        'adjustment', 'other')),
+                    CONSTRAINT investment_events_account_id_fkey FOREIGN KEY
+                        (account_id) REFERENCES accounts(id) ON DELETE RESTRICT,
+                    CONSTRAINT investment_events_security_id_fkey FOREIGN KEY
+                        (security_id) REFERENCES securities(id) ON DELETE RESTRICT,
+                    CONSTRAINT uq_investment_event_idempotency
+                        UNIQUE (idempotency_key)
+                )""",
+                "investment_events",
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = current_schema() AND table_name = :object_name)",
+            ),
+            DsqlMigrationStep(
+                "index_investment_events_account_date",
+                "index",
+                "CREATE INDEX ASYNC ix_investment_events_account_date "
+                "ON investment_events (account_id, effective_date)",
+                "ix_investment_events_account_date",
+                "SELECT true",
+                expected_index_table="investment_events",
+                expected_index_columns=("account_id", "effective_date"),
+            ),
+            DsqlMigrationStep(
+                "index_investment_events_security_date",
+                "index",
+                "CREATE INDEX ASYNC ix_investment_events_security_date "
+                "ON investment_events (security_id, effective_date)",
+                "ix_investment_events_security_date",
+                "SELECT true",
+                expected_index_table="investment_events",
+                expected_index_columns=("security_id", "effective_date"),
             ),
         ),
     ),
