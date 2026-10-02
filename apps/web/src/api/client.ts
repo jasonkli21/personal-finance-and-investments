@@ -1,5 +1,5 @@
 import createClient from 'openapi-fetch'
-import type { paths } from './schema'
+import type { components, paths } from './schema'
 
 export const api = createClient<paths>({ baseUrl: '/api' })
 
@@ -72,6 +72,129 @@ export async function fetchPositions(accountId: string) {
   return unwrap(
     await api.GET('/v1/accounts/{account_id}/positions', {
       params: { path: { account_id: accountId } },
+    }),
+  )
+}
+
+export async function fetchOwnedPortfolio(accountId: string, asOf?: string) {
+  return unwrap(
+    await api.GET('/v1/portfolio/owned/{account_id}', {
+      params: {
+        path: { account_id: accountId },
+        query: asOf ? { as_of: asOf } : {},
+      },
+    }),
+  )
+}
+
+export async function createIssuer(input: { display_name: string }) {
+  return unwrap(await api.POST('/v1/issuers', { body: input }))
+}
+
+export async function fetchIssuers() {
+  return unwrap(await api.GET('/v1/issuers'))
+}
+
+export async function fetchSecurities() {
+  return unwrap(await api.GET('/v1/securities'))
+}
+
+export async function createSecurity(
+  input: components['schemas']['SecurityCreate'],
+) {
+  return unwrap(await api.POST('/v1/securities', { body: input }))
+}
+
+export async function createManualQuote(
+  input: components['schemas']['QuoteCreate'],
+) {
+  return unwrap(await api.POST('/v1/market-data/quotes', { body: input }))
+}
+
+export async function fetchImport(importId: string) {
+  return unwrap(
+    await api.GET('/v1/imports/{import_id}', {
+      params: { path: { import_id: importId } },
+    }),
+  )
+}
+
+export async function previewPositionImport(input: {
+  accountId: string
+  effectiveDate: string
+  expectedRevision: number
+  sourceLabel: string
+  mapping: Record<string, string>
+  file: File
+  replaceExisting?: boolean
+}) {
+  const response = await fetch('/api/v1/imports/positions/preview', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'text/csv',
+      'X-Account-Id': input.accountId,
+      'X-Effective-Date': input.effectiveDate,
+      'X-Expected-Account-Revision': String(input.expectedRevision),
+      'X-Source-Label': input.sourceLabel,
+      'X-Column-Mapping': JSON.stringify(input.mapping),
+      'X-File-Name': input.file.name,
+      'X-Replace-Existing': String(input.replaceExisting ?? false),
+      'Idempotency-Key': crypto.randomUUID(),
+    },
+    body: input.file,
+  })
+  const body = (await response.json()) as
+    components['schemas']['ImportCreated'] | { detail?: string }
+  if (!response.ok) {
+    throw new ApiError(
+      response.status,
+      'detail' in body
+        ? (body.detail ?? 'CSV review could not be started.')
+        : 'CSV review could not be started.',
+    )
+  }
+  return body as components['schemas']['ImportCreated']
+}
+
+export async function correctImportRow(
+  importId: string,
+  rowId: string,
+  input: components['schemas']['ImportRowCorrection'],
+) {
+  return unwrap(
+    await api.PATCH('/v1/imports/{import_id}/rows/{row_id}', {
+      params: { path: { import_id: importId, row_id: rowId } },
+      body: input,
+    }),
+  )
+}
+
+export async function cancelImport(
+  importId: string,
+  expectedReviewRevision: number,
+) {
+  return unwrap(
+    await api.POST('/v1/imports/{import_id}/cancel', {
+      params: { path: { import_id: importId } },
+      body: {
+        expected_review_revision: expectedReviewRevision,
+        reason: 'Cancelled in local review',
+      },
+    }),
+  )
+}
+
+export async function publishImport(
+  importId: string,
+  expectedReviewRevision: number,
+) {
+  return unwrap(
+    await api.POST('/v1/imports/{import_id}/publish', {
+      params: { path: { import_id: importId } },
+      body: {
+        expected_review_revision: expectedReviewRevision,
+        reason: 'Published after local review',
+      },
     }),
   )
 }

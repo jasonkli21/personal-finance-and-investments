@@ -12,6 +12,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     Text,
@@ -240,4 +241,206 @@ class PositionSnapshotLine(Base):
     source: Mapped[str] = mapped_column(String(100), nullable=False)
     quality_status: Mapped[str] = mapped_column(
         String(24), nullable=False, default="reported"
+    )
+
+
+class PrivateFile(TimestampMixin, Base):
+    """A private local file and its content identity; bytes stay outside SQL."""
+
+    __tablename__ = "private_files"
+    __table_args__ = (
+        UniqueConstraint("content_hash", name="uq_private_file_content_hash"),
+        UniqueConstraint("storage_key", name="uq_private_file_storage_key"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    storage_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    original_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    byte_size: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class ImportAttempt(TimestampMixin, Base):
+    """Reviewed position/fund source attempt with immutable source identity."""
+
+    __tablename__ = "imports"
+    __table_args__ = (
+        CheckConstraint(
+            "(kind = 'positions' AND account_id IS NOT NULL AND "
+            "fund_security_id IS NULL) OR "
+            "(kind = 'fund' AND account_id IS NULL AND "
+            "fund_security_id IS NOT NULL)",
+            name="ck_import_scope",
+        ),
+        UniqueConstraint("idempotency_key", name="uq_import_idempotency_key"),
+        Index("ix_imports_identity", "identity_hash", "interpretation_hash"),
+        Index("ix_imports_file", "file_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    file_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("private_files.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    account_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("accounts.id", ondelete="RESTRICT")
+    )
+    fund_security_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("securities.id", ondelete="RESTRICT")
+    )
+    effective_date: Mapped[date] = mapped_column(Date, nullable=False)
+    source_label: Mapped[str] = mapped_column(String(100), nullable=False)
+    parser_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    column_mapping: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), nullable=False, default=dict
+    )
+    file_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    identity_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    interpretation_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    payload_hash: Mapped[str | None] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    review_revision: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
+    expected_account_revision: Mapped[int | None] = mapped_column(Integer)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    batch_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    duplicate_of_import_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("imports.id", ondelete="SET NULL")
+    )
+    staging_snapshot_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("position_snapshots.id", ondelete="SET NULL"),
+    )
+    published_snapshot_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("position_snapshots.id", ondelete="SET NULL"),
+    )
+    diagnostics: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), nullable=False, default=dict
+    )
+
+
+class ImportBatch(TimestampMixin, Base):
+    """Idempotency marker for one bounded review or publication batch."""
+
+    __tablename__ = "import_batches"
+    __table_args__ = (
+        UniqueConstraint(
+            "import_id",
+            "purpose",
+            "review_revision",
+            "ordinal",
+            name="uq_import_batch_identity",
+        ),
+        Index("ix_import_batches_import", "import_id", "purpose"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    import_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("imports.id", ondelete="CASCADE"), nullable=False
+    )
+    purpose: Mapped[str] = mapped_column(String(32), nullable=False)
+    review_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    ordinal: Mapped[int] = mapped_column(Integer, nullable=False)
+    payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+
+
+class ImportRow(Base):
+    """Bounded raw evidence plus its explicitly reviewed interpretation."""
+
+    __tablename__ = "import_rows"
+    __table_args__ = (
+        UniqueConstraint("import_id", "row_number", name="uq_import_row_number"),
+        Index("ix_import_rows_import_status", "import_id", "row_status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    import_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("imports.id", ondelete="CASCADE"), nullable=False
+    )
+    row_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    raw_payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), nullable=False, default=dict
+    )
+    raw_identifier: Mapped[str | None] = mapped_column(String(2000))
+    raw_name: Mapped[str | None] = mapped_column(String(2000))
+    raw_asset_type: Mapped[str | None] = mapped_column(String(2000))
+    raw_quantity: Mapped[str | None] = mapped_column(String(2000))
+    raw_price: Mapped[str | None] = mapped_column(String(2000))
+    raw_currency: Mapped[str | None] = mapped_column(String(200))
+    raw_weight_value: Mapped[str | None] = mapped_column(String(100))
+    raw_weight_unit: Mapped[str | None] = mapped_column(String(24))
+    security_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("securities.id", ondelete="RESTRICT")
+    )
+    normalized_quantity: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
+    normalized_price: Mapped[Decimal | None] = mapped_column(Numeric(24, 10))
+    normalized_weight: Mapped[Decimal | None] = mapped_column(Numeric(18, 10))
+    currency: Mapped[str | None] = mapped_column(String(3))
+    row_status: Mapped[str] = mapped_column(String(24), nullable=False)
+    excluded: Mapped[bool] = mapped_column(nullable=False, default=False)
+    correction_reason: Mapped[str | None] = mapped_column(Text)
+    diagnostics: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), nullable=False, default=dict
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
+    )
+
+
+class ImportReviewEvent(Base):
+    """Append-only audit event for a correction or explicit acknowledgement."""
+
+    __tablename__ = "import_review_events"
+    __table_args__ = (
+        UniqueConstraint(
+            "import_id", "review_revision", name="uq_import_review_revision"
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    import_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("imports.id", ondelete="CASCADE"), nullable=False
+    )
+    review_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    action: Mapped[str] = mapped_column(String(32), nullable=False)
+    reason: Mapped[str] = mapped_column(String(500), nullable=False)
+    change_payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), nullable=False, default=dict
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class IssuerMappingEvent(Base):
+    """Reviewed history for a security-to-issuer mapping change."""
+
+    __tablename__ = "security_issuer_mapping_events"
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    security_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("securities.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    previous_issuer_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("issuers.id", ondelete="SET NULL")
+    )
+    new_issuer_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("issuers.id", ondelete="SET NULL")
+    )
+    reason: Mapped[str] = mapped_column(String(500), nullable=False)
+    changed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
     )

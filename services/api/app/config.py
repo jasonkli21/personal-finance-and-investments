@@ -35,6 +35,9 @@ class Settings:
     database_max_overflow: int
     database_pool_recycle_seconds: int
     database_connect_timeout_seconds: int
+    private_file_dir: str
+    max_import_file_bytes: int
+    max_import_rows: int
 
 
 def load_settings() -> Settings:
@@ -122,5 +125,12 @@ def load_settings() -> Settings:
         ),
         database_connect_timeout_seconds=_int_setting(
             "DATABASE_CONNECT_TIMEOUT_SECONDS", 3, minimum=1, maximum=30
+        ),
+        private_file_dir=environ.get("PRIVATE_FILE_DIR", "./.private"),
+        max_import_file_bytes=_int_setting(
+            "MAX_IMPORT_FILE_BYTES", 5_000_000, minimum=1024, maximum=20_000_000
+        ),
+        max_import_rows=_int_setting(
+            "MAX_IMPORT_ROWS", 5000, minimum=1, maximum=20_000
         ),
     )

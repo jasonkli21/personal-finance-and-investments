@@ -38,6 +38,9 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
     )
     app.state.database_engine = database_engine
     app.state.session_factory = session_factory
+    app.state.private_file_root = settings.private_file_dir
+    app.state.max_import_file_bytes = settings.max_import_file_bytes
+    app.state.max_import_rows = settings.max_import_rows
     app.include_router(api_router)
 
     @app.exception_handler(SQLAlchemyError)

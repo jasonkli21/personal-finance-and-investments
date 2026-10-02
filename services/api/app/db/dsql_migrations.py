@@ -138,6 +138,97 @@ TABLE_COLUMNS: dict[str, tuple[ColumnSignature, ...]] = {
         ("source", "character varying", "NO", 100, None, None),
         ("review_status", "character varying", "NO", 24, None, None),
     ),
+    "private_files": (
+        ("id", "uuid", "NO", None, None, None),
+        ("content_hash", "character varying", "NO", 64, None, None),
+        ("storage_key", "character varying", "NO", 100, None, None),
+        ("original_name", "character varying", "NO", 200, None, None),
+        ("content_type", "character varying", "NO", 100, None, None),
+        ("byte_size", "integer", "NO", None, None, None),
+        ("created_at", "timestamp with time zone", "NO", None, None, None),
+        ("updated_at", "timestamp with time zone", "NO", None, None, None),
+    ),
+    "imports": (
+        ("id", "uuid", "NO", None, None, None),
+        ("file_id", "uuid", "NO", None, None, None),
+        ("kind", "character varying", "NO", 20, None, None),
+        ("account_id", "uuid", "YES", None, None, None),
+        ("fund_security_id", "uuid", "YES", None, None, None),
+        ("effective_date", "date", "NO", None, None, None),
+        ("source_label", "character varying", "NO", 100, None, None),
+        ("parser_version", "character varying", "NO", 80, None, None),
+        ("column_mapping", "jsonb", "NO", None, None, None),
+        ("file_sha256", "character varying", "NO", 64, None, None),
+        ("identity_hash", "character varying", "NO", 64, None, None),
+        ("interpretation_hash", "character varying", "NO", 64, None, None),
+        ("payload_hash", "character varying", "YES", 64, None, None),
+        ("status", "character varying", "NO", 24, None, None),
+        ("review_revision", "integer", "NO", None, None, None),
+        ("expected_account_revision", "integer", "YES", None, None, None),
+        ("idempotency_key", "character varying", "NO", 128, None, None),
+        ("row_count", "integer", "NO", None, None, None),
+        ("batch_count", "integer", "NO", None, None, None),
+        ("duplicate_of_import_id", "uuid", "YES", None, None, None),
+        ("staging_snapshot_id", "uuid", "YES", None, None, None),
+        ("published_snapshot_id", "uuid", "YES", None, None, None),
+        ("diagnostics", "jsonb", "NO", None, None, None),
+        ("created_at", "timestamp with time zone", "NO", None, None, None),
+        ("updated_at", "timestamp with time zone", "NO", None, None, None),
+    ),
+    "import_batches": (
+        ("id", "uuid", "NO", None, None, None),
+        ("import_id", "uuid", "NO", None, None, None),
+        ("purpose", "character varying", "NO", 32, None, None),
+        ("review_revision", "integer", "NO", None, None, None),
+        ("ordinal", "integer", "NO", None, None, None),
+        ("payload_hash", "character varying", "NO", 64, None, None),
+        ("row_count", "integer", "NO", None, None, None),
+        ("status", "character varying", "NO", 24, None, None),
+        ("created_at", "timestamp with time zone", "NO", None, None, None),
+        ("updated_at", "timestamp with time zone", "NO", None, None, None),
+    ),
+    "import_rows": (
+        ("id", "uuid", "NO", None, None, None),
+        ("import_id", "uuid", "NO", None, None, None),
+        ("row_number", "integer", "NO", None, None, None),
+        ("raw_payload", "jsonb", "NO", None, None, None),
+        ("raw_identifier", "character varying", "YES", 2000, None, None),
+        ("raw_name", "character varying", "YES", 2000, None, None),
+        ("raw_asset_type", "character varying", "YES", 2000, None, None),
+        ("raw_quantity", "character varying", "YES", 2000, None, None),
+        ("raw_price", "character varying", "YES", 2000, None, None),
+        ("raw_currency", "character varying", "YES", 200, None, None),
+        ("raw_weight_value", "character varying", "YES", 100, None, None),
+        ("raw_weight_unit", "character varying", "YES", 24, None, None),
+        ("security_id", "uuid", "YES", None, None, None),
+        ("normalized_quantity", "numeric", "YES", None, 28, 10),
+        ("normalized_price", "numeric", "YES", None, 24, 10),
+        ("normalized_weight", "numeric", "YES", None, 18, 10),
+        ("currency", "character varying", "YES", 3, None, None),
+        ("row_status", "character varying", "NO", 24, None, None),
+        ("excluded", "boolean", "NO", None, None, None),
+        ("correction_reason", "text", "YES", None, None, None),
+        ("diagnostics", "jsonb", "NO", None, None, None),
+        ("created_at", "timestamp with time zone", "NO", None, None, None),
+        ("updated_at", "timestamp with time zone", "NO", None, None, None),
+    ),
+    "import_review_events": (
+        ("id", "uuid", "NO", None, None, None),
+        ("import_id", "uuid", "NO", None, None, None),
+        ("review_revision", "integer", "NO", None, None, None),
+        ("action", "character varying", "NO", 32, None, None),
+        ("reason", "character varying", "NO", 500, None, None),
+        ("change_payload", "jsonb", "NO", None, None, None),
+        ("created_at", "timestamp with time zone", "NO", None, None, None),
+    ),
+    "security_issuer_mapping_events": (
+        ("id", "uuid", "NO", None, None, None),
+        ("security_id", "uuid", "NO", None, None, None),
+        ("previous_issuer_id", "uuid", "YES", None, None, None),
+        ("new_issuer_id", "uuid", "YES", None, None, None),
+        ("reason", "character varying", "NO", 500, None, None),
+        ("changed_at", "timestamp with time zone", "NO", None, None, None),
+    ),
 }
 
 
@@ -229,6 +320,121 @@ TABLE_CONSTRAINTS: dict[str, tuple[ConstraintSignature, ...]] = {
             "uq_security_identifier_scoped_start",
             "UNIQUE",
             ("unique(namespace,exchange,normalized_value,valid_from)",),
+        ),
+    ),
+    "private_files": (
+        ("private_files_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+        ("uq_private_file_content_hash", "UNIQUE", ("unique(content_hash)",)),
+        ("uq_private_file_storage_key", "UNIQUE", ("unique(storage_key)",)),
+    ),
+    "imports": (
+        ("imports_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+        (
+            "ck_import_scope",
+            "CHECK",
+            ("kind", "account_id", "fund_security_id", "positions", "fund"),
+        ),
+        ("uq_import_idempotency_key", "UNIQUE", ("unique(idempotency_key)",)),
+        (
+            "imports_account_id_fkey",
+            "FOREIGN KEY",
+            ("foreignkey(account_id)referencesaccounts(id)ondelete restrict",),
+        ),
+        (
+            "imports_duplicate_of_import_id_fkey",
+            "FOREIGN KEY",
+            (
+                "foreignkey(duplicate_of_import_id)referencesimports(id)"
+                "ondelete set null",
+            ),
+        ),
+        (
+            "imports_file_id_fkey",
+            "FOREIGN KEY",
+            ("foreignkey(file_id)referencesprivate_files(id)ondelete restrict",),
+        ),
+        (
+            "imports_fund_security_id_fkey",
+            "FOREIGN KEY",
+            ("foreignkey(fund_security_id)referencessecurities(id)ondelete restrict",),
+        ),
+        (
+            "imports_published_snapshot_id_fkey",
+            "FOREIGN KEY",
+            (
+                "foreignkey(published_snapshot_id)referencesposition_snapshots(id)"
+                "ondelete set null",
+            ),
+        ),
+        (
+            "imports_staging_snapshot_id_fkey",
+            "FOREIGN KEY",
+            (
+                "foreignkey(staging_snapshot_id)referencesposition_snapshots(id)"
+                "ondelete set null",
+            ),
+        ),
+    ),
+    "import_batches": (
+        ("import_batches_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+        (
+            "import_batches_import_id_fkey",
+            "FOREIGN KEY",
+            ("foreignkey(import_id)referencesimports(id)ondelete cascade",),
+        ),
+        (
+            "uq_import_batch_identity",
+            "UNIQUE",
+            ("unique(import_id,purpose,review_revision,ordinal)",),
+        ),
+    ),
+    "import_rows": (
+        ("import_rows_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+        (
+            "import_rows_import_id_fkey",
+            "FOREIGN KEY",
+            ("foreignkey(import_id)referencesimports(id)ondelete cascade",),
+        ),
+        (
+            "import_rows_security_id_fkey",
+            "FOREIGN KEY",
+            ("foreignkey(security_id)referencessecurities(id)ondelete restrict",),
+        ),
+        (
+            "uq_import_row_number",
+            "UNIQUE",
+            ("unique(import_id,row_number)",),
+        ),
+    ),
+    "import_review_events": (
+        ("import_review_events_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+        (
+            "import_review_events_import_id_fkey",
+            "FOREIGN KEY",
+            ("foreignkey(import_id)referencesimports(id)ondelete cascade",),
+        ),
+        (
+            "uq_import_review_revision",
+            "UNIQUE",
+            ("unique(import_id,review_revision)",),
+        ),
+    ),
+    "security_issuer_mapping_events": (
+        ("security_issuer_mapping_events_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+        (
+            "security_issuer_mapping_events_security_id_fkey",
+            "FOREIGN KEY",
+            ("foreignkey(security_id)referencessecurities(id)ondelete restrict",),
+        ),
+        (
+            "security_issuer_mapping_events_new_issuer_id_fkey",
+            "FOREIGN KEY",
+            ("foreignkey(new_issuer_id)referencesissuers(id)ondelete set null",),
+        ),
+        (
+            "security_issuer_mapping_events_previous_issuer_id_fkey",
+            "FOREIGN KEY",
+            ("foreignkey(previous_issuer_id)referencesissuers(id)ondelete set null",),
         ),
     ),
 }
@@ -738,10 +944,237 @@ IMMUTABLE_POSITION_REVISIONS_AND_IDENTIFIERS = DsqlMigration(
     ),
 )
 
+STAGE1_POSITION_IMPORTS = DsqlMigration(
+    revision="0004_stage1_position_imports",
+    steps=(
+        DsqlMigrationStep(
+            "create_private_files",
+            "table",
+            """CREATE TABLE private_files (
+                id uuid NOT NULL,
+                content_hash varchar(64) NOT NULL,
+                storage_key varchar(100) NOT NULL,
+                original_name varchar(200) NOT NULL,
+                content_type varchar(100) NOT NULL,
+                byte_size integer NOT NULL,
+                created_at timestamptz NOT NULL,
+                updated_at timestamptz NOT NULL,
+                CONSTRAINT private_files_pkey PRIMARY KEY (id),
+                CONSTRAINT uq_private_file_content_hash UNIQUE (content_hash),
+                CONSTRAINT uq_private_file_storage_key UNIQUE (storage_key)
+            )""",
+            "private_files",
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :object_name)",
+        ),
+        DsqlMigrationStep(
+            "create_imports",
+            "table",
+            """CREATE TABLE imports (
+                id uuid NOT NULL,
+                file_id uuid NOT NULL,
+                kind varchar(20) NOT NULL,
+                account_id uuid,
+                fund_security_id uuid,
+                effective_date date NOT NULL,
+                source_label varchar(100) NOT NULL,
+                parser_version varchar(80) NOT NULL,
+                column_mapping jsonb NOT NULL,
+                file_sha256 varchar(64) NOT NULL,
+                identity_hash varchar(64) NOT NULL,
+                interpretation_hash varchar(64) NOT NULL,
+                payload_hash varchar(64),
+                status varchar(24) NOT NULL,
+                review_revision integer NOT NULL DEFAULT 1,
+                expected_account_revision integer,
+                idempotency_key varchar(128) NOT NULL,
+                row_count integer NOT NULL,
+                batch_count integer NOT NULL,
+                duplicate_of_import_id uuid,
+                staging_snapshot_id uuid,
+                published_snapshot_id uuid,
+                diagnostics jsonb NOT NULL,
+                created_at timestamptz NOT NULL,
+                updated_at timestamptz NOT NULL,
+                CONSTRAINT imports_pkey PRIMARY KEY (id),
+                CONSTRAINT ck_import_scope CHECK (
+                    (kind = 'positions' AND account_id IS NOT NULL
+                        AND fund_security_id IS NULL) OR
+                    (kind = 'fund' AND account_id IS NULL
+                        AND fund_security_id IS NOT NULL)
+                ),
+                CONSTRAINT uq_import_idempotency_key UNIQUE (idempotency_key),
+                CONSTRAINT imports_account_id_fkey FOREIGN KEY (account_id)
+                    REFERENCES accounts (id) ON DELETE RESTRICT,
+                CONSTRAINT imports_duplicate_of_import_id_fkey
+                    FOREIGN KEY (duplicate_of_import_id)
+                    REFERENCES imports (id) ON DELETE SET NULL,
+                CONSTRAINT imports_file_id_fkey FOREIGN KEY (file_id)
+                    REFERENCES private_files (id) ON DELETE RESTRICT,
+                CONSTRAINT imports_fund_security_id_fkey FOREIGN KEY (fund_security_id)
+                    REFERENCES securities (id) ON DELETE RESTRICT,
+                CONSTRAINT imports_published_snapshot_id_fkey
+                    FOREIGN KEY (published_snapshot_id)
+                    REFERENCES position_snapshots (id) ON DELETE SET NULL,
+                CONSTRAINT imports_staging_snapshot_id_fkey
+                    FOREIGN KEY (staging_snapshot_id)
+                    REFERENCES position_snapshots (id) ON DELETE SET NULL
+            )""",
+            "imports",
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :object_name)",
+        ),
+        DsqlMigrationStep(
+            "create_security_issuer_mapping_events",
+            "table",
+            """CREATE TABLE security_issuer_mapping_events (
+                id uuid NOT NULL,
+                security_id uuid NOT NULL,
+                previous_issuer_id uuid,
+                new_issuer_id uuid,
+                reason varchar(500) NOT NULL,
+                changed_at timestamptz NOT NULL,
+                CONSTRAINT security_issuer_mapping_events_pkey PRIMARY KEY (id),
+                CONSTRAINT security_issuer_mapping_events_security_id_fkey
+                    FOREIGN KEY (security_id)
+                    REFERENCES securities (id) ON DELETE RESTRICT,
+                CONSTRAINT security_issuer_mapping_events_new_issuer_id_fkey
+                    FOREIGN KEY (new_issuer_id)
+                    REFERENCES issuers (id) ON DELETE SET NULL,
+                CONSTRAINT security_issuer_mapping_events_previous_issuer_id_fkey
+                    FOREIGN KEY (previous_issuer_id)
+                    REFERENCES issuers (id) ON DELETE SET NULL
+            )""",
+            "security_issuer_mapping_events",
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :object_name)",
+        ),
+        DsqlMigrationStep(
+            "create_import_batches",
+            "table",
+            """CREATE TABLE import_batches (
+                id uuid NOT NULL,
+                import_id uuid NOT NULL,
+                purpose varchar(32) NOT NULL,
+                review_revision integer NOT NULL,
+                ordinal integer NOT NULL,
+                payload_hash varchar(64) NOT NULL,
+                row_count integer NOT NULL,
+                status varchar(24) NOT NULL,
+                created_at timestamptz NOT NULL,
+                updated_at timestamptz NOT NULL,
+                CONSTRAINT import_batches_pkey PRIMARY KEY (id),
+                CONSTRAINT import_batches_import_id_fkey FOREIGN KEY (import_id)
+                    REFERENCES imports (id) ON DELETE CASCADE,
+                CONSTRAINT uq_import_batch_identity
+                    UNIQUE (import_id, purpose, review_revision, ordinal)
+            )""",
+            "import_batches",
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :object_name)",
+        ),
+        DsqlMigrationStep(
+            "create_import_rows",
+            "table",
+            """CREATE TABLE import_rows (
+                id uuid NOT NULL,
+                import_id uuid NOT NULL,
+                row_number integer NOT NULL,
+                raw_payload jsonb NOT NULL,
+                raw_identifier varchar(2000),
+                raw_name varchar(2000),
+                raw_asset_type varchar(2000),
+                raw_quantity varchar(2000),
+                raw_price varchar(2000),
+                raw_currency varchar(200),
+                raw_weight_value varchar(100),
+                raw_weight_unit varchar(24),
+                security_id uuid,
+                normalized_quantity numeric(28, 10),
+                normalized_price numeric(24, 10),
+                normalized_weight numeric(18, 10),
+                currency varchar(3),
+                row_status varchar(24) NOT NULL,
+                excluded boolean NOT NULL,
+                correction_reason text,
+                diagnostics jsonb NOT NULL,
+                created_at timestamptz NOT NULL,
+                updated_at timestamptz NOT NULL,
+                CONSTRAINT import_rows_pkey PRIMARY KEY (id),
+                CONSTRAINT import_rows_import_id_fkey FOREIGN KEY (import_id)
+                    REFERENCES imports (id) ON DELETE CASCADE,
+                CONSTRAINT import_rows_security_id_fkey FOREIGN KEY (security_id)
+                    REFERENCES securities (id) ON DELETE RESTRICT,
+                CONSTRAINT uq_import_row_number UNIQUE (import_id, row_number)
+            )""",
+            "import_rows",
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :object_name)",
+        ),
+        DsqlMigrationStep(
+            "create_import_review_events",
+            "table",
+            """CREATE TABLE import_review_events (
+                id uuid NOT NULL,
+                import_id uuid NOT NULL,
+                review_revision integer NOT NULL,
+                action varchar(32) NOT NULL,
+                reason varchar(500) NOT NULL,
+                change_payload jsonb NOT NULL,
+                created_at timestamptz NOT NULL,
+                CONSTRAINT import_review_events_pkey PRIMARY KEY (id),
+                CONSTRAINT import_review_events_import_id_fkey FOREIGN KEY (import_id)
+                    REFERENCES imports (id) ON DELETE CASCADE,
+                CONSTRAINT uq_import_review_revision UNIQUE (import_id, review_revision)
+            )""",
+            "import_review_events",
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :object_name)",
+        ),
+        *(
+            DsqlMigrationStep(
+                f"create_index_{name}",
+                "index",
+                f"CREATE INDEX ASYNC {name} ON {table_name} ({', '.join(columns)})",
+                name,
+                """SELECT EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_index i
+                    JOIN pg_catalog.pg_class c ON c.oid = i.indexrelid
+                    JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                    WHERE n.nspname = current_schema()
+                      AND c.relname = :object_name
+                      AND i.indisvalid
+                )""",
+                expected_index_table=table_name,
+                expected_index_columns=columns,
+            )
+            for name, table_name, columns in (
+                ("ix_imports_file", "imports", ("file_id",)),
+                (
+                    "ix_imports_identity",
+                    "imports",
+                    ("identity_hash", "interpretation_hash"),
+                ),
+                (
+                    "ix_import_batches_import",
+                    "import_batches",
+                    ("import_id", "purpose"),
+                ),
+                (
+                    "ix_import_rows_import_status",
+                    "import_rows",
+                    ("import_id", "row_status"),
+                ),
+            )
+        ),
+    ),
+)
+
 DSQL_MIGRATIONS = (
     CORE_SCHEMA,
     POSITION_SNAPSHOT_REVISION,
     IMMUTABLE_POSITION_REVISIONS_AND_IDENTIFIERS,
+    STAGE1_POSITION_IMPORTS,
 )
 LEDGER_DDL = """CREATE TABLE IF NOT EXISTS dsql_schema_migration_steps (
     revision varchar(128) NOT NULL,

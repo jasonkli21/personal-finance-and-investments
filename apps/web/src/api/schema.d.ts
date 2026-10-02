@@ -91,6 +91,161 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/imports/positions/preview': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Post Position Import Preview */
+    post: operations['post_position_import_preview_v1_imports_positions_preview_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/imports/{import_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Import */
+    get: operations['get_import_v1_imports__import_id__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/imports/{import_id}/cancel': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Post Cancel Import */
+    post: operations['post_cancel_import_v1_imports__import_id__cancel_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/imports/{import_id}/publish': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Post Publish Import */
+    post: operations['post_publish_import_v1_imports__import_id__publish_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/imports/{import_id}/rows/{row_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /** Patch Import Row */
+    patch: operations['patch_import_row_v1_imports__import_id__rows__row_id__patch']
+    trace?: never
+  }
+  '/v1/issuers': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Issuers */
+    get: operations['get_issuers_v1_issuers_get']
+    put?: never
+    /** Post Issuer */
+    post: operations['post_issuer_v1_issuers_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/market-data/quotes': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Post Manual Quote */
+    post: operations['post_manual_quote_v1_market_data_quotes_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/portfolio/owned/{account_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Owned Portfolio */
+    get: operations['get_owned_portfolio_v1_portfolio_owned__account_id__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/securities': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Securities */
+    get: operations['get_securities_v1_securities_get']
+    put?: never
+    /** Post Security */
+    post: operations['post_security_v1_securities_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/securities/resolve': {
     parameters: {
       query?: never
@@ -106,6 +261,23 @@ export interface paths {
     options?: never
     head?: never
     patch?: never
+    trace?: never
+  }
+  '/v1/securities/{security_id}/issuer': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /** Patch Security Issuer */
+    patch: operations['patch_security_issuer_v1_securities__security_id__issuer_patch']
     trace?: never
   }
 }
@@ -164,6 +336,228 @@ export interface components {
     HealthResponse: {
       /** Status */
       status: string
+    }
+    /** ImportAction */
+    ImportAction: {
+      /** Expected Review Revision */
+      expected_review_revision: number
+      /**
+       * Reason
+       * @default Reviewed by user
+       */
+      reason: string
+    }
+    /** ImportCreated */
+    ImportCreated: {
+      /** Batch Count */
+      batch_count: number
+      /** Duplicate */
+      duplicate: boolean
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: 'positions' | 'fund'
+      /** Review Revision */
+      review_revision: number
+      /** Row Count */
+      row_count: number
+      /** Status */
+      status: string
+    }
+    /** ImportReviewRead */
+    ImportReviewRead: {
+      /** Account Id */
+      account_id: string | null
+      /** Diagnostics */
+      diagnostics: {
+        [key: string]: string
+      }
+      /**
+       * Effective Date
+       * Format: date
+       */
+      effective_date: string
+      /** Expected Account Revision */
+      expected_account_revision: number | null
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Kind */
+      kind: string
+      /** Review Revision */
+      review_revision: number
+      /** Row Count */
+      row_count: number
+      /** Rows */
+      rows: components['schemas']['ImportRowRead'][]
+      /** Source Label */
+      source_label: string
+      /** Status */
+      status: string
+    }
+    /** ImportRowCorrection */
+    ImportRowCorrection: {
+      /** Currency */
+      currency?: string | null
+      /** Excluded */
+      excluded?: boolean | null
+      /** Expected Review Revision */
+      expected_review_revision: number
+      /** Price */
+      price?: string | null
+      /** Quantity */
+      quantity?: string | null
+      /** Reason */
+      reason: string
+      /** Security Id */
+      security_id?: string | null
+    }
+    /** ImportRowRead */
+    ImportRowRead: {
+      /** Correction Reason */
+      correction_reason: string | null
+      /** Currency */
+      currency: string | null
+      /** Diagnostics */
+      diagnostics: {
+        [key: string]: string
+      }
+      /** Excluded */
+      excluded: boolean
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Normalized Price */
+      normalized_price: string | null
+      /** Normalized Quantity */
+      normalized_quantity: string | null
+      /** Raw Asset Type */
+      raw_asset_type: string | null
+      /** Raw Currency */
+      raw_currency: string | null
+      /** Raw Identifier */
+      raw_identifier: string | null
+      /** Raw Name */
+      raw_name: string | null
+      /** Raw Payload */
+      raw_payload: {
+        [key: string]: string
+      }
+      /** Raw Price */
+      raw_price: string | null
+      /** Raw Quantity */
+      raw_quantity: string | null
+      /** Row Number */
+      row_number: number
+      /** Row Status */
+      row_status: string
+      /** Security Id */
+      security_id: string | null
+      /** Security Label */
+      security_label: string | null
+    }
+    /** IssuerAssignment */
+    IssuerAssignment: {
+      /** Expected Issuer Id */
+      expected_issuer_id: string | null
+      /** Issuer Id */
+      issuer_id: string | null
+      /** Reason */
+      reason: string
+    }
+    /** IssuerCreate */
+    IssuerCreate: {
+      /** Display Name */
+      display_name: string
+    }
+    /** IssuerRead */
+    IssuerRead: {
+      /** Display Name */
+      display_name: string
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+    }
+    /** OwnedPortfolioRead */
+    OwnedPortfolioRead: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** As Of */
+      as_of: string | null
+      /**
+       * Completeness
+       * @enum {string}
+       */
+      completeness: 'complete' | 'incomplete' | 'empty'
+      /** Current Revision */
+      current_revision: number
+      /** Effective Date */
+      effective_date: string | null
+      /** Known Usd Subtotal */
+      known_usd_subtotal: string
+      /** Lines */
+      lines: components['schemas']['OwnedValuationLine'][]
+      /** Percentages Available */
+      percentages_available: boolean
+      /** Snapshot Id */
+      snapshot_id: string | null
+      /** Total Usd */
+      total_usd: string | null
+    }
+    /** OwnedValuationLine */
+    OwnedValuationLine: {
+      /** Allocation Percent */
+      allocation_percent: string | null
+      /** Currency */
+      currency: string
+      /** Name */
+      name: string
+      /**
+       * Position Id
+       * Format: uuid
+       */
+      position_id: string
+      /** Price */
+      price: string | null
+      /** Price As Of */
+      price_as_of: string | null
+      /** Price Source */
+      price_source: string | null
+      /** Quality Status */
+      quality_status: string
+      /** Quantity */
+      quantity: string
+      /**
+       * Security Id
+       * Format: uuid
+       */
+      security_id: string
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'valued' | 'unpriced' | 'foreign_currency'
+      /** Ticker */
+      ticker: string | null
+      /** Value */
+      value: string | null
+      /** Value Currency */
+      value_currency: string | null
     }
     /** PositionInput */
     PositionInput: {
@@ -243,6 +637,76 @@ export interface components {
       /** Current Revision */
       current_revision: number
       snapshot: components['schemas']['PositionSnapshotRead'] | null
+    }
+    /** QuoteCreate */
+    QuoteCreate: {
+      /**
+       * As Of
+       * Format: date-time
+       */
+      as_of: string
+      /** Currency */
+      currency: string
+      /** Price */
+      price: string
+      /** Reason */
+      reason: string
+      /**
+       * Security Id
+       * Format: uuid
+       */
+      security_id: string
+    }
+    /** QuoteRead */
+    QuoteRead: {
+      /**
+       * As Of
+       * Format: date-time
+       */
+      as_of: string
+      /** Currency */
+      currency: string
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Price */
+      price: string
+      /** Quality Status */
+      quality_status: string
+      /**
+       * Security Id
+       * Format: uuid
+       */
+      security_id: string
+      /** Source */
+      source: string
+    }
+    /** SecurityCreate */
+    SecurityCreate: {
+      /** Currency */
+      currency: string
+      /** Display Ticker */
+      display_ticker?: string | null
+      /**
+       * Identifier Exchange
+       * @default
+       */
+      identifier_exchange: string
+      /** Identifier Namespace */
+      identifier_namespace?: string | null
+      /** Identifier Value */
+      identifier_value?: string | null
+      /** Issuer Id */
+      issuer_id?: string | null
+      /** Name */
+      name: string
+      /**
+       * Security Type
+       * @enum {string}
+       */
+      security_type: 'equity' | 'etf' | 'cash' | 'other'
     }
     /** SecurityRead */
     SecurityRead: {
@@ -503,7 +967,9 @@ export interface operations {
   }
   get_positions_v1_accounts__account_id__positions_get: {
     parameters: {
-      query?: never
+      query?: {
+        as_of?: string | null
+      }
       header?: never
       path: {
         account_id: string
@@ -621,6 +1087,660 @@ export interface operations {
       }
     }
   }
+  post_position_import_preview_v1_imports_positions_preview_post: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Account-Id': string
+        'X-Effective-Date': string
+        'X-Source-Label': string
+        'X-Expected-Account-Revision': number
+        'Idempotency-Key': string
+        'X-Column-Mapping': string
+        'X-Replace-Existing'?: boolean
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImportCreated']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  get_import_v1_imports__import_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        import_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImportReviewRead']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  post_cancel_import_v1_imports__import_id__cancel_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        import_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ImportAction']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImportCreated']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  post_publish_import_v1_imports__import_id__publish_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        import_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ImportAction']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PositionSnapshotRead']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  patch_import_row_v1_imports__import_id__rows__row_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        import_id: string
+        row_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ImportRowCorrection']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImportRowRead']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  get_issuers_v1_issuers_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['IssuerRead'][]
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  post_issuer_v1_issuers_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['IssuerCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['IssuerRead']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  post_manual_quote_v1_market_data_quotes_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['QuoteCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['QuoteRead']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  get_owned_portfolio_v1_portfolio_owned__account_id__get: {
+    parameters: {
+      query?: {
+        as_of?: string | null
+      }
+      header?: never
+      path: {
+        account_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['OwnedPortfolioRead']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  get_securities_v1_securities_get: {
+    parameters: {
+      query?: {
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SecurityRead'][]
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  post_security_v1_securities_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SecurityCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SecurityRead']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
   get_security_resolution_v1_securities_resolve_get: {
     parameters: {
       query: {
@@ -639,6 +1759,68 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['SecurityResolution']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  patch_security_issuer_v1_securities__security_id__issuer_patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        security_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['IssuerAssignment']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SecurityRead']
         }
       }
       /** @description Requested resource not found */

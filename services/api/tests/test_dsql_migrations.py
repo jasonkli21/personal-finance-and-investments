@@ -127,9 +127,9 @@ class FakeEngine:
 def test_core_plan_has_single_statement_steps_and_async_indexes() -> None:
     validate_migration_plan(dsql_migrations.DSQL_MIGRATIONS)
     plan = dsql_migrations.describe_migration_plan()
-    assert len(plan) == 27
-    assert sum(row["kind"] == "table" for row in plan) == 8
-    assert sum(row["kind"] == "index" for row in plan) == 7
+    assert len(plan) == 37
+    assert sum(row["kind"] == "table" for row in plan) == 14
+    assert sum(row["kind"] == "index" for row in plan) == 11
     assert sum(row["kind"] == "alter" for row in plan) == 5
     assert sum(row["kind"] == "backfill" for row in plan) == 1
     assert all(";" not in row["statement"] for row in plan)

@@ -12,6 +12,7 @@ import {
 import type { components } from './api/schema'
 import { captureDraftBaseRevision } from './position-draft'
 import { startReadinessPolling, type ApiStatus } from './readiness'
+import StageOneWorkspace from './StageOneWorkspace'
 
 type Security = components['schemas']['SecurityRead']
 type PositionLine = components['schemas']['PositionLineRead']
@@ -125,8 +126,8 @@ function HoldingEditor({
               ))
             ) : (
               <p className="text-sm text-slate-500">
-                No local match. Add a catalog fixture before entering this
-                security.
+                No local match. Add a reviewed security in the local catalog
+                below before entering this position.
               </p>
             )}
           </div>
@@ -904,6 +905,27 @@ export default function App() {
           )}
         </section>
       </section>
+      <StageOneWorkspace
+        accountId={selectedAccountId}
+        effectiveDate={effectiveDate}
+        expectedRevision={positionsQuery.data?.current_revision ?? 0}
+        onPublished={async () => {
+          if (selectedAccountId) {
+            await queryClient.invalidateQueries({
+              queryKey: ['positions', selectedAccountId],
+            })
+            setEffectiveDates((current) =>
+              withoutKey(current, selectedAccountId),
+            )
+            setHoldingDrafts((current) =>
+              withoutKey(current, selectedAccountId),
+            )
+            setHoldingBaseRevisions((current) =>
+              withoutKey(current, selectedAccountId),
+            )
+          }
+        }}
+      />
     </main>
   )
 }
