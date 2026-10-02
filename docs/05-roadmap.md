@@ -1,6 +1,6 @@
 # Staged implementation plan
 
-**Status:** Stage 0.2 local quality checks verified; remote CI pending | **Updated:** 2026-10-01  
+**Status:** Stage 0.3 core schema and PostgreSQL 16 migration verified; DSQL unverified | **Updated:** 2026-10-01
 **Sequencing:** Stage 0 → Stage 1 deliver the local MVP **with Aurora DSQL compatibility designed in from the start**. Stage 2 and Stage 3 enrich it. Stage 4 (AWS) may be scheduled after Stage 1, but any production deployment **must** use Aurora DSQL, not RDS. Stage 5 (research) builds on reliable portfolio data with portable retrieval. See [`07-aurora-dsql-compatibility.md`](07-aurora-dsql-compatibility.md).
 
 Each work package should produce a small PR or coherent series of PRs, include unit/integration/e2e tests where applicable, and be independently demonstrable. Prioritize a working vertical slice rather than creating empty abstractions for the entire future roadmap.
@@ -21,6 +21,8 @@ Each work package should produce a small PR or coherent series of PRs, include u
 **Stage 0 local exit gate:** documented setup, passing PostgreSQL 16 tests, local migrations and offline manual-stock workflow. Define and implement the DSQL dialect/migration path as a separately gated work package. A local MVP can proceed without AWS credentials; **no production-readiness claim until a real DSQL smoke/migration test passes**. No market API, PDF extraction or AI model is required.
 
 **Stage 0.2 evidence (2026-10-01):** `pnpm check` runs lint, formatting, strict typechecks, 7 Vitest tests, 10 pytest tests, and the web production build. A temporary intentionally failing test caused the command to exit with status 1 and was removed afterward. The GitHub Actions workflow uses this same gate, but has not run remotely; Git initialization and a configured GitHub remote remain pending. DSQL remains unverified.
+
+**Stage 0.3 implementation:** SQLAlchemy models and Alembic migration `0001_core_portfolio_schema` define accounts, securities, issuers/aliases, dated quotes, position snapshots and lines, with application UUIDs, `NUMERIC`, provenance, quality status and source-scoped uniqueness. The opt-in PG16 integration test applies the migration and exercises a synthetic UUID/Decimal/JSONB round trip, unresolved/negative quantity preservation, uniqueness and FK constraints. Fresh migration and the integration test passed on a disposable PostgreSQL 16 container on 2026-10-01. `pnpm check` passed (7 Vitest tests, 10 pytest tests, with the opt-in database test separately executed). Work is paused after 0.3 at the user's request; DSQL remains unverified and follows the migration plan in `07-aurora-dsql-compatibility.md`.
 
 ## Stage 1 — Portfolio MVP (primary milestone)
 
@@ -135,4 +137,4 @@ Expected NVDA look-through: `$30,000 + ($50,000 × 0.08) + ($20,000 × 0.06) = $
 | Document parsing rules and local review | Always-on remote AI, autonomous trading, wholesale agent frameworks |
 | Verifiable source dates and residual exposure | Perfect breadth of ETFs, real-time quote promises, speculative classification |
 
-**Next Codex prompt:** “Read `AGENTS.md` and all docs, especially `docs/07-aurora-dsql-compatibility.md`. Implement Stage 0 / 0.3 only: add the portable core schema and local Alembic migrations. Document the DSQL DDL plan and unverified cloud test status. Do not provision AWS resources or claim DSQL tests ran.”
+**Next Codex prompt:** “Read `AGENTS.md` and all docs, especially `docs/07-aurora-dsql-compatibility.md`. When resumed, implement Stage 0 / 0.4 only: add the database engine factory, official DSQL dialect, separate migration path and bounded retry helper. Keep real DSQL verification explicitly gated on AWS access. Do not provision AWS resources or claim DSQL tests ran.”

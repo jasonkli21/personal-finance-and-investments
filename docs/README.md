@@ -1,6 +1,6 @@
 # Personal Finance & Portfolio Intelligence — Docs
 
-**Status:** Stage 0.2 local quality checks verified; GitHub Actions configured  
+**Status:** Stage 0.3 core schema and PostgreSQL 16 migration verified; DSQL unverified
 **Last reviewed:** 2026-10-01  
 **Databases:** PostgreSQL 16 local/personal; Aurora DSQL required for production  
 **Deployment:** local indefinitely; AWS deployment optional until ready, with production targeting DSQL  
@@ -55,7 +55,7 @@ A private tool to track stocks, ETFs, cash, and eventually broader personal fina
 
 ## Current implementation and next task
 
-Stage 0.1 source and lockfiles are present. The web build, API tests, PostgreSQL 16 and API Compose startup, and Vite-to-API readiness proxy passed locally on 2026-10-01. Stage 0.2 adds Ruff, strict mypy, ESLint, Prettier, strict TypeScript, Vitest, and a shared `pnpm check` command. The local quality gate passed, and a temporary failing test confirmed that it exits unsuccessfully. A GitHub Actions workflow runs the same command; the initial push to the configured `jasonkli21/personal-finance-and-investments` origin triggered the workflow. See the root [`README.md`](../README.md) for actual commands and the repository Actions page for run status. The next planned work is **Stage 0 / Work Package 0.3** from `docs/05-roadmap.md`. Do not provision AWS resources or claim DSQL tests ran.
+Stage 0.1 source and lockfiles are present. The web build, API tests, PostgreSQL 16 and API Compose startup, and Vite-to-API readiness proxy passed locally on 2026-10-01. Stage 0.2 adds Ruff, strict mypy, ESLint, Prettier, strict TypeScript, Vitest, and a shared `pnpm check` command. The local quality gate passed, and a temporary failing test confirmed that it exits unsuccessfully. Stage 0.3 adds SQLAlchemy/Alembic mappings and a PostgreSQL migration for issuers and aliases, accounts, securities, quotes, and owned position snapshots/lines. Its fresh migration and synthetic persistence/constraint checks passed on PostgreSQL 16 on 2026-10-01; `pnpm check` also passed. DSQL remains unverified; see the DDL plan in `07-aurora-dsql-compatibility.md`. The next planned work is **Stage 0 / Work Package 0.4** from `docs/05-roadmap.md`; work is paused after 0.3 at the user's request.
 
 ## Documentation maintenance
 

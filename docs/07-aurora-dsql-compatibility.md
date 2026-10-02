@@ -53,6 +53,12 @@ Do not assume **PostgreSQL extensions** work: Aurora DSQL is managed and does no
 
 ## 4. Transaction design and ingestion
 
+### Stage 0.3 core schema migration plan
+
+The local Alembic revision `0001_core_portfolio_schema` creates `issuers`, `accounts`, `issuer_aliases`, `securities`, `position_snapshots`, `quotes`, and `position_snapshot_lines`. It uses application-supplied UUID primary keys, `NUMERIC` quantities/prices/values, bounded JSONB quote metadata, source and quality fields, and relational constraints. The local revision uses PostgreSQL's JSONB type spelling, which DSQL also supports.
+
+The future DSQL migration runner must translate the revision into a versioned DSQL plan: execute each `CREATE TABLE` as its own DDL transaction, then each standalone `CREATE INDEX ASYNC` as a separate DDL transaction and wait for readiness before advancing. DML to update the migration ledger must run only after DDL transactions complete. Fresh install and upgrade paths must verify FK actions, unique/check constraints, JSONB and index readiness on a real cluster. In particular, confirm support for `ON DELETE CASCADE`/`SET NULL` and `CHECK` constraints against current DSQL behavior before using the migration in production. Stage 0.3's local Alembic environment rejects `DATABASE_BACKEND=aurora_dsql` so it cannot accidentally send PostgreSQL migration DDL to DSQL. **No DSQL migration or integration test has run; DSQL is unverified.**
+
 As of 2026-09-25, [AWS DSQL limits](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/CHAP_quotas.html) include **10 MiB of changed data**, **3,000 modified rows** and **five minutes per transaction**. DSQL uses optimistic concurrency and the fixed Repeatable Read isolation level; conflicting transactions may abort and need a whole-unit retry. Connections can expire after 60 minutes. These are upper limits, **not** recommended targets.
 
 - Keep transaction scopes brief. Prefer batches of a few hundred rows (configurable and measured), with a safety margin for secondary-index changes, provider payload size and latency. Never hold a transaction open while downloading a PDF, calling AI, fetching holdings, or waiting for review.
