@@ -2741,6 +2741,142 @@
         "title": "PositionsEnvelope",
         "type": "object"
       },
+      "PotentialPurchaseRead": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "account_name": {
+            "title": "Account Name",
+            "type": "string"
+          },
+          "effective_date": {
+            "format": "date",
+            "title": "Effective Date",
+            "type": "string"
+          },
+          "evidence_id": {
+            "format": "uuid",
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "source_label": {
+            "title": "Source Label",
+            "type": "string"
+          },
+          "source_type": {
+            "enum": [
+              "investment_event",
+              "tax_lot"
+            ],
+            "title": "Source Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_type",
+          "evidence_id",
+          "account_id",
+          "account_name",
+          "effective_date",
+          "quantity",
+          "source_label"
+        ],
+        "title": "PotentialPurchaseRead",
+        "type": "object"
+      },
+      "PotentialWashSaleWarningRead": {
+        "properties": {
+          "affected_lot_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Affected Lot Ids",
+            "type": "array"
+          },
+          "coverage": {
+            "const": "unknown",
+            "title": "Coverage",
+            "type": "string"
+          },
+          "disclosure": {
+            "title": "Disclosure",
+            "type": "string"
+          },
+          "evidence_truncated": {
+            "title": "Evidence Truncated",
+            "type": "boolean"
+          },
+          "jurisdiction": {
+            "title": "Jurisdiction",
+            "type": "string"
+          },
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/PotentialPurchaseRead"
+            },
+            "title": "Matches",
+            "type": "array"
+          },
+          "rule_version": {
+            "title": "Rule Version",
+            "type": "string"
+          },
+          "source_url": {
+            "title": "Source Url",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "potential_match",
+              "none_detected",
+              "not_applicable",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "window_end": {
+            "format": "date",
+            "title": "Window End",
+            "type": "string"
+          },
+          "window_start": {
+            "format": "date",
+            "title": "Window Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "coverage",
+          "rule_version",
+          "jurisdiction",
+          "window_start",
+          "window_end",
+          "affected_lot_ids",
+          "matches",
+          "evidence_truncated",
+          "source_url",
+          "disclosure"
+        ],
+        "title": "PotentialWashSaleWarningRead",
+        "type": "object"
+      },
       "QuoteCreate": {
         "properties": {
           "as_of": {
@@ -3306,6 +3442,579 @@
           "warnings"
         ],
         "title": "ReportSummary",
+        "type": "object"
+      },
+      "SaleLotResultRead": {
+        "properties": {
+          "acquired_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acquired At"
+          },
+          "available_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available Basis"
+          },
+          "available_quantity": {
+            "title": "Available Quantity",
+            "type": "string"
+          },
+          "basis_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis Currency"
+          },
+          "estimated_gain_loss": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Gain Loss"
+          },
+          "fee_allocation": {
+            "title": "Fee Allocation",
+            "type": "string"
+          },
+          "gross_proceeds": {
+            "title": "Gross Proceeds",
+            "type": "string"
+          },
+          "holding_period_candidate": {
+            "enum": [
+              "short_term",
+              "long_term",
+              "unknown"
+            ],
+            "title": "Holding Period Candidate",
+            "type": "string"
+          },
+          "lot_id": {
+            "format": "uuid",
+            "title": "Lot Id",
+            "type": "string"
+          },
+          "net_proceeds": {
+            "title": "Net Proceeds",
+            "type": "string"
+          },
+          "quality_status": {
+            "title": "Quality Status",
+            "type": "string"
+          },
+          "remaining_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Basis"
+          },
+          "remaining_quantity": {
+            "title": "Remaining Quantity",
+            "type": "string"
+          },
+          "selected_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Basis"
+          },
+          "selected_quantity": {
+            "title": "Selected Quantity",
+            "type": "string"
+          },
+          "source_label": {
+            "title": "Source Label",
+            "type": "string"
+          },
+          "source_lot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Lot Id"
+          }
+        },
+        "required": [
+          "lot_id",
+          "source_lot_id",
+          "source_label",
+          "acquired_at",
+          "quality_status",
+          "selected_quantity",
+          "available_quantity",
+          "basis_currency",
+          "available_basis",
+          "selected_basis",
+          "remaining_quantity",
+          "remaining_basis",
+          "gross_proceeds",
+          "fee_allocation",
+          "net_proceeds",
+          "estimated_gain_loss",
+          "holding_period_candidate"
+        ],
+        "title": "SaleLotResultRead",
+        "type": "object"
+      },
+      "SaleLotSelection": {
+        "properties": {
+          "lot_id": {
+            "format": "uuid",
+            "title": "Lot Id",
+            "type": "string"
+          },
+          "quantity": {
+            "maxLength": 40,
+            "pattern": "^\\d+(?:\\.\\d{1,10})?$",
+            "title": "Quantity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "lot_id",
+          "quantity"
+        ],
+        "title": "SaleLotSelection",
+        "type": "object"
+      },
+      "SalePriceBaselineRead": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "account_position_revision": {
+            "title": "Account Position Revision",
+            "type": "integer"
+          },
+          "baseline_fingerprint": {
+            "title": "Baseline Fingerprint",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "position_line_id": {
+            "format": "uuid",
+            "title": "Position Line Id",
+            "type": "string"
+          },
+          "position_quantity": {
+            "title": "Position Quantity",
+            "type": "string"
+          },
+          "position_snapshot_at": {
+            "format": "date-time",
+            "title": "Position Snapshot At",
+            "type": "string"
+          },
+          "position_snapshot_id": {
+            "format": "uuid",
+            "title": "Position Snapshot Id",
+            "type": "string"
+          },
+          "position_snapshot_revision": {
+            "title": "Position Snapshot Revision",
+            "type": "integer"
+          },
+          "price": {
+            "title": "Price",
+            "type": "string"
+          },
+          "price_as_of": {
+            "format": "date-time",
+            "title": "Price As Of",
+            "type": "string"
+          },
+          "price_quality": {
+            "title": "Price Quality",
+            "type": "string"
+          },
+          "price_source": {
+            "title": "Price Source",
+            "type": "string"
+          },
+          "price_source_id": {
+            "format": "uuid",
+            "title": "Price Source Id",
+            "type": "string"
+          },
+          "security_id": {
+            "format": "uuid",
+            "title": "Security Id",
+            "type": "string"
+          },
+          "security_type": {
+            "title": "Security Type",
+            "type": "string"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          }
+        },
+        "required": [
+          "account_id",
+          "account_position_revision",
+          "position_snapshot_id",
+          "position_snapshot_revision",
+          "position_snapshot_at",
+          "position_line_id",
+          "position_quantity",
+          "security_id",
+          "security_type",
+          "ticker",
+          "currency",
+          "price",
+          "price_as_of",
+          "price_source",
+          "price_source_id",
+          "price_quality",
+          "baseline_fingerprint"
+        ],
+        "title": "SalePriceBaselineRead",
+        "type": "object"
+      },
+      "SaleScenarioInput": {
+        "properties": {
+          "fee_amount": {
+            "default": "0",
+            "maxLength": 40,
+            "pattern": "^\\d+(?:\\.\\d{1,10})?$",
+            "title": "Fee Amount",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "selections": {
+            "items": {
+              "$ref": "#/components/schemas/SaleLotSelection"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Selections",
+            "type": "array"
+          }
+        },
+        "required": [
+          "label",
+          "selections"
+        ],
+        "title": "SaleScenarioInput",
+        "type": "object"
+      },
+      "SaleScenarioResultRead": {
+        "properties": {
+          "basis_status": {
+            "enum": [
+              "available",
+              "unavailable"
+            ],
+            "title": "Basis Status",
+            "type": "string"
+          },
+          "disclosure": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Disclosure",
+            "type": "array"
+          },
+          "estimated_gain_loss": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimated Gain Loss"
+          },
+          "fees": {
+            "title": "Fees",
+            "type": "string"
+          },
+          "gross_proceeds": {
+            "title": "Gross Proceeds",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "lots": {
+            "items": {
+              "$ref": "#/components/schemas/SaleLotResultRead"
+            },
+            "title": "Lots",
+            "type": "array"
+          },
+          "net_proceeds": {
+            "title": "Net Proceeds",
+            "type": "string"
+          },
+          "potential_wash_sale": {
+            "$ref": "#/components/schemas/PotentialWashSaleWarningRead"
+          },
+          "remaining_position_quantity": {
+            "title": "Remaining Position Quantity",
+            "type": "string"
+          },
+          "selected_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Basis"
+          },
+          "selected_shares": {
+            "title": "Selected Shares",
+            "type": "string"
+          },
+          "target_shares": {
+            "title": "Target Shares",
+            "type": "string"
+          },
+          "target_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Value"
+          },
+          "value_rounding_remainder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Rounding Remainder"
+          }
+        },
+        "required": [
+          "label",
+          "target_shares",
+          "selected_shares",
+          "target_value",
+          "value_rounding_remainder",
+          "gross_proceeds",
+          "fees",
+          "net_proceeds",
+          "basis_status",
+          "selected_basis",
+          "estimated_gain_loss",
+          "remaining_position_quantity",
+          "lots",
+          "potential_wash_sale",
+          "disclosure"
+        ],
+        "title": "SaleScenarioResultRead",
+        "type": "object"
+      },
+      "SalesSimulationRead": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "baseline": {
+            "$ref": "#/components/schemas/SalePriceBaselineRead"
+          },
+          "calculation_fingerprint": {
+            "title": "Calculation Fingerprint",
+            "type": "string"
+          },
+          "canonical_records_mutated": {
+            "const": false,
+            "title": "Canonical Records Mutated",
+            "type": "boolean"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "disclosures": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Disclosures",
+            "type": "array"
+          },
+          "jurisdiction_policy_version": {
+            "title": "Jurisdiction Policy Version",
+            "type": "string"
+          },
+          "methodology_version": {
+            "title": "Methodology Version",
+            "type": "string"
+          },
+          "persisted": {
+            "const": false,
+            "title": "Persisted",
+            "type": "boolean"
+          },
+          "sale_date": {
+            "format": "date",
+            "title": "Sale Date",
+            "type": "string"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/SaleScenarioResultRead"
+            },
+            "title": "Scenarios",
+            "type": "array"
+          },
+          "security_id": {
+            "format": "uuid",
+            "title": "Security Id",
+            "type": "string"
+          },
+          "target_amount": {
+            "title": "Target Amount",
+            "type": "string"
+          },
+          "target_type": {
+            "enum": [
+              "shares",
+              "value"
+            ],
+            "title": "Target Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "methodology_version",
+          "jurisdiction_policy_version",
+          "account_id",
+          "security_id",
+          "sale_date",
+          "target_type",
+          "target_amount",
+          "currency",
+          "baseline",
+          "scenarios",
+          "calculation_fingerprint",
+          "canonical_records_mutated",
+          "persisted",
+          "disclosures"
+        ],
+        "title": "SalesSimulationRead",
+        "type": "object"
+      },
+      "SalesSimulationRequest": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "sale_date": {
+            "format": "date",
+            "title": "Sale Date",
+            "type": "string"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/SaleScenarioInput"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Scenarios",
+            "type": "array"
+          },
+          "security_id": {
+            "format": "uuid",
+            "title": "Security Id",
+            "type": "string"
+          },
+          "target_amount": {
+            "maxLength": 40,
+            "pattern": "^\\d+(?:\\.\\d{1,10})?$",
+            "title": "Target Amount",
+            "type": "string"
+          },
+          "target_type": {
+            "enum": [
+              "shares",
+              "value"
+            ],
+            "title": "Target Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "security_id",
+          "sale_date",
+          "target_type",
+          "target_amount",
+          "scenarios"
+        ],
+        "title": "SalesSimulationRequest",
         "type": "object"
       },
       "SecurityCreate": {
@@ -8731,6 +9440,44 @@
           }
         },
         "summary": "Patch Security Issuer"
+      }
+    },
+    "/v1/simulations/sales": {
+      "post": {
+        "operationId": "simulate_lot_sales_v1_simulations_sales_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SalesSimulationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalesSimulationRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Simulate Lot Sales"
       }
     },
     "/v1/tax-lot-imports/{import_id}": {

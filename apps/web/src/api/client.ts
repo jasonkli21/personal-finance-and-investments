@@ -724,3 +724,9 @@ export async function createTaxLotAdjustment(
     }),
   )
 }
+
+export async function simulateTaxLotSales(
+  input: components['schemas']['SalesSimulationRequest'],
+) {
+  return unwrap(await api.POST('/v1/simulations/sales', { body: input }))
+}

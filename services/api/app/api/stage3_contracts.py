@@ -329,3 +329,158 @@ class TaxLotRead(BaseModel):
     evidence_ref: str | None
     quality_status: str
     adjustments: list[TaxLotAdjustmentRead]
+
+
+class SaleLotSelection(BaseModel):
+    lot_id: UUID
+    quantity: str = Field(max_length=40, pattern=r"^\d+(?:\.\d{1,10})?$")
+
+    @field_validator("quantity")
+    @classmethod
+    def selection_precision(cls, value: str) -> str:
+        if len(value.split(".")[0]) > 18:
+            raise ValueError("Quantity exceeds NUMERIC(28, 10) precision")
+        return value
+
+
+class SaleScenarioInput(BaseModel):
+    label: str = Field(min_length=1, max_length=80)
+    fee_amount: str = Field(default="0", max_length=40, pattern=r"^\d+(?:\.\d{1,10})?$")
+    selections: list[SaleLotSelection] = Field(min_length=1, max_length=100)
+
+    @field_validator("label")
+    @classmethod
+    def clean_sale_label(cls, value: str) -> str:
+        clean = value.strip()
+        if not clean:
+            raise ValueError("Scenario label cannot be blank")
+        return clean
+
+    @field_validator("fee_amount")
+    @classmethod
+    def fee_precision(cls, value: str) -> str:
+        if len(value.split(".")[0]) > 18:
+            raise ValueError("Fee exceeds NUMERIC(28, 10) precision")
+        return value
+
+
+class SalesSimulationRequest(BaseModel):
+    account_id: UUID
+    security_id: UUID
+    sale_date: date
+    target_type: Literal["shares", "value"]
+    target_amount: str = Field(max_length=40, pattern=r"^\d+(?:\.\d{1,10})?$")
+    scenarios: list[SaleScenarioInput] = Field(min_length=1, max_length=2)
+
+    @field_validator("target_amount")
+    @classmethod
+    def target_precision(cls, value: str) -> str:
+        if len(value.split(".")[0]) > 18:
+            raise ValueError("Target exceeds NUMERIC(28, 10) precision")
+        return value
+
+    @model_validator(mode="after")
+    def unique_scenario_labels(self) -> "SalesSimulationRequest":
+        labels = [scenario.label.casefold() for scenario in self.scenarios]
+        if len(labels) != len(set(labels)):
+            raise ValueError("Scenario labels must be unique")
+        return self
+
+
+class SalePriceBaselineRead(BaseModel):
+    account_id: UUID
+    account_position_revision: int
+    position_snapshot_id: UUID
+    position_snapshot_revision: int
+    position_snapshot_at: datetime
+    position_line_id: UUID
+    position_quantity: str
+    security_id: UUID
+    security_type: str
+    ticker: str | None
+    currency: str
+    price: str
+    price_as_of: datetime
+    price_source: str
+    price_source_id: UUID
+    price_quality: str
+    baseline_fingerprint: str
+
+
+class SaleLotResultRead(BaseModel):
+    lot_id: UUID
+    source_lot_id: str | None
+    source_label: str
+    acquired_at: date | None
+    quality_status: str
+    selected_quantity: str
+    available_quantity: str
+    basis_currency: str | None
+    available_basis: str | None
+    selected_basis: str | None
+    remaining_quantity: str
+    remaining_basis: str | None
+    gross_proceeds: str
+    fee_allocation: str
+    net_proceeds: str
+    estimated_gain_loss: str | None
+    holding_period_candidate: Literal["short_term", "long_term", "unknown"]
+
+
+class PotentialPurchaseRead(BaseModel):
+    source_type: Literal["investment_event", "tax_lot"]
+    evidence_id: UUID
+    account_id: UUID
+    account_name: str
+    effective_date: date
+    quantity: str | None
+    source_label: str
+
+
+class PotentialWashSaleWarningRead(BaseModel):
+    status: Literal["potential_match", "none_detected", "not_applicable", "unknown"]
+    coverage: Literal["unknown"]
+    rule_version: str
+    jurisdiction: str
+    window_start: date
+    window_end: date
+    affected_lot_ids: list[UUID]
+    matches: list[PotentialPurchaseRead]
+    evidence_truncated: bool
+    source_url: str
+    disclosure: str
+
+
+class SaleScenarioResultRead(BaseModel):
+    label: str
+    target_shares: str
+    selected_shares: str
+    target_value: str | None
+    value_rounding_remainder: str | None
+    gross_proceeds: str
+    fees: str
+    net_proceeds: str
+    basis_status: Literal["available", "unavailable"]
+    selected_basis: str | None
+    estimated_gain_loss: str | None
+    remaining_position_quantity: str
+    lots: list[SaleLotResultRead]
+    potential_wash_sale: PotentialWashSaleWarningRead
+    disclosure: list[str]
+
+
+class SalesSimulationRead(BaseModel):
+    methodology_version: str
+    jurisdiction_policy_version: str
+    account_id: UUID
+    security_id: UUID
+    sale_date: date
+    target_type: Literal["shares", "value"]
+    target_amount: str
+    currency: str
+    baseline: SalePriceBaselineRead
+    scenarios: list[SaleScenarioResultRead]
+    calculation_fingerprint: str
+    canonical_records_mutated: Literal[False]
+    persisted: Literal[False]
+    disclosures: list[str]

@@ -1,7 +1,7 @@
 # Stage 3 implementation plan
 
-**Status:** Proposed execution backlog, not implemented  
-**Updated:** 2026-10-01  
+**Status:** In progress; S3.1–S3.3 delivered locally, S3.4/S3.5/S3.R remain
+**Updated:** 2026-10-02
 **Roadmap coverage:** Work packages 3.1–3.5
 
 This is the execution plan for historical investment analysis, source-backed tax lots, and hypothetical decision support. It consumes reliable [Stage 1 portfolio](stage-1-implementation-plan.md) and [Stage 2 transaction](stage-2-implementation-plan.md) records. Read [the product specification](01-product-spec.md), [architecture](02-architecture.md), [source policy](03-data-sources.md), and [DSQL contract](07-aurora-dsql-compatibility.md) first.

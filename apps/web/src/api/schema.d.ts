@@ -707,6 +707,23 @@ export interface paths {
     patch: operations['patch_security_issuer_v1_securities__security_id__issuer_patch']
     trace?: never
   }
+  '/v1/simulations/sales': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Simulate Lot Sales */
+    post: operations['simulate_lot_sales_v1_simulations_sales_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/tax-lot-imports/{import_id}': {
     parameters: {
       query?: never
@@ -1983,6 +2000,72 @@ export interface components {
       current_revision: number
       snapshot: components['schemas']['PositionSnapshotRead'] | null
     }
+    /** PotentialPurchaseRead */
+    PotentialPurchaseRead: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Account Name */
+      account_name: string
+      /**
+       * Effective Date
+       * Format: date
+       */
+      effective_date: string
+      /**
+       * Evidence Id
+       * Format: uuid
+       */
+      evidence_id: string
+      /** Quantity */
+      quantity: string | null
+      /** Source Label */
+      source_label: string
+      /**
+       * Source Type
+       * @enum {string}
+       */
+      source_type: 'investment_event' | 'tax_lot'
+    }
+    /** PotentialWashSaleWarningRead */
+    PotentialWashSaleWarningRead: {
+      /** Affected Lot Ids */
+      affected_lot_ids: string[]
+      /**
+       * Coverage
+       * @constant
+       */
+      coverage: 'unknown'
+      /** Disclosure */
+      disclosure: string
+      /** Evidence Truncated */
+      evidence_truncated: boolean
+      /** Jurisdiction */
+      jurisdiction: string
+      /** Matches */
+      matches: components['schemas']['PotentialPurchaseRead'][]
+      /** Rule Version */
+      rule_version: string
+      /** Source Url */
+      source_url: string
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'potential_match' | 'none_detected' | 'not_applicable' | 'unknown'
+      /**
+       * Window End
+       * Format: date
+       */
+      window_end: string
+      /**
+       * Window Start
+       * Format: date
+       */
+      window_start: string
+    }
     /** QuoteCreate */
     QuoteCreate: {
       /**
@@ -2183,6 +2266,239 @@ export interface components {
       valuation_at: string
       /** Warnings */
       warnings: string[]
+    }
+    /** SaleLotResultRead */
+    SaleLotResultRead: {
+      /** Acquired At */
+      acquired_at: string | null
+      /** Available Basis */
+      available_basis: string | null
+      /** Available Quantity */
+      available_quantity: string
+      /** Basis Currency */
+      basis_currency: string | null
+      /** Estimated Gain Loss */
+      estimated_gain_loss: string | null
+      /** Fee Allocation */
+      fee_allocation: string
+      /** Gross Proceeds */
+      gross_proceeds: string
+      /**
+       * Holding Period Candidate
+       * @enum {string}
+       */
+      holding_period_candidate: 'short_term' | 'long_term' | 'unknown'
+      /**
+       * Lot Id
+       * Format: uuid
+       */
+      lot_id: string
+      /** Net Proceeds */
+      net_proceeds: string
+      /** Quality Status */
+      quality_status: string
+      /** Remaining Basis */
+      remaining_basis: string | null
+      /** Remaining Quantity */
+      remaining_quantity: string
+      /** Selected Basis */
+      selected_basis: string | null
+      /** Selected Quantity */
+      selected_quantity: string
+      /** Source Label */
+      source_label: string
+      /** Source Lot Id */
+      source_lot_id: string | null
+    }
+    /** SaleLotSelection */
+    SaleLotSelection: {
+      /**
+       * Lot Id
+       * Format: uuid
+       */
+      lot_id: string
+      /** Quantity */
+      quantity: string
+    }
+    /** SalePriceBaselineRead */
+    SalePriceBaselineRead: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Account Position Revision */
+      account_position_revision: number
+      /** Baseline Fingerprint */
+      baseline_fingerprint: string
+      /** Currency */
+      currency: string
+      /**
+       * Position Line Id
+       * Format: uuid
+       */
+      position_line_id: string
+      /** Position Quantity */
+      position_quantity: string
+      /**
+       * Position Snapshot At
+       * Format: date-time
+       */
+      position_snapshot_at: string
+      /**
+       * Position Snapshot Id
+       * Format: uuid
+       */
+      position_snapshot_id: string
+      /** Position Snapshot Revision */
+      position_snapshot_revision: number
+      /** Price */
+      price: string
+      /**
+       * Price As Of
+       * Format: date-time
+       */
+      price_as_of: string
+      /** Price Quality */
+      price_quality: string
+      /** Price Source */
+      price_source: string
+      /**
+       * Price Source Id
+       * Format: uuid
+       */
+      price_source_id: string
+      /**
+       * Security Id
+       * Format: uuid
+       */
+      security_id: string
+      /** Security Type */
+      security_type: string
+      /** Ticker */
+      ticker: string | null
+    }
+    /** SaleScenarioInput */
+    SaleScenarioInput: {
+      /**
+       * Fee Amount
+       * @default 0
+       */
+      fee_amount: string
+      /** Label */
+      label: string
+      /** Selections */
+      selections: components['schemas']['SaleLotSelection'][]
+    }
+    /** SaleScenarioResultRead */
+    SaleScenarioResultRead: {
+      /**
+       * Basis Status
+       * @enum {string}
+       */
+      basis_status: 'available' | 'unavailable'
+      /** Disclosure */
+      disclosure: string[]
+      /** Estimated Gain Loss */
+      estimated_gain_loss: string | null
+      /** Fees */
+      fees: string
+      /** Gross Proceeds */
+      gross_proceeds: string
+      /** Label */
+      label: string
+      /** Lots */
+      lots: components['schemas']['SaleLotResultRead'][]
+      /** Net Proceeds */
+      net_proceeds: string
+      potential_wash_sale: components['schemas']['PotentialWashSaleWarningRead']
+      /** Remaining Position Quantity */
+      remaining_position_quantity: string
+      /** Selected Basis */
+      selected_basis: string | null
+      /** Selected Shares */
+      selected_shares: string
+      /** Target Shares */
+      target_shares: string
+      /** Target Value */
+      target_value: string | null
+      /** Value Rounding Remainder */
+      value_rounding_remainder: string | null
+    }
+    /** SalesSimulationRead */
+    SalesSimulationRead: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      baseline: components['schemas']['SalePriceBaselineRead']
+      /** Calculation Fingerprint */
+      calculation_fingerprint: string
+      /**
+       * Canonical Records Mutated
+       * @constant
+       */
+      canonical_records_mutated: false
+      /** Currency */
+      currency: string
+      /** Disclosures */
+      disclosures: string[]
+      /** Jurisdiction Policy Version */
+      jurisdiction_policy_version: string
+      /** Methodology Version */
+      methodology_version: string
+      /**
+       * Persisted
+       * @constant
+       */
+      persisted: false
+      /**
+       * Sale Date
+       * Format: date
+       */
+      sale_date: string
+      /** Scenarios */
+      scenarios: components['schemas']['SaleScenarioResultRead'][]
+      /**
+       * Security Id
+       * Format: uuid
+       */
+      security_id: string
+      /** Target Amount */
+      target_amount: string
+      /**
+       * Target Type
+       * @enum {string}
+       */
+      target_type: 'shares' | 'value'
+    }
+    /** SalesSimulationRequest */
+    SalesSimulationRequest: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /**
+       * Sale Date
+       * Format: date
+       */
+      sale_date: string
+      /** Scenarios */
+      scenarios: components['schemas']['SaleScenarioInput'][]
+      /**
+       * Security Id
+       * Format: uuid
+       */
+      security_id: string
+      /** Target Amount */
+      target_amount: string
+      /**
+       * Target Type
+       * @enum {string}
+       */
+      target_type: 'shares' | 'value'
     }
     /** SecurityCreate */
     SecurityCreate: {
@@ -5181,6 +5497,39 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  simulate_lot_sales_v1_simulations_sales_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SalesSimulationRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SalesSimulationRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
         }
       }
     }

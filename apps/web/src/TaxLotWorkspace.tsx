@@ -6,9 +6,11 @@ import {
   fetchAccounts,
   fetchTaxLotImport,
   fetchTaxLots,
+  fetchPositions,
   fetchSecurities,
   previewTaxLotImport,
   publishTaxLotImport,
+  simulateTaxLotSales,
 } from './api/client'
 import type { components } from './api/schema'
 
@@ -355,6 +357,20 @@ export default function TaxLotWorkspace() {
   )
   const [adjustmentReason, setAdjustmentReason] = useState('')
   const [adjustmentEvidence, setAdjustmentEvidence] = useState('')
+  const [saleSecurityId, setSaleSecurityId] = useState('')
+  const [saleDate, setSaleDate] = useState(today)
+  const [saleTargetType, setSaleTargetType] = useState<'shares' | 'value'>(
+    'shares',
+  )
+  const [saleTarget, setSaleTarget] = useState('')
+  const [saleFeeA, setSaleFeeA] = useState('0')
+  const [saleFeeB, setSaleFeeB] = useState('0')
+  const [saleSelectionsA, setSaleSelectionsA] = useState<
+    Record<string, string>
+  >({})
+  const [saleSelectionsB, setSaleSelectionsB] = useState<
+    Record<string, string>
+  >({})
 
   const selectedAccountId = accountId || accounts[0]?.id || ''
 
@@ -365,6 +381,11 @@ export default function TaxLotWorkspace() {
         selectedAccountId,
         lotQuality === 'all' ? undefined : lotQuality,
       ),
+    enabled: Boolean(selectedAccountId),
+  })
+  const positionsQuery = useQuery({
+    queryKey: ['positions', selectedAccountId],
+    queryFn: () => fetchPositions(selectedAccountId),
     enabled: Boolean(selectedAccountId),
   })
   const importQuery = useQuery({
@@ -459,10 +480,97 @@ export default function TaxLotWorkspace() {
     },
   })
 
+  const saleSimulation = useMutation({
+    mutationFn: () => {
+      if (!selectedAccountId || !saleSecurityId || !saleTarget || !saleDate)
+        throw new Error('Select an owned security, sale date, and sale target.')
+      const selectedA = Object.entries(saleSelectionsA)
+        .filter(([, quantity]) => quantity.trim())
+        .map(([lot_id, quantity]) => ({ lot_id, quantity }))
+      const selectedB = Object.entries(saleSelectionsB)
+        .filter(([, quantity]) => quantity.trim())
+        .map(([lot_id, quantity]) => ({ lot_id, quantity }))
+      if (!selectedA.length || !selectedB.length)
+        throw new Error('Select at least one lot in each comparison scenario.')
+      return simulateTaxLotSales({
+        account_id: selectedAccountId,
+        security_id: saleSecurityId,
+        sale_date: saleDate,
+        target_type: saleTargetType,
+        target_amount: saleTarget,
+        scenarios: [
+          {
+            label: 'Selection A',
+            fee_amount: saleFeeA || '0',
+            selections: selectedA,
+          },
+          {
+            label: 'Selection B',
+            fee_amount: saleFeeB || '0',
+            selections: selectedB,
+          },
+        ],
+      })
+    },
+  })
+
   const review = importQuery.data
   const rows = review?.rows ?? []
   const visibleRows = rows.slice(page * 50, page * 50 + 50)
   const lotRows: Lot[] = lotsQuery.data ?? []
+  const saleSecurities = Array.from(
+    new Map(
+      lotRows.map((lot) => [
+        lot.security_id,
+        { id: lot.security_id, ticker: lot.ticker, name: lot.security_name },
+      ]),
+    ).values(),
+  )
+  const selectedSaleLots = lotRows.filter(
+    (lot) => lot.security_id === saleSecurityId,
+  )
+  const saleResult = saleSimulation.data
+  const saleInputsChanged = Boolean(
+    saleResult &&
+    (saleResult.target_type !== saleTargetType ||
+      saleResult.target_amount !== saleTarget ||
+      saleResult.sale_date !== saleDate ||
+      saleResult.scenarios.some((scenario, index) => {
+        const currentSelections = Object.entries(
+          index === 0 ? saleSelectionsA : saleSelectionsB,
+        )
+          .filter(([, quantity]) => quantity.trim())
+          .sort(([left], [right]) => left.localeCompare(right))
+        const resultSelections = scenario.lots
+          .map((lot) => [lot.lot_id, lot.selected_quantity])
+          .sort(([left], [right]) => left.localeCompare(right))
+        const currentFee = index === 0 ? saleFeeA || '0' : saleFeeB || '0'
+        return (
+          JSON.stringify(currentSelections) !==
+            JSON.stringify(resultSelections) || scenario.fees !== currentFee
+        )
+      })),
+  )
+  const saleBaselineChanged = Boolean(
+    saleResult &&
+    (saleResult.account_id !== selectedAccountId ||
+      saleInputsChanged ||
+      saleResult.security_id !== saleSecurityId ||
+      (positionsQuery.data !== undefined &&
+        positionsQuery.data.current_revision !==
+          saleResult.baseline.account_position_revision) ||
+      saleResult.scenarios.some((scenario) =>
+        scenario.lots.some((resultLot) => {
+          const currentLot = lotRows.find((lot) => lot.id === resultLot.lot_id)
+          return (
+            !currentLot ||
+            currentLot.current_remaining_quantity !==
+              resultLot.available_quantity ||
+            currentLot.current_remaining_basis !== resultLot.available_basis
+          )
+        }),
+      )),
+  )
   const selectedAdjustmentLot = lotRows.find(
     (lot) => lot.id === adjustmentLotId,
   )
@@ -952,6 +1060,331 @@ export default function TaxLotWorkspace() {
           </form>
         </section>
       )}
+
+      <section className="space-y-5 rounded-2xl border border-cyan-200 bg-cyan-50/40 p-5 shadow-sm">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-800">
+            Hypothetical only · read-only
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-slate-900">
+            Compare two lot selections
+          </h2>
+          <p className="mt-1 max-w-4xl text-sm text-slate-600">
+            Choose the same sale target for both selections. The calculation
+            uses the accepted position price as a constant assumption through
+            the sale date; it never changes holdings, events, lots, or basis.
+            Each result is tied to a frozen position and lot evidence
+            fingerprint.
+          </p>
+        </div>
+        {saleSimulation.error && (
+          <p
+            role="alert"
+            className="rounded-lg bg-rose-50 p-3 text-sm text-rose-900"
+          >
+            {saleSimulation.error.message}
+          </p>
+        )}
+        <div className="grid gap-4 md:grid-cols-4">
+          <label className="grid gap-1 text-sm font-medium">
+            Actual security
+            <select
+              className="rounded-lg border border-slate-300 bg-white p-2"
+              value={saleSecurityId}
+              onChange={(event) => {
+                setSaleSecurityId(event.target.value)
+                setSaleSelectionsA({})
+                setSaleSelectionsB({})
+              }}
+            >
+              <option value="">Select from this account’s lots</option>
+              {saleSecurities.map((security) => (
+                <option key={security.id} value={security.id}>
+                  {security.ticker ?? security.name} · {security.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm font-medium">
+            Hypothetical sale date
+            <input
+              className="rounded-lg border border-slate-300 bg-white p-2"
+              type="date"
+              value={saleDate}
+              onChange={(event) => setSaleDate(event.target.value)}
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-medium">
+            Target type
+            <select
+              className="rounded-lg border border-slate-300 bg-white p-2"
+              value={saleTargetType}
+              onChange={(event) =>
+                setSaleTargetType(event.target.value as typeof saleTargetType)
+              }
+            >
+              <option value="shares">Shares</option>
+              <option value="value">Gross sale value</option>
+            </select>
+          </label>
+          <label className="grid gap-1 text-sm font-medium">
+            Sale target
+            <input
+              className="rounded-lg border border-slate-300 bg-white p-2"
+              inputMode="decimal"
+              value={saleTarget}
+              onChange={(event) => setSaleTarget(event.target.value)}
+              placeholder={
+                saleTargetType === 'shares' ? 'e.g. 10' : 'e.g. 1000'
+              }
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-medium">
+            Selection A fees
+            <input
+              className="rounded-lg border border-slate-300 bg-white p-2"
+              inputMode="decimal"
+              value={saleFeeA}
+              onChange={(event) => setSaleFeeA(event.target.value)}
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-medium">
+            Selection B fees
+            <input
+              className="rounded-lg border border-slate-300 bg-white p-2"
+              inputMode="decimal"
+              value={saleFeeB}
+              onChange={(event) => setSaleFeeB(event.target.value)}
+            />
+          </label>
+        </div>
+
+        {saleSecurityId &&
+          (selectedSaleLots.length === 0 ? (
+            <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
+              No lots match the current evidence-quality filter. Set it to “All
+              lots” to include incomplete evidence; missing basis keeps the gain
+              estimate unavailable.
+            </p>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-100 text-xs uppercase text-slate-600">
+                  <tr>
+                    <th className="p-2">Lot / date / basis</th>
+                    <th className="p-2">Available shares</th>
+                    <th className="p-2">Selection A shares</th>
+                    <th className="p-2">Selection B shares</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedSaleLots.map((lot) => (
+                    <tr className="border-t border-slate-100" key={lot.id}>
+                      <td className="p-2">
+                        <span className="font-semibold">
+                          {lot.source_lot_id ?? lot.id}
+                        </span>
+                        <span className="block text-xs text-slate-500">
+                          {lot.acquired_at ?? 'Date unavailable'} ·{' '}
+                          {lot.current_remaining_basis === null
+                            ? 'Basis unavailable'
+                            : `${lot.current_remaining_basis} ${lot.basis_currency ?? ''}`}
+                        </span>
+                      </td>
+                      <td className="p-2">{lot.current_remaining_quantity}</td>
+                      <td className="p-2">
+                        <input
+                          aria-label={`Selection A quantity for ${lot.source_lot_id ?? lot.id}`}
+                          className="w-32 rounded border border-slate-300 p-2"
+                          inputMode="decimal"
+                          value={saleSelectionsA[lot.id] ?? ''}
+                          onChange={(event) =>
+                            setSaleSelectionsA((current) => ({
+                              ...current,
+                              [lot.id]: event.target.value,
+                            }))
+                          }
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          aria-label={`Selection B quantity for ${lot.source_lot_id ?? lot.id}`}
+                          className="w-32 rounded border border-slate-300 p-2"
+                          inputMode="decimal"
+                          value={saleSelectionsB[lot.id] ?? ''}
+                          onChange={(event) =>
+                            setSaleSelectionsB((current) => ({
+                              ...current,
+                              [lot.id]: event.target.value,
+                            }))
+                          }
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            className="rounded-lg bg-cyan-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            type="button"
+            disabled={
+              saleSimulation.isPending || !saleSecurityId || !saleTarget
+            }
+            onClick={() => saleSimulation.mutate()}
+          >
+            {saleSimulation.isPending
+              ? 'Calculating…'
+              : saleResult
+                ? 'Refresh comparison'
+                : 'Calculate comparison'}
+          </button>
+          <p className="text-xs text-slate-600">
+            Both selections must sum to the same target. Fees use the security’s
+            currency.
+          </p>
+        </div>
+
+        {saleResult && (
+          <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-slate-900">
+                  Frozen comparison · {saleResult.currency}
+                </h3>
+                <p className="mt-1 text-xs text-slate-600">
+                  Price {saleResult.baseline.price} from{' '}
+                  {saleResult.baseline.price_source} at{' '}
+                  {saleResult.baseline.price_as_of} · position revision{' '}
+                  {saleResult.baseline.account_position_revision}
+                </p>
+              </div>
+              <code className="max-w-full break-all text-xs text-slate-500">
+                {saleResult.calculation_fingerprint}
+              </code>
+            </div>
+            {saleBaselineChanged && (
+              <p
+                role="status"
+                className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900"
+              >
+                The accepted position or selected lot evidence changed after
+                this calculation. The result stays tied to its original
+                fingerprint; refresh to use current evidence.
+              </p>
+            )}
+            <div className="grid gap-4 lg:grid-cols-2">
+              {saleResult.scenarios.map((scenario) => (
+                <article
+                  className="space-y-3 rounded-lg border border-slate-200 p-4"
+                  key={scenario.label}
+                >
+                  <h4 className="font-semibold text-slate-900">
+                    {scenario.label}
+                  </h4>
+                  <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                    <dt className="text-slate-600">Shares sold</dt>
+                    <dd>{scenario.target_shares}</dd>
+                    <dt className="text-slate-600">Gross proceeds</dt>
+                    <dd>{scenario.gross_proceeds}</dd>
+                    <dt className="text-slate-600">Fees</dt>
+                    <dd>{scenario.fees}</dd>
+                    <dt className="text-slate-600">Net proceeds</dt>
+                    <dd>{scenario.net_proceeds}</dd>
+                    <dt className="text-slate-600">Selected basis</dt>
+                    <dd>{scenario.selected_basis ?? 'Unavailable'}</dd>
+                    <dt className="font-medium text-slate-800">
+                      Estimated gain/loss
+                    </dt>
+                    <dd className="font-semibold">
+                      {scenario.estimated_gain_loss ?? 'Unavailable'}
+                    </dd>
+                  </dl>
+                  {scenario.target_value !== null && (
+                    <p className="text-xs text-slate-600">
+                      Gross value target {scenario.target_value}; rounded share
+                      remainder {scenario.value_rounding_remainder}.
+                    </p>
+                  )}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="text-slate-500">
+                        <tr>
+                          <th className="py-1">Lot</th>
+                          <th className="py-1">Shares</th>
+                          <th className="py-1">Basis</th>
+                          <th className="py-1">Gain/loss</th>
+                          <th className="py-1">Period</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {scenario.lots.map((lot) => (
+                          <tr
+                            className="border-t border-slate-100"
+                            key={lot.lot_id}
+                          >
+                            <td className="py-1">
+                              {lot.source_lot_id ?? lot.lot_id}
+                            </td>
+                            <td className="py-1">{lot.selected_quantity}</td>
+                            <td className="py-1">
+                              {lot.selected_basis ?? 'Unavailable'}
+                            </td>
+                            <td className="py-1">
+                              {lot.estimated_gain_loss ?? 'Unavailable'}
+                            </td>
+                            <td className="py-1">
+                              {lot.holding_period_candidate.replace('_', ' ')}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-950">
+                    <p className="font-medium">
+                      Potential wash-sale check:{' '}
+                      {scenario.potential_wash_sale.status.replaceAll('_', ' ')}
+                    </p>
+                    <p className="mt-1 text-xs">
+                      Coverage is unknown. This checks exact local security IDs
+                      and available reviewed records only; no match is not
+                      compliance clearance.
+                    </p>
+                    {scenario.potential_wash_sale.matches.length > 0 && (
+                      <ul className="mt-2 list-disc pl-5 text-xs">
+                        {scenario.potential_wash_sale.matches.map((match) => (
+                          <li key={`${match.source_type}-${match.evidence_id}`}>
+                            {match.effective_date} · {match.account_name} ·{' '}
+                            {match.source_type.replace('_', ' ')} ·{' '}
+                            {match.source_label}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <a
+                      className="mt-2 inline-block text-xs font-medium underline"
+                      href={scenario.potential_wash_sale.source_url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      U.S. IRS Publication 550 source
+                    </a>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <p className="text-xs text-slate-600">
+              Policy {saleResult.jurisdiction_policy_version}. Holding-period
+              labels are limited candidates; exceptions and prior-period tacking
+              are not modeled. This tool does not estimate tax or provide legal
+              or tax advice.
+            </p>
+          </section>
+        )}
+      </section>
     </section>
   )
 }
