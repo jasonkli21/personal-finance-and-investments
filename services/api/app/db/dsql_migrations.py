@@ -1170,11 +1170,173 @@ STAGE1_POSITION_IMPORTS = DsqlMigration(
     ),
 )
 
+
+# Versioned Stage 1 fund schema: statements frozen at generation time.
+TABLE_COLUMNS["fund_snapshots"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("fund_security_id", "uuid", "NO", None, None, None),
+    ("import_id", "uuid", "NO", None, None, None),
+    ("review_revision", "integer", "NO", None, None, None),
+    ("as_of", "date", "NO", None, None, None),
+    ("fetched_at", "timestamp with time zone", "NO", None, None, None),
+    ("source", "character varying", "NO", 100, None, None),
+    ("source_url", "character varying", "YES", 500, None, None),
+    ("parser_version", "character varying", "NO", 80, None, None),
+    ("content_hash", "character varying", "NO", 64, None, None),
+    ("status", "character varying", "NO", 24, None, None),
+    ("reported_weight", "numeric", "NO", None, 18, 10),
+    ("recognized_weight", "numeric", "NO", None, 18, 10),
+    ("quality_status", "character varying", "NO", 24, None, None),
+    ("diagnostics", "jsonb", "NO", None, None, None),
+    ("published_at", "timestamp with time zone", "YES", None, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+    ("updated_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["fund_snapshots"] = (
+    (
+        "fund_snapshots_fund_security_id_fkey",
+        "FOREIGN KEY",
+        (("foreignkey(fund_security_id)referencessecurities(id)ondeleteRESTRICT"),),
+    ),
+    (
+        "fund_snapshots_import_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(import_id)referencesimports(id)ondeleteRESTRICT",),
+    ),
+    ("fund_snapshots_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    ("uq_fund_import_revision", "UNIQUE", ("unique(import_id,review_revision)",)),
+)
+TABLE_COLUMNS["fund_lines"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("snapshot_id", "uuid", "NO", None, None, None),
+    ("row_number", "integer", "NO", None, None, None),
+    ("review_row_id", "uuid", "NO", None, None, None),
+    ("security_id", "uuid", "YES", None, None, None),
+    ("weight", "numeric", "NO", None, 18, 10),
+    ("asset_type", "character varying", "NO", 24, None, None),
+    ("raw_identifier", "character varying", "YES", 2000, None, None),
+    ("raw_name", "character varying", "YES", 2000, None, None),
+    ("match_status", "character varying", "NO", 24, None, None),
+)
+TABLE_CONSTRAINTS["fund_lines"] = (
+    ("fund_lines_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    (
+        "fund_lines_review_row_id_fkey",
+        "FOREIGN KEY",
+        (("foreignkey(review_row_id)referencesimport_rows(id)ondeleteRESTRICT"),),
+    ),
+    (
+        "fund_lines_security_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(security_id)referencessecurities(id)ondeleteRESTRICT",),
+    ),
+    (
+        "fund_lines_snapshot_id_fkey",
+        "FOREIGN KEY",
+        (("foreignkey(snapshot_id)referencesfund_snapshots(id)ondeleteCASCADE"),),
+    ),
+    ("uq_fund_line_row", "UNIQUE", ("unique(snapshot_id,row_number)",)),
+)
+STAGE1_FUND_COMPOSITIONS = DsqlMigration(
+    "0005_fund_compositions",
+    (
+        DsqlMigrationStep(
+            "create_fund_snapshots",
+            "table",
+            """CREATE TABLE fund_snapshots (
+	id UUID NOT NULL,
+	fund_security_id UUID NOT NULL,
+	import_id UUID NOT NULL,
+	review_revision INTEGER NOT NULL,
+	as_of DATE NOT NULL,
+	fetched_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	source VARCHAR(100) NOT NULL,
+	source_url VARCHAR(500),
+	parser_version VARCHAR(80) NOT NULL,
+	content_hash VARCHAR(64) NOT NULL,
+	status VARCHAR(24) NOT NULL,
+	reported_weight NUMERIC(18, 10) NOT NULL,
+	recognized_weight NUMERIC(18, 10) NOT NULL,
+	quality_status VARCHAR(24) NOT NULL,
+	diagnostics JSONB NOT NULL,
+	published_at TIMESTAMP WITH TIME ZONE,
+	created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	CONSTRAINT fund_snapshots_pkey PRIMARY KEY (id),
+	CONSTRAINT uq_fund_import_revision UNIQUE (import_id, review_revision),
+	CONSTRAINT fund_snapshots_fund_security_id_fkey FOREIGN KEY(fund_security_id)
+    REFERENCES securities (id) ON DELETE RESTRICT,
+	CONSTRAINT fund_snapshots_import_id_fkey FOREIGN KEY(import_id)
+    REFERENCES imports (id) ON DELETE RESTRICT
+)""",
+            "fund_snapshots",
+            (
+                "SELECT EXISTS (SELECT 1 FROM information_schema."
+                "tables WHERE table_schema = current_schema() AND"
+                " table_name = :object_name)"
+            ),
+        ),
+        DsqlMigrationStep(
+            "ix_fund_snapshots_selection",
+            "index",
+            (
+                "CREATE INDEX ASYNC ix_fund_snapshots_selection O"
+                "N fund_snapshots (fund_security_id, as_of, statu"
+                "s)"
+            ),
+            "ix_fund_snapshots_selection",
+            "SELECT 1",
+            expected_index_table="fund_snapshots",
+            expected_index_columns=("fund_security_id", "as_of", "status"),
+        ),
+        DsqlMigrationStep(
+            "create_fund_lines",
+            "table",
+            """CREATE TABLE fund_lines (
+	id UUID NOT NULL,
+	snapshot_id UUID NOT NULL,
+	row_number INTEGER NOT NULL,
+	review_row_id UUID NOT NULL,
+	security_id UUID,
+	weight NUMERIC(18, 10) NOT NULL,
+	asset_type VARCHAR(24) NOT NULL,
+	raw_identifier VARCHAR(2000),
+	raw_name VARCHAR(2000),
+	match_status VARCHAR(24) NOT NULL,
+	CONSTRAINT fund_lines_pkey PRIMARY KEY (id),
+	CONSTRAINT uq_fund_line_row UNIQUE (snapshot_id, row_number),
+	CONSTRAINT fund_lines_snapshot_id_fkey FOREIGN KEY(snapshot_id)
+    REFERENCES fund_snapshots (id) ON DELETE CASCADE,
+	CONSTRAINT fund_lines_review_row_id_fkey FOREIGN KEY(review_row_id)
+    REFERENCES import_rows (id) ON DELETE RESTRICT,
+	CONSTRAINT fund_lines_security_id_fkey FOREIGN KEY(security_id)
+    REFERENCES securities (id) ON DELETE RESTRICT
+)""",
+            "fund_lines",
+            (
+                "SELECT EXISTS (SELECT 1 FROM information_schema."
+                "tables WHERE table_schema = current_schema() AND"
+                " table_name = :object_name)"
+            ),
+        ),
+        DsqlMigrationStep(
+            "ix_fund_lines_snapshot",
+            "index",
+            ("CREATE INDEX ASYNC ix_fund_lines_snapshot ON fund_lines (snapshot_id)"),
+            "ix_fund_lines_snapshot",
+            "SELECT 1",
+            expected_index_table="fund_lines",
+            expected_index_columns=("snapshot_id",),
+        ),
+    ),
+)
+
 DSQL_MIGRATIONS = (
     CORE_SCHEMA,
     POSITION_SNAPSHOT_REVISION,
     IMMUTABLE_POSITION_REVISIONS_AND_IDENTIFIERS,
     STAGE1_POSITION_IMPORTS,
+    STAGE1_FUND_COMPOSITIONS,
 )
 LEDGER_DDL = """CREATE TABLE IF NOT EXISTS dsql_schema_migration_steps (
     revision varchar(128) NOT NULL,

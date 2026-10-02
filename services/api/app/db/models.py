@@ -444,3 +444,71 @@ class IssuerMappingEvent(Base):
     changed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
+
+
+class FundSnapshot(TimestampMixin, Base):
+    """Immutable reviewed composition; staging records are never selected."""
+
+    __tablename__ = "fund_snapshots"
+    __table_args__ = (
+        UniqueConstraint(
+            "import_id", "review_revision", name="uq_fund_import_revision"
+        ),
+        Index("ix_fund_snapshots_selection", "fund_security_id", "as_of", "status"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    fund_security_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("securities.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    import_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("imports.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    review_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    as_of: Mapped[date] = mapped_column(Date, nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    source: Mapped[str] = mapped_column(String(100), nullable=False)
+    source_url: Mapped[str | None] = mapped_column(String(500))
+    parser_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    reported_weight: Mapped[Decimal] = mapped_column(Numeric(18, 10), nullable=False)
+    recognized_weight: Mapped[Decimal] = mapped_column(Numeric(18, 10), nullable=False)
+    quality_status: Mapped[str] = mapped_column(String(24), nullable=False)
+    diagnostics: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), nullable=False
+    )
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class FundLine(Base):
+    __tablename__ = "fund_lines"
+    __table_args__ = (
+        UniqueConstraint("snapshot_id", "row_number", name="uq_fund_line_row"),
+        Index("ix_fund_lines_snapshot", "snapshot_id"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    snapshot_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("fund_snapshots.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    row_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    review_row_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("import_rows.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    security_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("securities.id", ondelete="RESTRICT")
+    )
+    weight: Mapped[Decimal] = mapped_column(Numeric(18, 10), nullable=False)
+    asset_type: Mapped[str] = mapped_column(String(24), nullable=False)
+    raw_identifier: Mapped[str | None] = mapped_column(String(2000))
+    raw_name: Mapped[str | None] = mapped_column(String(2000))
+    match_status: Mapped[str] = mapped_column(String(24), nullable=False)

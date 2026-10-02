@@ -13,6 +13,7 @@ import type { components } from './api/schema'
 import { captureDraftBaseRevision } from './position-draft'
 import { startReadinessPolling, type ApiStatus } from './readiness'
 import StageOneWorkspace from './StageOneWorkspace'
+import FundWorkspace from './FundWorkspace'
 
 type Security = components['schemas']['SecurityRead']
 type PositionLine = components['schemas']['PositionLineRead']
@@ -905,6 +906,7 @@ export default function App() {
           )}
         </section>
       </section>
+      <FundWorkspace />
       <StageOneWorkspace
         accountId={selectedAccountId}
         effectiveDate={effectiveDate}

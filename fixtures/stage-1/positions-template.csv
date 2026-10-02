@@ -1,0 +1,5 @@
+account,identifier,quantity,price,currency,as_of,asset_type
+Synthetic Brokerage,NVDA,100,300,USD,2026-10-01,equity
+Synthetic Brokerage,ETF-A,500,100,USD,2026-10-01,etf
+Synthetic Brokerage,ETF-B,200,100,USD,2026-10-01,etf
+Synthetic Brokerage,cash:USD,100000,,USD,2026-10-01,cash

@@ -174,6 +174,9 @@ class ImportRowRead(BaseModel):
     raw_identifier: str | None
     raw_name: str | None
     raw_asset_type: str | None
+    raw_weight_value: str | None = None
+    raw_weight_unit: str | None = None
+    normalized_weight: str | None = None
     raw_quantity: str | None
     raw_price: str | None
     raw_currency: str | None
@@ -319,3 +322,30 @@ class QuoteRead(BaseModel):
     currency: str
     source: str
     quality_status: str
+
+
+class FundCorrection(BaseModel):
+    expected_review_revision: int = Field(ge=1)
+    reason: str = Field(min_length=1, max_length=500)
+    security_id: UUID | None = None
+    weight: str | None = Field(default=None, max_length=30)
+    asset_type: Literal["equity", "cash", "nested", "other", "unsupported"] | None = (
+        None
+    )
+
+
+class FundSnapshotRead(BaseModel):
+    id: UUID
+    fund_security_id: UUID
+    import_id: UUID
+    as_of: date
+    fetched_at: datetime
+    source: str
+    source_url: str | None
+    parser_version: str
+    content_hash: str
+    quality_status: str
+    reported_weight: str
+    recognized_weight: str
+    warnings: list[str]
+    row_count: int

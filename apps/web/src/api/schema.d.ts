@@ -91,6 +91,91 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/fund-imports/{import_id}/publish': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Publish */
+    post: operations['publish_v1_fund_imports__import_id__publish_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/fund-imports/{import_id}/rows/{row_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /** Correction */
+    patch: operations['correction_v1_fund_imports__import_id__rows__row_id__patch']
+    trace?: never
+  }
+  '/v1/funds/{fund_id}/refresh': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Refresh */
+    post: operations['refresh_v1_funds__fund_id__refresh_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/funds/{fund_id}/snapshots': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** History */
+    get: operations['history_v1_funds__fund_id__snapshots_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/funds/{fund_id}/upload': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Upload */
+    post: operations['upload_v1_funds__fund_id__upload_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/imports/positions/preview': {
     parameters: {
       query?: never
@@ -327,6 +412,66 @@ export interface components {
       /** Detail */
       detail: string
     }
+    /** FundCorrection */
+    FundCorrection: {
+      /** Asset Type */
+      asset_type?:
+        ('equity' | 'cash' | 'nested' | 'other' | 'unsupported') | null
+      /** Expected Review Revision */
+      expected_review_revision: number
+      /** Reason */
+      reason: string
+      /** Security Id */
+      security_id?: string | null
+      /** Weight */
+      weight?: string | null
+    }
+    /** FundSnapshotRead */
+    FundSnapshotRead: {
+      /**
+       * As Of
+       * Format: date
+       */
+      as_of: string
+      /** Content Hash */
+      content_hash: string
+      /**
+       * Fetched At
+       * Format: date-time
+       */
+      fetched_at: string
+      /**
+       * Fund Security Id
+       * Format: uuid
+       */
+      fund_security_id: string
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /**
+       * Import Id
+       * Format: uuid
+       */
+      import_id: string
+      /** Parser Version */
+      parser_version: string
+      /** Quality Status */
+      quality_status: string
+      /** Recognized Weight */
+      recognized_weight: string
+      /** Reported Weight */
+      reported_weight: string
+      /** Row Count */
+      row_count: number
+      /** Source */
+      source: string
+      /** Source Url */
+      source_url: string | null
+      /** Warnings */
+      warnings: string[]
+    }
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -441,6 +586,8 @@ export interface components {
       normalized_price: string | null
       /** Normalized Quantity */
       normalized_quantity: string | null
+      /** Normalized Weight */
+      normalized_weight?: string | null
       /** Raw Asset Type */
       raw_asset_type: string | null
       /** Raw Currency */
@@ -457,6 +604,10 @@ export interface components {
       raw_price: string | null
       /** Raw Quantity */
       raw_quantity: string | null
+      /** Raw Weight Unit */
+      raw_weight_unit?: string | null
+      /** Raw Weight Value */
+      raw_weight_value?: string | null
       /** Row Number */
       row_number: number
       /** Row Status */
@@ -1083,6 +1234,177 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  publish_v1_fund_imports__import_id__publish_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        import_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ImportAction']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['FundSnapshotRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  correction_v1_fund_imports__import_id__rows__row_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        import_id: string
+        row_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['FundCorrection']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImportRowRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  refresh_v1_funds__fund_id__refresh_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        fund_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': unknown
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  history_v1_funds__fund_id__snapshots_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        fund_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['FundSnapshotRead'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  upload_v1_funds__fund_id__upload_post: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Effective-Date': string
+        'Idempotency-Key': string
+        'X-Source-Label'?: string
+        'X-Fund-Format'?: string
+        'X-Weight-Unit'?: string
+        'X-Column-Mapping'?: string
+      }
+      path: {
+        fund_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ImportCreated']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
         }
       }
     }

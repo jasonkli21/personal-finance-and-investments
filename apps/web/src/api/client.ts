@@ -219,3 +219,63 @@ export async function replacePositions(
     }),
   )
 }
+
+export async function previewFundImport(input: {
+  fundId: string
+  date: string
+  format: string
+  unit: string
+  mapping: Record<string, string>
+  file: File
+}) {
+  const response = await fetch(`/api/v1/funds/${input.fundId}/upload`, {
+    method: 'POST',
+    headers: {
+      'X-Effective-Date': input.date,
+      'X-Fund-Format': input.format,
+      'X-Weight-Unit': input.unit,
+      'X-Column-Mapping': JSON.stringify(input.mapping),
+      'X-File-Name': input.file.name,
+      'X-Source-Label': `User upload (${input.format})`,
+      'Idempotency-Key': crypto.randomUUID(),
+    },
+    body: input.file,
+  })
+  const body =
+    (await response.json()) as components['schemas']['ImportCreated'] & {
+      detail?: string
+    }
+  if (!response.ok)
+    throw new ApiError(response.status, body.detail ?? 'Fund review failed')
+  return body
+}
+export async function fetchFundSnapshots(fundId: string) {
+  return unwrap(
+    await api.GET('/v1/funds/{fund_id}/snapshots', {
+      params: { path: { fund_id: fundId } },
+    }),
+  )
+}
+export async function publishFundImport(importId: string, revision: number) {
+  return unwrap(
+    await api.POST('/v1/fund-imports/{import_id}/publish', {
+      params: { path: { import_id: importId } },
+      body: {
+        expected_review_revision: revision,
+        reason: 'Accepted after fund review',
+      },
+    }),
+  )
+}
+export async function correctFundRow(
+  importId: string,
+  rowId: string,
+  data: components['schemas']['FundCorrection'],
+) {
+  return unwrap(
+    await api.PATCH('/v1/fund-imports/{import_id}/rows/{row_id}', {
+      params: { path: { import_id: importId, row_id: rowId } },
+      body: data,
+    }),
+  )
+}

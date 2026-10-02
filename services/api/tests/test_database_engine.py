@@ -85,8 +85,8 @@ def test_official_dsql_dialect_compiles_core_schema_without_connecting() -> None
             for table in Base.metadata.sorted_tables
             for index in table.indexes
         ]
-        assert len(table_ddl) == 14
-        assert len(index_ddl) == 9
+        assert len(table_ddl) == 16
+        assert len(index_ddl) == 11
         assert all(
             statement.lstrip().startswith("CREATE TABLE") for statement in table_ddl
         )

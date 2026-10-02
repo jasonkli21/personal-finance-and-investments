@@ -621,6 +621,11 @@ def _row_read(session: Session, row: ImportRow) -> dict[str, Any]:
         "raw_identifier": row.raw_identifier,
         "raw_name": row.raw_name,
         "raw_asset_type": row.raw_asset_type,
+        "raw_weight_value": row.raw_weight_value,
+        "raw_weight_unit": row.raw_weight_unit,
+        "normalized_weight": str(row.normalized_weight)
+        if row.normalized_weight is not None
+        else None,
         "raw_quantity": row.raw_quantity,
         "raw_price": row.raw_price,
         "raw_currency": row.raw_currency,
@@ -675,6 +680,8 @@ def correct_import_row(
     row = session.get(ImportRow, row_id)
     if attempt is None or row is None or row.import_id != import_id:
         raise ImportNotFound
+    if attempt.kind != "positions":
+        raise ImportConflict("Use the fund review action for fund rows.")
     if attempt.status != "review":
         raise ImportConflict("Only an import under review can be corrected.")
     if attempt.review_revision != correction.expected_review_revision:

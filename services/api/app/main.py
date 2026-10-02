@@ -42,6 +42,9 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
     app.state.max_import_file_bytes = settings.max_import_file_bytes
     app.state.max_import_rows = settings.max_import_rows
     app.include_router(api_router)
+    from app.api.fund_routes import router as fund_router
+
+    app.include_router(fund_router)
 
     @app.exception_handler(SQLAlchemyError)
     def database_error_handler(

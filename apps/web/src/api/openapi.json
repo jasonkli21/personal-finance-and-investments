@@ -136,6 +136,162 @@
         "title": "ErrorResponse",
         "type": "object"
       },
+      "FundCorrection": {
+        "properties": {
+          "asset_type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "equity",
+                  "cash",
+                  "nested",
+                  "other",
+                  "unsupported"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Type"
+          },
+          "expected_review_revision": {
+            "minimum": 1.0,
+            "title": "Expected Review Revision",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "security_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Security Id"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          }
+        },
+        "required": [
+          "expected_review_revision",
+          "reason"
+        ],
+        "title": "FundCorrection",
+        "type": "object"
+      },
+      "FundSnapshotRead": {
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "content_hash": {
+            "title": "Content Hash",
+            "type": "string"
+          },
+          "fetched_at": {
+            "format": "date-time",
+            "title": "Fetched At",
+            "type": "string"
+          },
+          "fund_security_id": {
+            "format": "uuid",
+            "title": "Fund Security Id",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "import_id": {
+            "format": "uuid",
+            "title": "Import Id",
+            "type": "string"
+          },
+          "parser_version": {
+            "title": "Parser Version",
+            "type": "string"
+          },
+          "quality_status": {
+            "title": "Quality Status",
+            "type": "string"
+          },
+          "recognized_weight": {
+            "title": "Recognized Weight",
+            "type": "string"
+          },
+          "reported_weight": {
+            "title": "Reported Weight",
+            "type": "string"
+          },
+          "row_count": {
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "fund_security_id",
+          "import_id",
+          "as_of",
+          "fetched_at",
+          "source",
+          "source_url",
+          "parser_version",
+          "content_hash",
+          "quality_status",
+          "reported_weight",
+          "recognized_weight",
+          "warnings",
+          "row_count"
+        ],
+        "title": "FundSnapshotRead",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -459,6 +615,17 @@
             ],
             "title": "Normalized Quantity"
           },
+          "normalized_weight": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalized Weight"
+          },
           "raw_asset_type": {
             "anyOf": [
               {
@@ -531,6 +698,28 @@
               }
             ],
             "title": "Raw Quantity"
+          },
+          "raw_weight_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Weight Unit"
+          },
+          "raw_weight_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Weight Value"
           },
           "row_number": {
             "title": "Row Number",
@@ -1798,6 +1987,297 @@
           }
         },
         "summary": "Put Positions"
+      }
+    },
+    "/v1/fund-imports/{import_id}/publish": {
+      "post": {
+        "operationId": "publish_v1_fund_imports__import_id__publish_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Import Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportAction"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundSnapshotRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publish"
+      }
+    },
+    "/v1/fund-imports/{import_id}/rows/{row_id}": {
+      "patch": {
+        "operationId": "correction_v1_fund_imports__import_id__rows__row_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Import Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "row_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Row Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundCorrection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportRowRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Correction"
+      }
+    },
+    "/v1/funds/{fund_id}/refresh": {
+      "post": {
+        "operationId": "refresh_v1_funds__fund_id__refresh_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fund_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Fund Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refresh"
+      }
+    },
+    "/v1/funds/{fund_id}/snapshots": {
+      "get": {
+        "operationId": "history_v1_funds__fund_id__snapshots_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fund_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Fund Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/FundSnapshotRead"
+                  },
+                  "title": "Response History V1 Funds  Fund Id  Snapshots Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "History"
+      }
+    },
+    "/v1/funds/{fund_id}/upload": {
+      "post": {
+        "operationId": "upload_v1_funds__fund_id__upload_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "fund_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Fund Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Effective-Date",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "title": "X-Effective-Date",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Source-Label",
+            "required": false,
+            "schema": {
+              "default": "User fund CSV",
+              "title": "X-Source-Label",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Fund-Format",
+            "required": false,
+            "schema": {
+              "default": "manual",
+              "title": "X-Fund-Format",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Weight-Unit",
+            "required": false,
+            "schema": {
+              "default": "percent",
+              "title": "X-Weight-Unit",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Column-Mapping",
+            "required": false,
+            "schema": {
+              "default": "{}",
+              "title": "X-Column-Mapping",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload"
       }
     },
     "/v1/imports/positions/preview": {
