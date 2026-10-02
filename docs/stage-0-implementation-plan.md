@@ -1,6 +1,6 @@
 # Stage 0 implementation plan
 
-**Status:** S0.5 account/manual-position slice implemented; S0.6 demo pending; live DSQL remains unverified
+**Status:** S0.1–S0.6 local foundation implemented; live DSQL remains unverified
 **Updated:** 2026-10-02
 **Roadmap coverage:** Work packages 0.1–0.6
 
@@ -62,6 +62,8 @@ Deliver settings validation, versioned schema migrations, repository/domain cont
 | Quote | Security, decimal price, currency, as-of, provider/source, retrieved time, manual/observed status; retain conflicting observations |
 
 Cash is represented explicitly as cash with a balance/currency, never inferred from a fabricated equity ticker. A cash security type is permitted by the logical schema, but company lookups and equity-price multiplication must not treat it as a stock.
+
+**Stage 0 precision and rounding handoff:** Quantities use `NUMERIC(28,10)` (up to 18 integer digits and 10 fractional digits); quote/manual prices use `NUMERIC(24,10)` (up to 14 integer digits and 10 fractional digits); reported position values use `NUMERIC(28,10)`. API financial inputs and outputs are decimal strings and domain arithmetic uses Python `Decimal`. A non-cash reported value is quantity × dated reported price, rounded once to 10 fractional digits with `ROUND_HALF_UP`; explicit cash balance values use the balance directly. The manual API rejects absolute values at or above `10^18`, does not convert currencies, and leaves a missing price unavailable. The schema has no currency scale conversion or cents-only display rounding. PostgreSQL/DSQL persistence checks remain separately gated as recorded below.
 
 **Required configuration and API contract:**
 
@@ -198,6 +200,8 @@ S0.4 has a local contract/tooling deliverable and a separate credentialed execut
 **S0.4 delivery evidence (2026-10-01):** `DatabaseEngineFactory` uses the official `aurora-dsql-sqlalchemy` 1.3.0 dialect/connector with token-on-connect, `verify-full` TLS, separate app and migration roles, bounded pooling, and a 3,000-second recycle. The versioned DSQL core plan uses seven single-statement table DDL transactions, four asynchronous index DDL transactions with `sys.wait_for_job`, and standalone ledger DML. Local tests check configuration, official dialect compilation, migration step boundaries/resumption, and capped retry. The real DSQL integration suite is explicitly opt-in for a disposable cluster and was not run; production remains blocked pending that evidence.
 
 **S0.5 delivery evidence (2026-10-02):** Added Alembic revision `0002_position_snapshot_revision` and its two single-statement DSQL `ALTER TABLE` steps. Accounts keep a compare-and-swap revision counter; dated manual snapshots have a revision, and replacing a snapshot either updates that effective date or marks the prior accepted date superseded. Account create/list/edit/archive, bounded local security lookup, snapshot retrieval/replacement and safe conflict/validation errors are exposed under `/v1`. `pnpm api:generate` exports FastAPI OpenAPI and regenerates the web TypeScript schema. The UI uses TanStack Query, string financial inputs, account-scoped editing, source/date/quality labels, missing-price state and stale-revision reload behavior. Synthetic API tests exercise independent accounts, same-security holdings, cash balances, decimals, invalid/unknown securities, archived accounts, missing prices, dated revisions and stale writes. `pnpm check` passed on 2026-10-02 (7 Vitest tests, 30 pytest tests, web build); three opt-in database tests were skipped (one PostgreSQL and two DSQL). Alembic generated the PostgreSQL upgrade SQL offline, but no Docker client or `TEST_DATABASE_URL` was available to execute the fresh PostgreSQL 16 migration. Live DSQL remains unverified.
+
+**S0.6 delivery evidence (2026-10-02):** Demo records are created only by running `python -m app.demo_seed` while `DEMO_MODE=true`; configuration rejects DSQL, arbitrary hosts, and a database URL in demo mode. Stable UUIDv5 identities, dated synthetic quotes/snapshots, and synthetic source/quality labels make a second seed a no-op; it does not update any existing fixture row. `--reset-demo` is destructive only to the fixed demo IDs and refuses if demo account snapshots include non-seed line sources or the synthetic securities are referenced by non-demo accounts, quotes, or securities. It deletes only demo fixture data. The UI labels demo accounts. Synthetic position and illustrative fund-holdings CSVs, expected Decimal totals, and a future document-fixture specification live in `fixtures/stage-0/`; no CSV/PDF parser was added. The startup, migration, seed, check and reset commands are in the root README. The browser transcript and local quality results are in [`stage-0-demo-transcript.md`](stage-0-demo-transcript.md). No schema migration or provider integration was required. PostgreSQL runtime and live DSQL evidence remain distinct and are not inferred from SQLite/unit/UI smoke checks.
 
 ### S0.5 — Deliver account and manual-position API/UI
 

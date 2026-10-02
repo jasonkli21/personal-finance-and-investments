@@ -20,6 +20,7 @@ def _int_setting(name: str, default: int, *, minimum: int, maximum: int) -> int:
 @dataclass(frozen=True)
 class Settings:
     database_backend: str
+    demo_mode: bool
     database_url: str | None
     database_host: str
     database_port: int
@@ -42,6 +43,18 @@ def load_settings() -> Settings:
         raise ValueError("DATABASE_BACKEND must be 'postgres' or 'aurora_dsql'")
 
     database_url = environ.get("DATABASE_URL") or None
+    demo_mode_raw = environ.get("DEMO_MODE", "false").casefold()
+    if demo_mode_raw not in {"true", "false"}:
+        raise ValueError("DEMO_MODE must be 'true' or 'false'")
+    demo_mode = demo_mode_raw == "true"
+    database_host = environ.get("DATABASE_HOST", "127.0.0.1")
+    if demo_mode:
+        if backend != "postgres":
+            raise ValueError("DEMO_MODE is available only with local PostgreSQL")
+        if database_url is not None:
+            raise ValueError("DEMO_MODE requires discrete local database settings")
+        if database_host not in {"127.0.0.1", "localhost", "::1", "db"}:
+            raise ValueError("DEMO_MODE only allows loopback or Compose database hosts")
     database_port = _int_setting(
         "DATABASE_PORT",
         int(environ.get("POSTGRES_PORT", "5432")),
@@ -84,8 +97,9 @@ def load_settings() -> Settings:
 
     return Settings(
         database_backend=backend,
+        demo_mode=demo_mode,
         database_url=database_url,
-        database_host=environ.get("DATABASE_HOST", "127.0.0.1"),
+        database_host=database_host,
         database_port=database_port,
         database_user=environ.get(
             "DATABASE_USER", environ.get("POSTGRES_USER", "portfolio")

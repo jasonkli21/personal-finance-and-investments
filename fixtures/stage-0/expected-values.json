@@ -1,0 +1,23 @@
+{
+  "fixture": "Stage 0 synthetic demo",
+  "as_of": "2026-09-30",
+  "currency": "USD",
+  "quality_status": "synthetic",
+  "accounts": {
+    "taxable": {
+      "equity": "360.00",
+      "etf": "200.00",
+      "cash": "100.00",
+      "owned_total": "660.00"
+    },
+    "roth": {
+      "equity": "440.00",
+      "etf": "80.00",
+      "cash": "0.00",
+      "owned_total": "520.00"
+    }
+  },
+  "combined_owned_total": "1180.00",
+  "calculation": "sum(quantity * dated manual price), plus explicit cash balances",
+  "note": "ETF holdings CSV is illustrative only and is not added to owned totals."
+}

@@ -1,0 +1,6 @@
+fund_ticker,as_of,source,raw_constituent_ref,constituent_ticker,constituent_name,weight_fraction,quality_status
+SYNX,2026-09-30,synthetic_demo,synthetic-row-001,SYN1,Northstar Example Systems,0.55,synthetic
+SYNX,2026-09-30,synthetic_demo,synthetic-row-002,SYN2,Cedar Example Works,0.30,synthetic
+SYNX,2026-09-30,synthetic_demo,synthetic-row-003,,Synthetic cash and residual,0.15,synthetic
+SYNB,2026-09-30,synthetic_demo,synthetic-row-004,SYN2,Cedar Example Works,0.65,synthetic
+SYNB,2026-09-30,synthetic_demo,synthetic-row-005,SYN1,Northstar Example Systems,0.35,synthetic

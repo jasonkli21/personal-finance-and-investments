@@ -20,6 +20,7 @@ services:
       context: ./services/api
     environment:
       DATABASE_BACKEND: ${DATABASE_BACKEND:-postgres}
+      DEMO_MODE: ${DEMO_MODE:-false}
       DATABASE_URL: ${DATABASE_URL:-}
       DATABASE_HOST: db
       DATABASE_PORT: 5432

@@ -1,6 +1,6 @@
 # Portfolio Intelligence
 
-This repository contains the Stage 0.1 local scaffold, Stage 0.2 development quality tooling, Stage 0.3 core schema, Stage 0.4 Aurora DSQL engine/migration/retry boundary, and Stage 0.5 account/manual-position slice for the planned portfolio application. Product requirements and later work packages are in [`docs/README.md`](docs/README.md). The synthetic offline demo is the next work package; imports and exposure calculations are not implemented yet.
+This repository contains the Stage 0 local foundation through S0.6: local tooling/schema, the Aurora DSQL boundary, account/manual-position workflow, and an explicit synthetic offline demo. Product requirements and later work packages are in [`docs/README.md`](docs/README.md). CSV imports and exposure calculations are not implemented yet.
 
 ## Requirements
 
@@ -34,6 +34,21 @@ curl http://127.0.0.1:8000/health/ready
 
 Generate the exported FastAPI schema and TypeScript types after changing routes with `pnpm api:generate`.
 
+### Synthetic offline demo
+
+The demo is opt-in and never seeds automatically on API startup. For a local Compose database, copy `.env.example` to `.env`, set `DEMO_MODE=true`, start Compose, and apply migrations. Then seed explicitly from the host:
+
+```sh
+set -a
+. ./.env
+set +a
+docker compose up --build -d
+uv run --directory services/api --locked alembic upgrade head
+uv run --directory services/api --locked python -m app.demo_seed
+```
+
+The seed contains only fictional synthetic accounts, two equities, two ETFs, USD cash, and dated synthetic prices. The web UI labels demo accounts. Repeating the seed adds no duplicates and does not overwrite existing rows. To destructively remove only the labelled demo fixture, run `DEMO_MODE=true uv run --directory services/api --locked python -m app.demo_seed --reset-demo`. Reset refuses when demo securities or accounts have been reused/edited by non-seed data. It does not remove unrelated accounts, securities, quotes, or snapshots. Expected owned totals are $660.00 taxable, $520.00 Roth IRA, and $1,180.00 combined; see [`fixtures/stage-0/expected-values.json`](fixtures/stage-0/expected-values.json). CSVs are examples only; Stage 0 does not parse them.
+
 The web page checks readiness immediately, then polls every 5 seconds. Each request has a 2-second timeout; failed checks show `unavailable`, and later successful checks restore `ready`. The current interval and timeout are defaults in `apps/web/src/readiness.ts`.
 
 Copy `.env.example` to `.env` for local settings. The API defaults to `127.0.0.1` for host-based runs; Compose overrides the database host with its internal `db` service name. Leave `DATABASE_URL` blank to use the discrete database fields. A non-empty `DATABASE_URL` takes precedence over those fields. Vite reads `API_PORT` from the root `.env` for its `/api` proxy, with a shell `API_PORT` taking precedence; this value is used only by the Vite server.
@@ -52,7 +67,7 @@ pnpm check
 
 The API tests cover health/readiness, account and manual-position routes, revision conflicts, generated OpenAPI, explicit backend and DSQL role validation, engine TLS/pool configuration, dialect compilation, migration-plan resumption, and capped OCC retry. The web tests cover proxy port configuration and readiness timeouts, recovery, status changes, non-overlapping requests, and cleanup. The Compose services and Vite-to-API readiness proxy were smoke-tested with PostgreSQL 16 on 2026-10-01. A real DSQL suite is skipped unless `RUN_DSQL_INTEGRATION=1` and `DSQL_TEST_CLUSTER=disposable` are set.
 
-The latest `pnpm check` passed on 2026-10-02: 7 Vitest tests, 30 pytest tests, and a successful web build. Three database integration tests were skipped (one requires PostgreSQL 16 and two require a disposable DSQL cluster). Alembic generated PostgreSQL upgrade SQL offline; the new migration has not yet run against a live PostgreSQL 16 test database.
+The latest `pnpm check` passed on 2026-10-02: 7 Vitest tests, 37 pytest tests, and a successful web build. Three database integration tests were skipped (one requires PostgreSQL 16 and two require a disposable DSQL cluster). Alembic generated PostgreSQL upgrade SQL offline; the new migration has not yet run against a live PostgreSQL 16 test database. The S0.6 SQLite-backed browser/API transcript is in [`docs/stage-0-demo-transcript.md`](docs/stage-0-demo-transcript.md); SQLite is not PostgreSQL or DSQL evidence.
 
 ## Database schema
 
@@ -82,5 +97,6 @@ The GitHub Actions workflow in `.github/workflows/quality.yml` installs locked d
 - `services/api`: FastAPI routes/domains, selected-backend readiness probe, and tests.
 - `compose.yaml`: local PostgreSQL 16 and API containers.
 - `docs/05-roadmap.md`: staged implementation plan.
+- `fixtures/stage-0/`: synthetic positions/fund-holdings CSV examples and expected Decimal totals.
 
-Aurora DSQL configuration keys in `.env.example` are placeholders and are not needed for local development. The current plan, verification status, checked package versions and AWS references are recorded in [`docs/07-aurora-dsql-compatibility.md`](docs/07-aurora-dsql-compatibility.md). The next planned package is Stage 0.6 synthetic offline demo.
+Aurora DSQL configuration keys in `.env.example` are placeholders and are not needed for local development. The current plan, verification status, checked package versions and AWS references are recorded in [`docs/07-aurora-dsql-compatibility.md`](docs/07-aurora-dsql-compatibility.md). Stage 1 CSV import and exposure work is next; its implementation plan is in [`docs/stage-1-implementation-plan.md`](docs/stage-1-implementation-plan.md).

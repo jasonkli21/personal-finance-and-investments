@@ -1,7 +1,7 @@
 """Manual position snapshot reads and revision checked replacements."""
 
 from datetime import UTC, datetime, time
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import delete, select, update
@@ -25,6 +25,7 @@ from app.db.models import (
 from app.domains.accounts import AccountNotFound
 
 MANUAL_SOURCE = "manual"
+VALUATION_QUANTUM = Decimal("0.0000000001")
 
 
 class ArchivedAccount(Exception):
@@ -257,6 +258,8 @@ def replace_positions(
             value = Decimal(position.quantity) * Decimal(position.reported_price)
         else:
             value = None
+        if value is not None:
+            value = value.quantize(VALUATION_QUANTUM, rounding=ROUND_HALF_UP)
         if value is not None and abs(value) >= Decimal("1e18"):
             raise ValuationOutOfRange
         session.add(

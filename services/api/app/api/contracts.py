@@ -56,6 +56,7 @@ class AccountRead(BaseModel):
     account_type: str
     base_currency: str
     active: bool
+    source_type: str
 
 
 class SecurityRead(BaseModel):

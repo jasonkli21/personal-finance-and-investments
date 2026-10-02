@@ -8,6 +8,7 @@ from app.config import load_settings
 def clear_database_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for key in (
         "DATABASE_BACKEND",
+        "DEMO_MODE",
         "DATABASE_URL",
         "DATABASE_HOST",
         "DATABASE_PORT",
@@ -46,6 +47,36 @@ def test_unknown_database_backend_fails_configuration(
     monkeypatch.setenv("DATABASE_BACKEND", "mysql")
 
     with pytest.raises(ValueError, match="DATABASE_BACKEND"):
+        load_settings()
+
+
+def test_demo_mode_requires_explicit_local_postgres(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clear_database_env(monkeypatch)
+    settings = load_settings()
+    assert settings.demo_mode is False
+
+    monkeypatch.setenv("DEMO_MODE", "true")
+    assert load_settings().demo_mode is True
+
+    monkeypatch.setenv("DATABASE_BACKEND", "aurora_dsql")
+    with pytest.raises(ValueError, match="local PostgreSQL"):
+        load_settings()
+
+
+def test_demo_mode_rejects_database_url_and_nonlocal_host(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clear_database_env(monkeypatch)
+    monkeypatch.setenv("DEMO_MODE", "true")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://remote.example/portfolio")
+    with pytest.raises(ValueError, match="discrete local database"):
+        load_settings()
+
+    monkeypatch.delenv("DATABASE_URL")
+    monkeypatch.setenv("DATABASE_HOST", "remote.example")
+    with pytest.raises(ValueError, match="loopback or Compose"):
         load_settings()
 
 

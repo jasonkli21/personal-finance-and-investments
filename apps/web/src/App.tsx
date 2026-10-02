@@ -460,6 +460,7 @@ export default function App() {
               {accounts.map((account) => (
                 <option key={account.id} value={account.id}>
                   {account.name}
+                  {account.source_type === 'demo' ? ' (SYNTHETIC DEMO)' : ''}
                   {account.active ? '' : ' (archived)'}
                 </option>
               ))}
@@ -470,102 +471,109 @@ export default function App() {
               </p>
             )}
             {selectedAccount && (
-              <form
-                className="mt-5 border-t border-slate-100 pt-4"
-                onSubmit={(event) => {
-                  event.preventDefault()
-                  if (selectedAccountDraft?.name.trim()) {
-                    updateAccountMutation.mutate({
-                      id: selectedAccount.id,
-                      input: {
-                        name: selectedAccountDraft.name.trim(),
-                        account_type: selectedAccountDraft.account_type,
-                        base_currency: selectedAccountDraft.base_currency,
-                      },
-                    })
-                  }
-                }}
-              >
-                <label
-                  className="block text-sm font-medium text-slate-700"
-                  htmlFor="account-name"
-                >
-                  Account name
-                </label>
-                <input
-                  id="account-name"
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
-                  value={selectedAccountDraft?.name ?? ''}
-                  onChange={(event) =>
-                    updateAccountDraft({ name: event.target.value })
-                  }
-                />
-                <label
-                  className="mt-3 block text-sm font-medium text-slate-700"
-                  htmlFor="edit-account-type"
-                >
-                  Account type
-                </label>
-                <select
-                  id="edit-account-type"
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
-                  value={selectedAccountDraft?.account_type ?? 'taxable'}
-                  onChange={(event) =>
-                    updateAccountDraft({ account_type: event.target.value })
-                  }
-                >
-                  <option value="taxable">Taxable brokerage</option>
-                  <option value="ira">Traditional IRA</option>
-                  <option value="roth_ira">Roth IRA</option>
-                  <option value="401k">401(k)</option>
-                  <option value="hsa">HSA</option>
-                  <option value="other">Other</option>
-                </select>
-                <label
-                  className="mt-3 block text-sm font-medium text-slate-700"
-                  htmlFor="edit-account-currency"
-                >
-                  Base currency
-                </label>
-                <select
-                  id="edit-account-currency"
-                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
-                  value={selectedAccountDraft?.base_currency ?? 'USD'}
-                  onChange={(event) =>
-                    updateAccountDraft({ base_currency: event.target.value })
-                  }
-                >
-                  {['USD', 'CAD', 'EUR', 'GBP', 'JPY'].map((currency) => (
-                    <option key={currency} value={currency}>
-                      {currency}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                  type="submit"
-                  disabled={
-                    !selectedAccount.active || updateAccountMutation.isPending
-                  }
-                >
-                  Save account details
-                </button>
-                {selectedAccount.active && (
-                  <button
-                    className="mt-2 w-full rounded-lg px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
-                    type="button"
-                    disabled={updateAccountMutation.isPending}
-                    onClick={() =>
+              <>
+                {selectedAccount.source_type === 'demo' && (
+                  <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-amber-900">
+                    Synthetic demo account · fictional data only
+                  </p>
+                )}
+                <form
+                  className="mt-5 border-t border-slate-100 pt-4"
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    if (selectedAccountDraft?.name.trim()) {
                       updateAccountMutation.mutate({
                         id: selectedAccount.id,
-                        input: { active: false },
+                        input: {
+                          name: selectedAccountDraft.name.trim(),
+                          account_type: selectedAccountDraft.account_type,
+                          base_currency: selectedAccountDraft.base_currency,
+                        },
                       })
                     }
+                  }}
+                >
+                  <label
+                    className="block text-sm font-medium text-slate-700"
+                    htmlFor="account-name"
                   >
-                    Archive account
+                    Account name
+                  </label>
+                  <input
+                    id="account-name"
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
+                    value={selectedAccountDraft?.name ?? ''}
+                    onChange={(event) =>
+                      updateAccountDraft({ name: event.target.value })
+                    }
+                  />
+                  <label
+                    className="mt-3 block text-sm font-medium text-slate-700"
+                    htmlFor="edit-account-type"
+                  >
+                    Account type
+                  </label>
+                  <select
+                    id="edit-account-type"
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                    value={selectedAccountDraft?.account_type ?? 'taxable'}
+                    onChange={(event) =>
+                      updateAccountDraft({ account_type: event.target.value })
+                    }
+                  >
+                    <option value="taxable">Taxable brokerage</option>
+                    <option value="ira">Traditional IRA</option>
+                    <option value="roth_ira">Roth IRA</option>
+                    <option value="401k">401(k)</option>
+                    <option value="hsa">HSA</option>
+                    <option value="other">Other</option>
+                  </select>
+                  <label
+                    className="mt-3 block text-sm font-medium text-slate-700"
+                    htmlFor="edit-account-currency"
+                  >
+                    Base currency
+                  </label>
+                  <select
+                    id="edit-account-currency"
+                    className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
+                    value={selectedAccountDraft?.base_currency ?? 'USD'}
+                    onChange={(event) =>
+                      updateAccountDraft({ base_currency: event.target.value })
+                    }
+                  >
+                    {['USD', 'CAD', 'EUR', 'GBP', 'JPY'].map((currency) => (
+                      <option key={currency} value={currency}>
+                        {currency}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                    type="submit"
+                    disabled={
+                      !selectedAccount.active || updateAccountMutation.isPending
+                    }
+                  >
+                    Save account details
                   </button>
-                )}
-              </form>
+                  {selectedAccount.active && (
+                    <button
+                      className="mt-2 w-full rounded-lg px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                      type="button"
+                      disabled={updateAccountMutation.isPending}
+                      onClick={() =>
+                        updateAccountMutation.mutate({
+                          id: selectedAccount.id,
+                          input: { active: false },
+                        })
+                      }
+                    >
+                      Archive account
+                    </button>
+                  )}
+                </form>
+              </>
             )}
           </div>
 

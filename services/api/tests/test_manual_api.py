@@ -270,3 +270,22 @@ def test_cash_is_saved_as_an_explicit_currency_balance(
     assert line["reported_value"] == "123.4500000000"
     assert line["reported_price"] is None
     assert line["price_as_of"] is None
+
+
+def test_manual_valuation_rounds_half_up_to_numeric_scale(
+    api_context: tuple[TestClient, UUID, UUID],
+) -> None:
+    client, security_id, _cash_id = api_context
+    account = create_account(client, "Synthetic rounding account")
+    response = client.put(
+        f"/v1/accounts/{account['id']}/positions",
+        json=position_payload(
+            security_id,
+            expected_revision=None,
+            quantity="1.5",
+            price="1.0000000001",
+        ),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["positions"][0]["reported_value"] == "1.5000000002"

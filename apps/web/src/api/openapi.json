@@ -106,6 +106,10 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "source_type": {
+            "title": "Source Type",
+            "type": "string"
           }
         },
         "required": [
@@ -113,7 +117,8 @@
           "name",
           "account_type",
           "base_currency",
-          "active"
+          "active",
+          "source_type"
         ],
         "title": "AccountRead",
         "type": "object"

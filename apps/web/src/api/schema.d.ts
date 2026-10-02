@@ -147,6 +147,8 @@ export interface components {
       id: string
       /** Name */
       name: string
+      /** Source Type */
+      source_type: string
     }
     /** ErrorResponse */
     ErrorResponse: {
