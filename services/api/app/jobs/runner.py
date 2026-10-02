@@ -4,16 +4,21 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from uuid import uuid4
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.db.models import PrivateFile
+from app.db.models import Job, PrivateFile, utc_now
 from app.domains import documents, jobs
 from app.ingestion.brokerage_pdf import PdfExtractionError
 from app.storage.file_store import PrivateFileStore
+
+
+class _LeaseLost(RuntimeError):
+    """The worker lost its lease before a bounded persistence transaction."""
 
 
 def _stop_if_cancelled_or_stale(
@@ -94,6 +99,26 @@ def _process_one(
         ):
             _stop_if_cancelled_or_stale(session_factory, claim)
             return True
+
+        def fence(session: Session) -> None:
+            now = utc_now()
+            result = session.execute(
+                update(Job)
+                .where(
+                    Job.id == claim.id,
+                    Job.status == "running",
+                    Job.lease_owner == claim.owner,
+                    Job.lease_generation == claim.generation,
+                    Job.cancel_requested.is_(False),
+                )
+                .values(
+                    lease_until=now + timedelta(seconds=lease_seconds), updated_at=now
+                )
+                .execution_options(synchronize_session=False)
+            )
+            if getattr(result, "rowcount", None) != 1:
+                raise _LeaseLost("Job lease is no longer current.")
+
         payload = claim.payload
         result = documents.create_brokerage_pdf_import(
             session_factory,
@@ -109,6 +134,7 @@ def _process_one(
             max_pages=int(payload["max_pages"]),
             parser_timeout_seconds=int(payload["parser_timeout_seconds"]),
             replace_existing=bool(payload["replace_existing"]),
+            write_fence=fence,
         )
     except PdfExtractionError as exc:
         jobs.fail_job(

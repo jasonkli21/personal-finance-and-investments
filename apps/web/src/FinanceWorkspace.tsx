@@ -164,21 +164,32 @@ export default function FinanceWorkspace() {
                 <th className="p-2">Net spending</th>
                 <th className="p-2">Net cash flow</th>
                 <th className="p-2">Rows</th>
+                <th className="p-2">Unclassified rows / signed amount</th>
               </tr>
             </thead>
             <tbody>
               {summary?.currency_totals.map((total) => (
                 <tr className="border-t" key={total.currency}>
                   <th className="p-2 font-medium">{total.currency}</th>
-                  <td className="p-2 font-mono">{total.income}</td>
-                  <td className="p-2 font-mono">{total.net_spending}</td>
+                  <td className="p-2 font-mono">
+                    {total.income}
+                    {total.unclassified_count > 0 && ' (incomplete)'}
+                  </td>
+                  <td className="p-2 font-mono">
+                    {total.net_spending}
+                    {total.unclassified_count > 0 && ' (incomplete)'}
+                  </td>
                   <td className="p-2 font-mono">{total.net_cash_flow}</td>
                   <td className="p-2">{total.transaction_count}</td>
+                  <td className="p-2">
+                    {total.unclassified_count} /{' '}
+                    {total.unclassified_signed_amount}
+                  </td>
                 </tr>
               ))}
               {summary && summary.currency_totals.length === 0 && (
                 <tr>
-                  <td className="p-3 text-slate-600" colSpan={5}>
+                  <td className="p-3 text-slate-600" colSpan={6}>
                     No published transactions for this month.
                   </td>
                 </tr>

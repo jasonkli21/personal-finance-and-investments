@@ -83,6 +83,7 @@ def create_brokerage_pdf_import(
     max_pages: int,
     parser_timeout_seconds: int,
     replace_existing: bool,
+    write_fence: Any | None = None,
 ) -> tuple[UUID, UUID, UUID, int, bool]:
     """Extract a supported text holdings table, then stage it through S1 review."""
     safe_name = _filename(filename)
@@ -112,8 +113,16 @@ def create_brokerage_pdf_import(
     )
 
     file_key, digest = file_store.put(content)
-    original_file = run_database_unit(
-        session_factory,
+
+    def persist(operation: Any) -> Any:
+        def execute(session: Session) -> Any:
+            if write_fence is not None:
+                write_fence(session)
+            return operation(session)
+
+        return run_database_unit(session_factory, execute)
+
+    original_file = persist(
         lambda session: _document_file(
             session,
             digest=digest,
@@ -146,11 +155,14 @@ def create_brokerage_pdf_import(
                 DocumentImport.account_id == account_id,
                 DocumentImport.effective_date == effective_date,
                 DocumentImport.parser_version == PDF_PARSER_VERSION,
+                DocumentImport.position_import_id.not_in(
+                    select(ImportAttempt.id).where(ImportAttempt.status == "cancelled")
+                ),
             )
             .order_by(DocumentImport.created_at)
         )
 
-    prior = run_database_unit(session_factory, prior_attempt)
+    prior = persist(prior_attempt)
     if prior is not None:
         return (
             prior.id,
@@ -181,6 +193,7 @@ def create_brokerage_pdf_import(
             expected_account_revision=expected_account_revision,
             max_rows=max_rows,
             replace_existing=replace_existing,
+            write_fence=write_fence,
         )
     except imports.ImportErrorBase as exc:
         raise DocumentError(str(exc)) from exc
@@ -217,7 +230,7 @@ def create_brokerage_pdf_import(
         return row
 
     try:
-        document = run_database_unit(session_factory, record_document)
+        document = persist(record_document)
     except IntegrityError as exc:
         with session_factory() as session:
             raced = session.scalar(
@@ -252,7 +265,10 @@ def read_document_import(session: Session, document_id: UUID) -> dict[str, Any]:
         "effective_date": document.effective_date,
         "source_label": document.source_label,
         "parser_version": document.parser_version,
-        "status": document.status,
+        # The linked Stage 1 position import owns review/publication state.
+        # DocumentImport is created as "review" and otherwise immutable, so
+        # report the current linked state instead of leaving this status stale.
+        "status": attempt.status if attempt else document.status,
         "row_count": document.row_count,
         "diagnostics": document.diagnostics,
         "position_import_status": attempt.status if attempt else "unavailable",

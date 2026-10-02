@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   confirmTransfer,
@@ -88,6 +88,7 @@ function Section({
 
 export default function SpendingWorkspace() {
   const client = useQueryClient()
+  const manualDraftKey = useRef(crypto.randomUUID())
   const accountsQuery = useQuery({
     queryKey: ['accounts'],
     queryFn: fetchAccounts,
@@ -205,6 +206,7 @@ export default function SpendingWorkspace() {
           queryKey: ['transaction-import-review', importId],
         }),
         client.invalidateQueries({ queryKey: ['transactions', accountId] }),
+        client.invalidateQueries({ queryKey: ['finance-summary'] }),
       ])
     },
     onError: (cause) =>
@@ -273,15 +275,19 @@ export default function SpendingWorkspace() {
         description: manualDescription.trim(),
         classification: manualClass,
         category_id: null,
-        idempotency_key: crypto.randomUUID(),
+        idempotency_key: manualDraftKey.current,
       })
     },
     onSuccess: async () => {
       setManualAmount('')
       setManualDescription('')
+      manualDraftKey.current = crypto.randomUUID()
       setMessage('Manual transaction recorded.')
       setError('')
-      await client.invalidateQueries({ queryKey: ['transactions', accountId] })
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['transactions', accountId] }),
+        client.invalidateQueries({ queryKey: ['finance-summary'] }),
+      ])
     },
     onError: (cause) =>
       setError(cause instanceof Error ? cause.message : 'Manual entry failed.'),
@@ -304,7 +310,10 @@ export default function SpendingWorkspace() {
       }),
     onSuccess: async () => {
       setMessage('Classification saved.')
-      await client.invalidateQueries({ queryKey: ['transactions', accountId] })
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['transactions', accountId] }),
+        client.invalidateQueries({ queryKey: ['finance-summary'] }),
+      ])
     },
     onError: (cause) =>
       setError(cause instanceof Error ? cause.message : 'Update failed.'),
@@ -319,6 +328,7 @@ export default function SpendingWorkspace() {
       await Promise.all([
         client.invalidateQueries({ queryKey: ['transfer-candidates'] }),
         client.invalidateQueries({ queryKey: ['transactions', accountId] }),
+        client.invalidateQueries({ queryKey: ['finance-summary'] }),
       ])
     },
     onError: (cause) =>
@@ -332,6 +342,7 @@ export default function SpendingWorkspace() {
       setMessage('Transfer unlinked. Both signed transactions remain intact.')
       await Promise.all([
         client.invalidateQueries({ queryKey: ['transactions', accountId] }),
+        client.invalidateQueries({ queryKey: ['finance-summary'] }),
         client.invalidateQueries({ queryKey: ['transfer-candidates'] }),
       ])
     },
@@ -444,7 +455,10 @@ export default function SpendingWorkspace() {
             <select
               className="rounded-lg border p-2"
               value={accountId}
-              onChange={(event) => setAccountId(event.target.value)}
+              onChange={(event) => {
+                manualDraftKey.current = crypto.randomUUID()
+                setAccountId(event.target.value)
+              }}
             >
               <option value="">Choose account</option>
               {accounts.map((account) => (
@@ -576,7 +590,10 @@ export default function SpendingWorkspace() {
               type="date"
               className="rounded-lg border p-2"
               value={manualDate}
-              onChange={(event) => setManualDate(event.target.value)}
+              onChange={(event) => {
+                manualDraftKey.current = crypto.randomUUID()
+                setManualDate(event.target.value)
+              }}
             />
           </label>
           <label className="grid gap-1 text-sm">
@@ -586,7 +603,10 @@ export default function SpendingWorkspace() {
               inputMode="decimal"
               placeholder="-32.50"
               value={manualAmount}
-              onChange={(event) => setManualAmount(event.target.value)}
+              onChange={(event) => {
+                manualDraftKey.current = crypto.randomUUID()
+                setManualAmount(event.target.value)
+              }}
             />
           </label>
           <label className="grid gap-1 text-sm">
@@ -594,9 +614,10 @@ export default function SpendingWorkspace() {
             <select
               className="rounded-lg border p-2"
               value={manualClass}
-              onChange={(event) =>
+              onChange={(event) => {
+                manualDraftKey.current = crypto.randomUUID()
                 setManualClass(event.target.value as typeof manualClass)
-              }
+              }}
             >
               <option value="unclassified">Unclassified</option>
               <option value="expense">Expense</option>
@@ -610,7 +631,10 @@ export default function SpendingWorkspace() {
             <input
               className="rounded-lg border p-2"
               value={manualDescription}
-              onChange={(event) => setManualDescription(event.target.value)}
+              onChange={(event) => {
+                manualDraftKey.current = crypto.randomUUID()
+                setManualDescription(event.target.value)
+              }}
             />
           </label>
         </div>
@@ -947,7 +971,10 @@ function TransactionRow({
     },
     onSuccess: async () => {
       setEditingSplits(false)
-      await client.invalidateQueries({ queryKey: ['transactions'] })
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['transactions'] }),
+        client.invalidateQueries({ queryKey: ['finance-summary'] }),
+      ])
       await client.invalidateQueries({
         queryKey: ['transaction-splits', row.id],
       })

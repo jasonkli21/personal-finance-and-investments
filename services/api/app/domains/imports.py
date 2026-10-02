@@ -384,6 +384,7 @@ def create_position_import(
     expected_account_revision: int,
     max_rows: int,
     replace_existing: bool = False,
+    write_fence: Any | None = None,
 ) -> tuple[UUID, bool]:
     safe_name = _source_filename(filename)
     if not 1 <= len(idempotency_key) <= 128:
@@ -420,6 +421,14 @@ def create_position_import(
     filename_clean = safe_name
     now = utc_now()
 
+    def fenced(operation: Any) -> Any:
+        def execute(session: Session) -> Any:
+            if write_fence is not None:
+                write_fence(session)
+            return operation(session)
+
+        return run_database_unit(session_factory, execute)
+
     def begin_review(session: Session) -> tuple[UUID, bool]:
         existing_key = session.scalar(
             select(ImportAttempt).where(
@@ -447,7 +456,10 @@ def create_position_import(
 
         prior_interpretation = session.scalar(
             select(ImportAttempt)
-            .where(ImportAttempt.identity_hash == identity_hash)
+            .where(
+                ImportAttempt.identity_hash == identity_hash,
+                ImportAttempt.status.not_in(("cancelled", "replaced")),
+            )
             .order_by(ImportAttempt.created_at.desc())
         )
         if prior_interpretation is not None and not replace_existing:
@@ -523,7 +535,7 @@ def create_position_import(
         return import_id, False
 
     try:
-        created_id, duplicate = run_database_unit(session_factory, begin_review)
+        created_id, duplicate = fenced(begin_review)
     except IntegrityError as exc:
         raise ImportConflict(
             "Import identity conflicted with another in-progress request."
@@ -611,8 +623,7 @@ def create_position_import(
                 )
             )
 
-        run_database_unit(
-            session_factory,
+        fenced(
             partial(
                 persist_batch,
                 batch_ordinal=ordinal,
@@ -639,7 +650,7 @@ def create_position_import(
                 if session.get(ImportAttempt, created_id) is None:
                     raise ImportNotFound
 
-    run_database_unit(session_factory, finish_review)
+    fenced(finish_review)
     return created_id, False
 
 

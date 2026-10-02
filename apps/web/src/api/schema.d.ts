@@ -1047,6 +1047,10 @@ export interface components {
       net_spending: string
       /** Transaction Count */
       transaction_count: number
+      /** Unclassified Count */
+      unclassified_count: number
+      /** Unclassified Signed Amount */
+      unclassified_signed_amount: string
     }
     /** FinanceSummaryRead */
     FinanceSummaryRead: {

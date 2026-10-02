@@ -124,6 +124,7 @@ async def post_transaction_import_preview(
             statement_start=statement_start,
             statement_end=statement_end,
             max_rows=transactions.MAX_TRANSACTION_ROWS,
+            max_file_bytes=request.app.state.max_import_file_bytes,
         )
     except transactions.TransactionError as exc:
         raise _raise(exc) from exc

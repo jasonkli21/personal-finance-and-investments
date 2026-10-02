@@ -113,6 +113,30 @@ def _month_totals(
             else_=Decimal(0),
         )
     )
+    unclassified_count = func.sum(
+        case(
+            (
+                and_(
+                    FinancialTransaction.classification == "unclassified",
+                    ActiveTransferTransaction.transaction_id.is_(None),
+                ),
+                1,
+            ),
+            else_=0,
+        )
+    )
+    unclassified_signed_amount = func.sum(
+        case(
+            (
+                and_(
+                    FinancialTransaction.classification == "unclassified",
+                    ActiveTransferTransaction.transaction_id.is_(None),
+                ),
+                FinancialTransaction.amount,
+            ),
+            else_=Decimal(0),
+        )
+    )
     spending = -func.sum(
         case(
             (
@@ -136,6 +160,8 @@ def _month_totals(
             spending.label("net_spending"),
             cash_flow.label("net_cash_flow"),
             included_count.label("transaction_count"),
+            unclassified_count.label("unclassified_count"),
+            unclassified_signed_amount.label("unclassified_signed_amount"),
         )
         .outerjoin(
             ActiveTransferTransaction,
@@ -161,6 +187,8 @@ def _month_totals(
             "net_spending": str(row.net_spending or 0),
             "net_cash_flow": str(row.net_cash_flow or 0),
             "transaction_count": int(row.transaction_count or 0),
+            "unclassified_count": int(row.unclassified_count or 0),
+            "unclassified_signed_amount": str(row.unclassified_signed_amount or 0),
         }
         for row in totals_rows
     ]
@@ -230,6 +258,12 @@ def read_finance_summary(
     totals, categories = _month_totals(
         session, month=month_start, account_id=account_id
     )
+    transaction_gaps: list[str] = []
+    if any(total["unclassified_count"] for total in totals):
+        transaction_gaps.append(
+            "Income and spending totals are incomplete because one or more "
+            "transactions are unclassified."
+        )
     accounts_query = select(Account).order_by(Account.name, Account.id)
     if account_id is not None:
         if session.get(Account, account_id) is None:
@@ -441,7 +475,7 @@ def read_finance_summary(
         "category_totals": categories,
         "net_worth": net_worth,
         "balances": balances,
-        "coverage_gaps": coverage_gaps,
+        "coverage_gaps": transaction_gaps + coverage_gaps,
         "exclusions": [
             "No currency conversion is applied; net worth is grouped by currency.",
             (

@@ -20,7 +20,9 @@ def _apply_process_limits() -> None:
     import resource
 
     resource.setrlimit(resource.RLIMIT_CPU, (6, 7))
-    if hasattr(resource, "RLIMIT_AS"):
+    # Darwin exposes RLIMIT_AS but rejects setting it. CPU/time and input,
+    # page/text limits still apply there; Linux enforces the address-space cap.
+    if hasattr(resource, "RLIMIT_AS") and sys.platform != "darwin":
         memory_limit = 768 * 1024 * 1024
         resource.setrlimit(resource.RLIMIT_AS, (memory_limit, memory_limit))
     if hasattr(resource, "RLIMIT_FSIZE"):

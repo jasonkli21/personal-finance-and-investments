@@ -5,14 +5,21 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Any
+from typing import Any, cast
 from uuid import UUID, uuid4
 
 from sqlalchemy import and_, case, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.db.models import Account, DocumentImport, Job, PrivateFile, utc_now
+from app.db.models import (
+    Account,
+    DocumentImport,
+    ImportAttempt,
+    Job,
+    PrivateFile,
+    utc_now,
+)
 from app.db.transactions import run_database_unit
 from app.domains import documents
 from app.ingestion.brokerage_pdf import PDF_PARSER_VERSION
@@ -142,6 +149,8 @@ def enqueue_pdf_preview(
         parser_timeout_seconds=parser_timeout_seconds,
     )
 
+    retry_tag = str(uuid4())
+
     def create(session: Session) -> Job:
         account = session.get(Account, account_id)
         if account is None or not account.active:
@@ -153,14 +162,35 @@ def enqueue_pdf_preview(
             filename=safe_name,
             size=len(content),
         )
+        request_payload = dict(payload)
+
+        def reusable(job: Job) -> bool:
+            if job.status == "cancelled" or job.cancel_requested:
+                return False
+            if job.status == "completed" and job.result:
+                attempt_id = job.result.get("position_import_id")
+                attempt = (
+                    session.get(ImportAttempt, UUID(attempt_id)) if attempt_id else None
+                )
+                return attempt is not None and attempt.status not in {
+                    "cancelled",
+                    "replaced",
+                }
+            return True
+
         existing_job = session.scalar(select(Job).where(Job.idempotency_key == job_key))
+        actual_job_key = job_key
         if existing_job is not None:
-            if (
-                existing_job.input_file_id != source.id
-                or existing_job.payload != payload
-            ):
+            if existing_job.input_file_id != source.id or {
+                k: v
+                for k, v in existing_job.payload.items()
+                if k != "import_idempotency_key"
+            } != {k: v for k, v in payload.items() if k != "import_idempotency_key"}:
                 raise JobConflict("Idempotency key was used for another document job.")
-            return existing_job
+            if reusable(existing_job):
+                return existing_job
+            request_payload["import_idempotency_key"] = retry_tag
+            actual_job_key = f"{job_key}:retry:{retry_tag}"
         in_flight = session.scalars(
             select(Job)
             .where(
@@ -177,7 +207,9 @@ def enqueue_pdf_preview(
                 prior_job.payload.get("effective_date") == effective_date.isoformat()
                 and prior_job.payload.get("parser_version") == PDF_PARSER_VERSION
             ):
-                return prior_job
+                if reusable(prior_job):
+                    return prior_job
+                request_payload["import_idempotency_key"] = retry_tag
         prior = session.scalar(
             select(DocumentImport)
             .where(
@@ -185,6 +217,9 @@ def enqueue_pdf_preview(
                 DocumentImport.account_id == account_id,
                 DocumentImport.effective_date == effective_date,
                 DocumentImport.parser_version == PDF_PARSER_VERSION,
+                DocumentImport.position_import_id.not_in(
+                    select(ImportAttempt.id).where(ImportAttempt.status == "cancelled")
+                ),
             )
             .order_by(DocumentImport.created_at)
             .limit(1)
@@ -194,8 +229,8 @@ def enqueue_pdf_preview(
             job_type=PDF_PREVIEW_JOB,
             account_id=account_id,
             input_file_id=source.id,
-            idempotency_key=job_key,
-            payload=payload,
+            idempotency_key=actual_job_key,
+            payload=request_payload,
             result=(
                 {
                     "document_id": str(prior.id),
@@ -235,7 +270,12 @@ def enqueue_pdf_preview(
                 raced is None
                 or source is None
                 or raced.input_file_id != source.id
-                or raced.payload != payload
+                or {
+                    k: v
+                    for k, v in raced.payload.items()
+                    if k != "import_idempotency_key"
+                }
+                != {k: v for k, v in payload.items() if k != "import_idempotency_key"}
             ):
                 raise JobConflict(
                     "Document job identity conflicted; retry the upload."
@@ -271,6 +311,8 @@ def cancel_job(session: Session, job_id: UUID) -> dict[str, Any]:
         row.progress_stage = "cancellation_requested"
     row.updated_at = utc_now()
     session.flush()
+    if row.status == "cancelled":
+        _cancel_staging(session, row.payload)
     return _read(row)
 
 
@@ -280,6 +322,66 @@ def claim_next_job(
     now = utc_now()
 
     def claim(session: Session) -> JobClaim | None:
+        abandoned_cancellations: list[tuple[UUID, dict[str, Any]]] = [
+            (
+                cast(UUID, row[0]),
+                cast(dict[str, Any], row[1] or {}),
+            )
+            for row in session.execute(
+                select(Job.id, Job.payload)
+                .where(
+                    Job.status == "running",
+                    Job.cancel_requested.is_(True),
+                    Job.lease_until.is_not(None),
+                    Job.lease_until <= now,
+                )
+                .order_by(Job.id)
+                .limit(100)
+            )
+        ]
+        cancelled = session.execute(
+            update(Job)
+            .where(
+                Job.id.in_(
+                    [identity for identity, _payload in abandoned_cancellations]
+                ),
+                Job.status == "running",
+                Job.cancel_requested.is_(True),
+                Job.lease_until.is_not(None),
+                Job.lease_until <= now,
+            )
+            .values(
+                status="cancelled",
+                progress_stage="cancelled",
+                lease_owner=None,
+                lease_until=None,
+                lease_generation=Job.lease_generation + 1,
+                updated_at=now,
+            )
+        )
+        if getattr(cancelled, "rowcount", 0):
+            from app.domains import imports
+
+            for _job_id, payload in abandoned_cancellations:
+                attempt_key = payload.get("import_idempotency_key")
+                if not attempt_key:
+                    continue
+                attempt = session.scalar(
+                    select(ImportAttempt).where(
+                        ImportAttempt.idempotency_key == attempt_key
+                    )
+                )
+                if attempt is not None and attempt.status not in {
+                    "published",
+                    "cancelled",
+                    "replaced",
+                }:
+                    imports.cancel_import(
+                        session,
+                        attempt.id,
+                        expected_revision=attempt.review_revision,
+                        reason="Worker lease expired after cancellation was requested",
+                    )
         session.execute(
             update(Job)
             .where(
@@ -464,6 +566,29 @@ def cancel_completed_work(
     run_database_unit(session_factory, cancel)
 
 
+def _cancel_staging(session: Session, payload: dict[str, Any]) -> None:
+    """Resolve the attempt by its job reference without cancelling accepted history."""
+    from app.domains import imports
+
+    attempt_key = payload.get("import_idempotency_key")
+    if not attempt_key:
+        return
+    attempt = session.scalar(
+        select(ImportAttempt).where(ImportAttempt.idempotency_key == attempt_key)
+    )
+    if attempt is not None and attempt.status not in {
+        "published",
+        "cancelled",
+        "replaced",
+    }:
+        imports.cancel_import(
+            session,
+            attempt.id,
+            expected_revision=attempt.review_revision,
+            reason="Cancelled while document processing was running",
+        )
+
+
 def finish_cancelled_job(
     session_factory: sessionmaker[Session], claim: JobClaim
 ) -> bool:
@@ -487,7 +612,10 @@ def finish_cancelled_job(
             )
             .execution_options(synchronize_session=False)
         )
-        return getattr(result, "rowcount", None) == 1
+        changed = getattr(result, "rowcount", None) == 1
+        if changed:
+            _cancel_staging(session, claim.payload)
+        return changed
 
     return run_database_unit(session_factory, finish)
 
@@ -531,6 +659,11 @@ def fail_job(
             )
             .execution_options(synchronize_session=False)
         )
-        return getattr(result, "rowcount", None) == 1
+        changed = getattr(result, "rowcount", None) == 1
+        if changed:
+            row = session.get(Job, claim.id)
+            if row is not None and row.status == "cancelled":
+                _cancel_staging(session, claim.payload)
+        return changed
 
     return run_database_unit(session_factory, fail)

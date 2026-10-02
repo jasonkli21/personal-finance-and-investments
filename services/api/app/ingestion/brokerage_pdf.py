@@ -54,8 +54,13 @@ def extract_pdf_pages(
     if not content.startswith(b"%PDF-"):
         raise PdfExtractionError("pdf_invalid")
     try:
-        child_environment = dict(os.environ)
-        child_environment["PDF_MAX_PAGES"] = str(max_pages)
+        # Uploaded PDFs are untrusted parser input. Do not expose the API
+        # process's database/AWS credentials or other secrets to the parser
+        # subprocess. The worker needs only its page bound; Windows additionally
+        # needs SystemRoot to start a child process reliably.
+        child_environment = {"PDF_MAX_PAGES": str(max_pages)}
+        if os.name == "nt" and os.environ.get("SYSTEMROOT"):
+            child_environment["SYSTEMROOT"] = os.environ["SYSTEMROOT"]
         completed = subprocess.run(
             [sys.executable, str(_worker_path())],
             input=content,
@@ -93,7 +98,11 @@ def _header_fields(line: str) -> list[str] | None:
     for field in fields:
         key = " ".join(field.casefold().split())
         match = next(
-            (canonical for canonical, aliases in _HEADER_ALIASES.items() if key in aliases),
+            (
+                canonical
+                for canonical, aliases in _HEADER_ALIASES.items()
+                if key in aliases
+            ),
             None,
         )
         if match is None:
@@ -155,9 +164,8 @@ def parse_brokerage_pdf(
         str(page.get("text", "")) for page in pages if isinstance(page, dict)
     )
     date_candidate = _statement_date(document_text)
-    date_review_required = (
-        date_candidate is None
-        or (effective_date is not None and date_candidate != effective_date)
+    date_review_required = date_candidate is None or (
+        effective_date is not None and date_candidate != effective_date
     )
 
     for page in pages:
@@ -186,8 +194,7 @@ def parse_brokerage_pdf(
                 len(cells) == len(fields)
                 and _amount_is_valid(values.get("quantity", ""))
                 and (
-                    not values.get("price")
-                    or _amount_is_valid(values.get("price", ""))
+                    not values.get("price") or _amount_is_valid(values.get("price", ""))
                 )
                 and (
                     not values.get("reported_value")
@@ -224,7 +231,9 @@ def parse_brokerage_pdf(
                 elif not price and "cash" not in name.casefold():
                     discrepancy = "Price is missing; the position needs review."
                 elif not reported_value:
-                    discrepancy = "Reported value is missing; the position needs review."
+                    discrepancy = (
+                        "Reported value is missing; the position needs review."
+                    )
             warnings = [
                 warning
                 for warning in (
@@ -248,9 +257,7 @@ def parse_brokerage_pdf(
                     "quantity": quantity,
                     "price": price,
                     "currency": values.get("currency", "") or currency,
-                    "asset_type": "statement_needs_review"
-                    if warnings
-                    else "",
+                    "asset_type": "statement_needs_review" if warnings else "",
                     "reported_value": reported_value,
                     "source_evidence": source_evidence,
                     "source_text": line[:2000],

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -63,6 +63,44 @@ class TransactionConflict(TransactionError):
 
 class TransactionBlocked(TransactionError):
     """The operation cannot proceed while rows require user review."""
+
+
+def _advance_revision(
+    session: Session,
+    model: Any,
+    identity: UUID,
+    *,
+    expected: int,
+    extra: tuple[Any, ...] = (),
+) -> None:
+    """Claim a revision in the database before writing dependent audit/data rows."""
+    result = session.execute(
+        update(model)
+        .where(model.id == identity, model.revision == expected, *extra)
+        .values(revision=expected + 1, updated_at=utc_now())
+        .execution_options(synchronize_session=False)
+    )
+    if getattr(result, "rowcount", None) != 1:
+        raise TransactionConflict("Record changed; reload before editing.")
+
+
+def _advance_import_review(
+    session: Session, record: TransactionImport, expected: int
+) -> None:
+    result = session.execute(
+        update(TransactionImport)
+        .where(
+            TransactionImport.id == record.id,
+            TransactionImport.status == "review",
+            TransactionImport.review_revision == expected,
+        )
+        .values(review_revision=expected + 1, updated_at=utc_now())
+        .execution_options(synchronize_session=False)
+    )
+    if getattr(result, "rowcount", None) != 1:
+        raise TransactionConflict("Transaction import review changed; reload it.")
+    record.review_revision = expected + 1
+    record.updated_at = utc_now()
 
 
 def normalize_merchant(value: str) -> str:
@@ -161,6 +199,7 @@ def create_csv_import(
     statement_start: date | None = None,
     statement_end: date | None = None,
     max_rows: int = MAX_TRANSACTION_ROWS,
+    max_file_bytes: int = 5_000_000,
 ) -> tuple[UUID, bool]:
     """Validate CSV outside DB writes, then persist a bounded private review."""
     safe_name = _file_name(filename)
@@ -171,7 +210,7 @@ def create_csv_import(
         raise TransactionError("A valid idempotency key is required.")
     if statement_start and statement_end and statement_start > statement_end:
         raise TransactionError("Statement start date must not follow its end date.")
-    if not content or len(content) > 5_000_000:
+    if not content or len(content) > max_file_bytes:
         raise TransactionError("CSV is empty or exceeds the configured size limit.")
     if max_rows < 1 or max_rows > MAX_TRANSACTION_ROWS:
         raise TransactionError("Transaction imports are limited to 500 rows.")
@@ -534,6 +573,7 @@ def correct_import_row(
         raise TransactionConflict("Only an unpublished review can be corrected.")
     if data.expected_review_revision != record.review_revision:
         raise TransactionConflict("Transaction import review changed; reload it.")
+    _advance_import_review(session, record, data.expected_review_revision)
     before = {
         "posted_date": row.posted_date.isoformat() if row.posted_date else None,
         "transaction_date": row.transaction_date.isoformat()
@@ -554,6 +594,8 @@ def correct_import_row(
         },
         exclude_unset=True,
     )
+    if "description" in changes and changes["description"] is None:
+        raise TransactionError("Corrected description cannot be null.")
     if "amount" in changes:
         parsed = _amount(changes["amount"])
         if parsed is None:
@@ -569,6 +611,21 @@ def correct_import_row(
     ):
         if field in changes:
             setattr(row, field, changes[field])
+    if data.identity_resolution in {"duplicate", "update"} and (
+        row.posted_date is None
+        or row.amount is None
+        or row.currency is None
+        or not row.description.strip()
+    ):
+        raise TransactionError(
+            "Resolve posted date, amount, currency and description before "
+            "identity resolution."
+        )
+    merchant = normalize_merchant(row.description)
+    row.normalized_merchant = merchant
+    row.fingerprint = _fingerprint(
+        row.account_id, row.posted_date, row.amount, row.currency, merchant
+    )
     if data.identity_resolution in {"duplicate", "update"}:
         target_id = data.duplicate_of_transaction_id
         if target_id is None or target_id not in [
@@ -589,6 +646,11 @@ def correct_import_row(
             raise TransactionError(
                 "Only the same scoped provider ID can update an existing transaction."
             )
+        if data.identity_resolution == "update":
+            row.diagnostics = {
+                **row.diagnostics,
+                "expected_target_revision": target.revision,
+            }
         row.status = (
             "duplicate" if data.identity_resolution == "duplicate" else "update"
         )
@@ -596,11 +658,6 @@ def correct_import_row(
         row.identity_resolution = data.identity_resolution
     else:
         row.identity_resolution = data.identity_resolution or row.identity_resolution
-        merchant = normalize_merchant(row.description)
-        row.normalized_merchant = merchant
-        row.fingerprint = _fingerprint(
-            row.account_id, row.posted_date, row.amount, row.currency, merchant
-        )
         repeated_id_row = (
             session.scalar(
                 select(FinancialTransaction)
@@ -635,7 +692,7 @@ def correct_import_row(
                 for key, value in row.diagnostics.items()
                 if key in {"currency_assumed_from_account"}
             }
-    record.review_revision += 1
+    _advance_revision(session, FinancialTransaction, row.id, expected=row.revision)
     row.revision += 1
     row.updated_at = utc_now()
     record.updated_at = utc_now()
@@ -698,6 +755,18 @@ def publish_import(
             raise TransactionConflict("Transaction import is no longer reviewable.")
         if record.review_revision != data.expected_review_revision:
             raise TransactionConflict("Transaction import review changed; reload it.")
+        advanced = session.execute(
+            update(TransactionImport)
+            .where(
+                TransactionImport.id == import_id,
+                TransactionImport.status == "review",
+                TransactionImport.review_revision == data.expected_review_revision,
+            )
+            .values(status="committed", updated_at=utc_now())
+            .execution_options(synchronize_session=False)
+        )
+        if getattr(advanced, "rowcount", None) != 1:
+            raise TransactionConflict("Transaction import review changed; reload it.")
         rows = list(
             session.scalars(
                 select(FinancialTransaction)
@@ -714,6 +783,17 @@ def publish_import(
         if blocked:
             raise TransactionBlocked(
                 "Resolve every invalid or ambiguous row before publishing."
+            )
+        if any(
+            row.posted_date is None
+            or row.amount is None
+            or row.currency is None
+            or not row.description.strip()
+            for row in rows
+        ):
+            raise TransactionBlocked(
+                "Resolve posted date, amount, currency and description before "
+                "publishing."
             )
         now = utc_now()
         for row in rows:
@@ -740,6 +820,45 @@ def publish_import(
                     raise TransactionConflict(
                         "The selected provider identity changed after review."
                     )
+                expected_target_revision = row.diagnostics.get(
+                    "expected_target_revision"
+                )
+                if expected_target_revision is None or existing.revision != int(
+                    expected_target_revision
+                ):
+                    raise TransactionConflict(
+                        "The selected transaction changed after review; "
+                        "review it again."
+                    )
+                financial_fields_changed = (
+                    existing.posted_date != row.posted_date
+                    or existing.transaction_date != row.transaction_date
+                    or existing.amount != row.amount
+                    or existing.currency != row.currency
+                )
+                if financial_fields_changed:
+                    has_splits = session.scalar(
+                        select(TransactionSplit.id)
+                        .where(TransactionSplit.transaction_id == existing.id)
+                        .limit(1)
+                    )
+                    has_transfer = session.scalar(
+                        select(ActiveTransferTransaction.transaction_id)
+                        .where(ActiveTransferTransaction.transaction_id == existing.id)
+                        .limit(1)
+                    )
+                    if has_splits is not None or has_transfer is not None:
+                        raise TransactionBlocked(
+                            "Reconcile splits or the confirmed transfer before "
+                            "changing this transaction's amount, currency or date."
+                        )
+                _advance_revision(
+                    session,
+                    FinancialTransaction,
+                    existing.id,
+                    expected=int(expected_target_revision),
+                    extra=(FinancialTransaction.status == "published",),
+                )
                 before = {
                     "posted_date": existing.posted_date.isoformat()
                     if existing.posted_date
@@ -886,6 +1005,18 @@ def cancel_import(
     if record.status != "review":
         raise TransactionConflict("Only an unpublished review can be cancelled.")
     if record.review_revision != data.expected_review_revision:
+        raise TransactionConflict("Transaction import review changed; reload it.")
+    advanced = session.execute(
+        update(TransactionImport)
+        .where(
+            TransactionImport.id == import_id,
+            TransactionImport.status == "review",
+            TransactionImport.review_revision == data.expected_review_revision,
+        )
+        .values(status="cancelled", updated_at=utc_now())
+        .execution_options(synchronize_session=False)
+    )
+    if getattr(advanced, "rowcount", None) != 1:
         raise TransactionConflict("Transaction import review changed; reload it.")
     record.status = "cancelled"
     record.updated_at = utc_now()
@@ -1126,6 +1257,13 @@ def patch_transaction(
         raise TransactionNotFound("Published transaction not found.")
     if row.revision != data.expected_revision:
         raise TransactionConflict("Transaction changed; reload before editing.")
+    _advance_revision(
+        session,
+        FinancialTransaction,
+        row.id,
+        expected=data.expected_revision,
+        extra=(FinancialTransaction.status == "published",),
+    )
     before = {
         "classification": row.classification,
         "category_id": str(row.category_id) if row.category_id else None,
@@ -1177,6 +1315,13 @@ def replace_splits(
     for item in data.splits:
         if item.category_id and session.get(SpendingCategory, item.category_id) is None:
             raise TransactionNotFound("Split category not found.")
+    _advance_revision(
+        session,
+        FinancialTransaction,
+        row.id,
+        expected=data.expected_revision,
+        extra=(FinancialTransaction.status == "published",),
+    )
     old = list(
         session.scalars(
             select(TransactionSplit).where(TransactionSplit.transaction_id == row.id)
@@ -1191,6 +1336,8 @@ def replace_splits(
     ]
     for split_row in old:
         session.delete(split_row)
+    # Free (transaction_id, split_index) uniqueness before replacement inserts.
+    session.flush()
     row.revision += 1
     row.updated_at = utc_now()
     created = [
@@ -1362,6 +1509,13 @@ def confirm_transfer(session: Session, data: TransferCreate) -> TransferMatch:
         ]
     )
     for transaction in (left, right):
+        _advance_revision(
+            session,
+            FinancialTransaction,
+            transaction.id,
+            expected=transaction.revision,
+            extra=(FinancialTransaction.status == "published",),
+        )
         before = {"transfer_match_id": None}
         transaction.revision += 1
         transaction.updated_at = now
@@ -1383,9 +1537,6 @@ def unlink_transfer(session: Session, transfer_id: UUID, reason: str) -> Transfe
         raise TransactionNotFound("Transfer link not found.")
     if match.status != "confirmed":
         raise TransactionConflict("Transfer link is not active.")
-    match.status = "unlinked"
-    match.reason = reason
-    match.updated_at = utc_now()
     claims = list(
         session.scalars(
             select(ActiveTransferTransaction).where(
@@ -1393,10 +1544,25 @@ def unlink_transfer(session: Session, transfer_id: UUID, reason: str) -> Transfe
             )
         )
     )
+    transactions = [
+        session.get(FinancialTransaction, transaction_id)
+        for transaction_id in (match.first_transaction_id, match.second_transaction_id)
+    ]
+    for transaction in transactions:
+        if transaction is not None:
+            _advance_revision(
+                session,
+                FinancialTransaction,
+                transaction.id,
+                expected=transaction.revision,
+                extra=(FinancialTransaction.status == "published",),
+            )
+    match.status = "unlinked"
+    match.reason = reason
+    match.updated_at = utc_now()
     for claim in claims:
         session.delete(claim)
-    for transaction_id in (match.first_transaction_id, match.second_transaction_id):
-        transaction = session.get(FinancialTransaction, transaction_id)
+    for transaction in transactions:
         if transaction:
             transaction.revision += 1
             transaction.updated_at = utc_now()

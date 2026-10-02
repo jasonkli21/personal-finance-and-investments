@@ -235,6 +235,8 @@ class FinanceCurrencyTotal(BaseModel):
     net_spending: str
     net_cash_flow: str
     transaction_count: int
+    unclassified_count: int
+    unclassified_signed_amount: str
 
 
 class FinanceCategoryTotal(BaseModel):

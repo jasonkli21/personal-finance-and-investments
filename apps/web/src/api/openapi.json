@@ -528,6 +528,14 @@
           "transaction_count": {
             "title": "Transaction Count",
             "type": "integer"
+          },
+          "unclassified_count": {
+            "title": "Unclassified Count",
+            "type": "integer"
+          },
+          "unclassified_signed_amount": {
+            "title": "Unclassified Signed Amount",
+            "type": "string"
           }
         },
         "required": [
@@ -535,7 +543,9 @@
           "income",
           "net_spending",
           "net_cash_flow",
-          "transaction_count"
+          "transaction_count",
+          "unclassified_count",
+          "unclassified_signed_amount"
         ],
         "title": "FinanceCurrencyTotal",
         "type": "object"
