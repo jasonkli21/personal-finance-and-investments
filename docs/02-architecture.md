@@ -141,14 +141,19 @@ portfolio_weight(x) = exposure_value(x) / portfolio_nav
 
 **Timestamp policy:** tag output with a portfolio position date, quote times, each ETF holdings as-of date, and report generation time. Display material currency/valuation mismatches as quality warnings.
 
+**Stage 1 execution policy:** the reviewed [Stage 1 plan](stage-1-implementation-plan.md#deterministic-selection-and-financial-policy) specifies default account-pointer versus explicit historical selection, quote precedence and line-scoped price fallback, immutable same-date corrections, USD-only incomplete totals, signed/opaque treatment and exact reconciliation. Account filters select NAV; row search/top-N retain that denominator. Freeze input policies and issuer mappings with selected observation IDs in a durable immutable calculation record/private derived artifact; paginated output, drill-down and export use the same calculation UUID across edits and process restarts. Reports do not add authoritative positions. Catalog creation and review corrections must work without a demo seed.
+
 **Performance:** precompute only after historical data becomes available, with a versioned methodology. Do not claim true historical fund look-through when historical snapshots are missing.
 
 ## 6. Backend API outline (illustrative, versioned `/api/v1`)
+
+The actual backend currently uses `/v1`; Vite strips `/api` from browser `/api/v1` requests. Stage 1 preserves this routing and generates exact paths from OpenAPI. The prefixes below describe the browser-facing conceptual API, not an instruction to rename existing backend routes.
 
 - `GET/POST /accounts`, `PATCH /accounts/{id}`
 - `GET/POST /securities`, `GET /securities/resolve?q=`
 - `GET/PUT /accounts/{id}/positions` (manual snapshot workflows)
 - `POST /imports/positions/preview`, `POST /imports/{id}/commit`, `GET /imports/{id}`
+- Review correction/acknowledgement and cancellation actions with expected review revision; concrete Stage 1 routes are defined in OpenAPI.
 - `GET /portfolio/owned?as_of=&account_ids=`
 - `GET /portfolio/exposure?level=security|issuer&as_of=&account_ids=`
 - `GET /portfolio/exposure/{issuer_or_security_id}/breakdown`

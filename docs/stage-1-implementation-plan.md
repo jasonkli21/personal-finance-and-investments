@@ -1,7 +1,7 @@
 # Stage 1 implementation plan
 
 **Status:** Proposed execution backlog, not implemented  
-**Updated:** 2026-10-01  
+**Updated:** 2026-10-02 — reviewed against Stage 0 commit `81b220e`
 **Roadmap coverage:** 1.1 Owned positions/valuation; 1.2 ETF composition; 1.3 Look-through/dashboard
 
 This is the execution plan for the first useful release: owned stocks, ETFs, and cash across accounts, plus a separate, reconciled company-exposure view. Read [the product specification](01-product-spec.md), [architecture](02-architecture.md), [data-source policy](03-data-sources.md), [ingestion rules](04-ingestion-and-ai.md), and [DSQL contract](07-aurora-dsql-compatibility.md). [Stage 0](stage-0-implementation-plan.md) supplies the local foundation; its real-DSQL gate remains required before production.
@@ -16,7 +16,7 @@ PDF/OCR, AI, bank connections, transaction-based performance, tax lots, recursiv
 
 ## Delivery conventions and cross-cutting requirements
 
-- Reuse Stage 0 repositories/settings; extend schema incrementally rather than precreating later-stage domains.
+- Reuse Stage 0 domain services/settings; they currently receive SQLAlchemy sessions directly, with no repository-object layer. Extend schema incrementally rather than precreating later-stage domains.
 - Imports are previews until the user accepts a particular revision. Account/date position snapshots replace holdings; they are neither purchases nor additive imports.
 - Preserve raw rows, identifiers, weight values/units, zero/negative values, and unknown classes. A rejected or unresolved row remains in diagnostics/evidence.
 - Download/parse outside database transactions. Stage bounded idempotent batches under unpublished revision IDs, validate completeness, then atomically publish; every normal read filters published revisions.
@@ -27,15 +27,73 @@ PDF/OCR, AI, bank connections, transaction-based performance, tax lots, recursiv
 - Verify official access/terms/formats before implementing live adapters and update the source register. Existing shortlist dates are not new verification evidence.
 - CLI/manual refresh is sufficient; no AI or account API may become a prerequisite for the MVP.
 
+## Review decisions and implementation handoff
+
+These decisions close ambiguities in the original backlog. They are implementation requirements, not delivery evidence.
+
+### Prerequisite and major commit sequence
+
+Stage 0's latest local gate is still unverified. Before Stage 1 code changes, execute its PostgreSQL 16 fresh-install and populated `0002 → head` upgrade tests, replacement/history/rollback, draft-conflict tests, and generated-contract checks. The upgrade test begins at 0002, while the fresh install exercises 0001 through head; do not describe the populated fixture as starting at 0001. Obtain an isolated PostgreSQL 16 runtime locally or actual CI evidence for this checkout. Docker/psql are absent and `gh` is unauthenticated in the review environment; a configured workflow is not a successful run. Fix only necessary prerequisite defects and record commands/results. DSQL access is a separate production gate and does not block local Stage 1.
+
+Implement and commit three major packages, rather than one commit per dotted subtask:
+
+| Commit | Scope | Validation before committing |
+| --- | --- | --- |
+| Prerequisite, only if fixes are needed | Stage 0 local gate remediation | Real PG16 gate and existing aggregate checks |
+| **S1.1 Owned portfolio, valuation and reviewed position imports** | S1.1.1–S1.1.3, catalog authoring, shared private file/review/batch infrastructure; S1.1.4 is optional | Owned/selection, review correction/cancel, duplicate/replacement/concurrency, PG16 migration and generated contracts; runnable UI slice |
+| **S1.2 Fund composition and issuer formats** | S1.2.1–S1.2.2, history/review UI, source verification and permitted refresh/upload paths | Both official-format parser contracts, manual mapper, anomalous/raw preservation, PG16 batches/publication, generated contracts |
+| **S1.3 Reconciled exposure, dashboard and first release** | S1.3.1–S1.3.3, frozen reports, export, complete offline browser journey and release documentation | Golden math, report consistency, PG16 feature suite, Playwright and aggregate checks |
+
+Keep each package coherent; include its migrations, generated contracts and documentation in that commit. Existing applied Alembic files and recorded DSQL step checksums remain immutable. Maintain a release evidence record (for example `docs/stage-1-release.md`) listing package commit IDs, commands/results and unresolved live-provider/DSQL gates. A documentation-only evidence follow-up is acceptable if the final commit ID cannot be recorded within itself. Do not push, deploy, create paid resources, or implement later stages merely to complete Stage 1.
+
+### Deterministic selection and financial policy
+
+| Concern | Stage 1 decision |
+| --- | --- |
+| Default owned selection | Use each included active account's selected published pointer, shared by manual and imported writes. Both advance the same account counter. Archived accounts are excluded by default; explicit history inclusion is labelled and archived accounts reject writes. No account hard-delete workflow. |
+| Explicit `as_of=T` | Choose published position history with effective time ≤ T, latest effective time then highest account revision as tie-breaker. Include superseded published history; exclude unpublished/cancelled revisions. This is a snapshot inspection, not performance reconstruction. Default selection and historical selection are distinct modes. |
+| Quotes | Eligible observations match security/currency, are accepted and dated ≤ valuation time. Latest as-of wins; at equal time choose explicit reviewed manual override, then configured provider priority, then a stable observation ID. Snapshot reported prices are line-scoped fallbacks, not global manual overrides affecting another account. Retain conflicting observations; same source/time with changed content must not overwrite old accepted values. |
+| Fund selection | Latest published holdings as-of ≤ valuation time; ties use explicit reviewed source priority and publication revision/ID. Retain revised same-date source files. Stale last-good data is usable with a warning; fetching does not invent an effective date. |
+| Default dates | Use an injected UTC clock for report valuation/generation, serialize timezone-bearing timestamps, and show each account's separate position date. Future-dated selected positions cannot silently join an earlier valuation: exclude and warn. Date-only positions use the existing midnight UTC convention. |
+| Currency and incomplete NAV | USD-only, with all non-USD/unpriced rows retained and excluded with reasons. Return `included_valued_nav` plus completeness state; only call it total portfolio NAV when complete. On incomplete valuation, percentage of total portfolio is null; a separately labelled percentage of included valued USD assets may be shown. Unknown unpriced value has no fabricated dollar residual. |
+| Signed owned values | Preserve negative/zero quantities and cash. Reconcile signed dollar values, but suppress portfolio percentage/coverage metrics when NAV ≤ 0 or signed positions would make an allocation metric misleading. State the unsupported signed-allocation condition. |
+| Numeric policy | Preserve existing quantity/value `NUMERIC(28,10)`, price `NUMERIC(24,10)` bounds. Use weights with 10 decimal places and explicit input units. Reject nonfinite/out-of-range/excess-scale normalized inputs with retained raw evidence; never silently truncate. Use Decimal context precision ≥ 80 and test aggregate/product bounds. Compute exposure without intermediate cents rounding; if persistence/export quantizes components, allocate and identify any rounding remainder so reconciliation remains exact at the stored scale. Display USD to cents with ROUND_HALF_UP; displayed row sums may differ by ≤ $0.01 × displayed row count and must explain this. Golden fixture is exact. |
+| Anomalous fund | Negative weights, derivatives/leverage, duplicate unresolved economic lines, or reported total > 1 trigger whole-fund opaque fallback. Retain all source rows/diagnostics; do not manufacture a negative missing-weight bucket or normalize. For otherwise supported total ≤ 1, decompose recognized equity, cash and nested/other/unknown weights and assign `1 − reported_total` to missing weight. Zero rows remain visible. |
+| Coverage | Security attribution counts resolved supported equity value; issuer attribution additionally requires a reviewed issuer mapping. Cash is a separate reconciled category, nested funds remain opaque, and unknown/other/missing weights are residual. Publish the numerator/denominator and distinguish attribution from valuation completeness. On the 92% equity/5% cash/3% missing fixture, security coverage is 92%, with all three parts reconciling. |
+| Filters | Account inclusion determines NAV. Security/issuer/source search and top-N only filter report rows; they never silently change the denominator. Include hidden-row/subtotal metadata. One-level nested ETFs have their own opaque category, not an operating-company exposure. |
+
+Default stale thresholds must be explicit configuration, documented by provider and tested with an injected clock; they are application policy, not claims about verified vendor freshness.
+
+### Review, identity and publication
+
+- A position import targets exactly one internal account and one date. Require the mapped account/date values to match the confirmed target; reject mixed-account/mixed-date files. Empty replacement requires explicit clear-account confirmation. Cash uses explicit `cash:USD` (or another currency) and quantity as balance with no price; document optional `asset_type`/identifier namespace/exchange columns. Reject transaction mode. Duplicate position security rows require user correction rather than automatic sum.
+- Unmatched/ambiguous **position** rows block commit until resolved; foreign-currency rows can be retained canonically with exclusion labels. Fund constituents may stay unresolved and publish to residual after explicit review. Provide reviewed local security creation (type/name/currency and scoped identifiers) and issuer mapping from an empty catalog; never create securities or merge companies merely from parser guesses. No external catalog API is required.
+- Provide correction/remapping, explicit acknowledgement and cancellation API/UI actions, not only preview and commit. Corrections require the expected review revision, create audit history with a reason, and invalidate earlier approvals/batches. The client captures review and account revisions with the draft; background refetch cannot rebase them. Cancelled attempts cannot publish.
+- File/source/account-or-fund/effective-date identity identifies duplicate source input; parser version/mapping/review payload hashes identify attempts. Return an earlier accepted result for an unchanged duplicate **without moving a newer account pointer backward**. Changed interpretation of already-published bytes requires explicit correction/replacement and new immutable revision; never silently ignore or republish a revised mapping. A reused idempotency key with a different payload returns conflict.
+- All reads filter published lifecycle, not only the literal `accepted` status: superseded published history remains inspectable. Staging and final publication revalidate target identity, active account, review revision, exact row/batch hash counts and financial validation. The final DB-only transaction compares the captured account head/review revision and moves visibility once; stale conflicts return HTTP 409 without automatic rebase. Concurrent duplicate commits must return one canonical result.
+- Apply safe row **and byte** budgets to raw review rows, canonical lines, indexes and audit writes. Default batches should be at most 200 rows and comfortably below DSQL limits; test ≥ 500 lines across multiple commits and interruption/retry/cancel. Publication must update bounded metadata only, not all staged lines. Raw full-file evidence lives in private storage; bounded row evidence may live in SQL. A local cleanup CLI may remove orphaned unpublished batches/files after a documented grace period, never referenced accepted/history/report artifacts.
+- Official format parsing is mandatory for two issuers, but automated network retrieval is conditional on verified permitted access. Default candidates are iShares IVV and SPDR SPY. If automation is restricted, finish the adapter using official-download upload plus current source/rights evidence and an explicit unavailable-refresh reason; this is the plan's permitted fallback, not permission to bypass restrictions. Do not claim automated refresh or live success from parser fixtures. New public downloads still require preview/accept unless a distinct trusted path is explicitly approved.
+
+### Frozen report and private-input boundaries
+
+A report must survive a later portfolio edit, new quote, fund publication, issuer remapping or application restart without changing its drill-down/export. Add an immutable calculation record with a UUID, methodology version, filters, selected IDs, currency/status, and hash of normalized inputs including issuer mappings and policy settings. Persist the frozen inputs/results in bounded SQL records or a checksummed private derived artifact referenced from SQL. Avoid an unbounded JSONB payload or process-memory-only cache. Report generation resolves inputs in a consistent DB read transaction, then calculates outside write transactions; no provider calls occur during report generation. Failed report persistence returns a safe error, never a report ID pointing at a different calculation.
+
+Owned/exposure pagination, breakdown and CSV require the same calculation ID. Refresh explicitly creates a new report. Verify old report contents after changing every source type and after process restart. Source IDs alone are insufficient if issuer mappings or selection policies can mutate; freeze those values too. A missing/expired report must return an actionable 404/410, never transparently recompute under the old ID. Reports are derived artifacts, not additional authoritative holdings.
+
+Private uploads use generated keys, owner-only directories/files, atomic file writes/hash verification, and no user-supplied paths or public static mounts. Bound bytes, rows, fields, parser work and encodings; support UTF-8/BOM, quoted fields and CRLF, reject binary/HTML masquerading as CSV. MIME is evidence, not a sole acceptance check. Network adapters enforce exact destinations and redirect allowlists, disallow private/loopback destinations, cap response sizes/time and respect permission failures/Retry-After. Neutralize CSV formula injection only for textual cells; preserve legitimate signed numeric decimals. Test these boundaries with synthetic inputs and avoid raw financial content in logs.
+
 ## Required verification matrix
 
 | Area | Required fixtures / failure cases | Evidence |
 | --- | --- | --- |
-| Accounts/positions | Same security in two accounts, fractional/zero quantities, cash, archive/delete | Domain, API, PostgreSQL, browser |
+| Accounts/positions | Same security in two accounts, fractional/zero quantities, cash, account archive/position removal | Domain, API, PostgreSQL, browser |
 | Snapshot import | Duplicate file, 10→12 replacement, unresolved row, correction, conflicting revision, interrupted batch | PostgreSQL plus real DSQL before promotion |
+| Review/catalog | Empty catalog, ambiguous scoped ID, duplicate position rows, mixed account/date, correction after approval, cancellation, duplicate after newer head | Domain/API/UI and PostgreSQL |
 | Quotes/FX | Missing/stale/manual/conflicting observations, unavailable FX, quota/outage | Offline fake-provider and selection tests |
 | Fund formats | Percent/decimal weights, missing date, unknown class, cash, nested fund, short, weight total anomaly | Synthetic parser contracts, changed-format rejection |
 | Exposure | Golden NVDA, share classes, incomplete/opaque fund, rounding, zero/negative NAV, account filters | Pure Decimal unit tests and both SQL targets |
+| Frozen report | New quote/fund/account head/issuer mapping after generation, server restart, pagination/search, missing artifact, text formula export vs signed numeric cells | PostgreSQL/API and browser |
+| Input limits | UTF-8 BOM/CRLF/quotes, invalid/binary/HTML content, excessive bytes/rows/fields, unsafe file name, disallowed redirect, cleanup of referenced artifacts | Offline parser/storage/fake-HTTP tests |
 | Release journey | Create/import → compositions → drill-down → CSV; no provider keys | Playwright offline smoke |
 | Production | Fresh/upgrade migrations, FKs/index readiness, 500-row import, OCC and publish concurrency | Gated real DSQL; skipped means unverified |
 
@@ -51,20 +109,25 @@ PDF/OCR, AI, bank connections, transaction-based performance, tax lots, recursiv
 | Fund snapshot | Fund security, as-of, fetched time, source URL, content hash/file, parser version, reported/recognized weights, warnings, publication state |
 | Fund line | Snapshot, stable line identity, nullable constituent security, raw identifier/name/class, decimal weight, original weight unit/value, match status |
 | Manual override | Target field/revision, previous observation reference, accepted value, reason, actor/source, effective and recorded times |
+| Frozen calculation | UUID, methodology/policy/filter manifest, input/output hash, selected IDs and frozen issuer mappings, bounded immutable rows or private artifact key; stable drill-down/export across restart |
 
 **Required API and derived contracts:**
 
-| Route under `/api/v1` | Contract |
+| Route under backend `/v1` (browser `/api/v1` through existing Vite proxy) | Contract |
 | --- | --- |
 | `/accounts` and `/accounts/{id}/positions` | Stage 0 account/manual workflows extended to stocks/ETFs/cash and archive rules |
+| `POST /securities`, reviewed identifier/issuer mapping actions | Local catalog authoring from an empty database; conservative matching, expected revision and audit reasons |
 | `POST /imports/positions/preview` | Private CSV receipt, mapping and explicit target account/date/snapshot semantics; no canonical change |
 | `GET /imports/{id}` | Reviewed rows, diagnostics, before/after diff, state and revision |
+| `PATCH /imports/{id}/review`, `POST /imports/{id}/cancel` | Mapping/row corrections and acknowledgements with expected review revision; invalidate earlier approval; cancellation cannot publish |
 | `POST /imports/{id}/commit` | Expected review/target revision and idempotency key; staged, validated, atomic publish |
 | `/funds/{security_id}/snapshots`, `/upload`, `/refresh` | Dated history, reviewed manual import, bounded allowlisted refresh |
 | `/market-data/quotes/status` | Missing/stale/manual/source status; optional manual quote write contract |
 | `/portfolio/owned` | Account/as-of/currency filters, published positions, valued/unpriced parts |
 | `/portfolio/exposure` and `/{id}/breakdown` | Security/issuer level, contributions, NAV basis, residual/coverage/freshness |
 | Portfolio CSV export | Same frozen calculation identity/filters and source dates as displayed report |
+
+Finalize concrete catalog, report creation/retrieval, pagination and manual quote routes in OpenAPI while preserving existing `/v1` routes and the proxy. Do not change the API prefix solely to match the earlier illustrative `/api/v1` table. All decimal fields remain strings, including coverage and percentage values.
 
 Exposure responses must identify `calculation_version`, generation/valuation times, selected position/quote/fund snapshot IDs, reporting currency, included accounts, NAV status, direct/indirect/residual amounts, attribution coverage, and warnings. Account/fund contribution rows contain their own source dates. Generated TypeScript types/client follow OpenAPI changes.
 
@@ -74,7 +137,7 @@ Exposure responses must identify `calculation_version`, generation/valuation tim
 
 ```text
 Stage 0 local gate ─> S1.1.1 Fixtures/contracts ─> S1.1.2 Owned/valuation ─> S1.1.3 Position CSV
-                               └───────────────> S1.2.1 Fund import ─> S1.2.2 Issuer adapters
+S1.1.1 + S1.1.3 shared publication ──────────────> S1.2.1 Fund import ─> S1.2.2 Issuer adapters
 S1.1.2 + S1.2.1 ─> S1.3.1 Exposure engine ─> S1.3.2 Dashboard ─> S1.3.3 Export/release
 S1.1.3 + S1.2.2 ──────────────────────────────────────────────────────> S1.3.3
 S1.1.2 ─> S1.1.4 Optional quote adapter ───────────────────────────────> S1.3.3
@@ -139,7 +202,7 @@ Manual valuation supports the entire offline release path. The optional live quo
 
 1. Publish a canonical CSV template: account, ticker/identifier, quantity, optional price, currency, as-of; support explicit column mapping and source/account/date confirmation.
 2. Validate upload bytes/size, retain private original/hash, parse rows outside transactions, and preserve raw data plus unknown identifiers and diagnostics.
-3. Show a before/after diff against the selected account revision. Require resolution or an explicit unresolved policy; never hide rows from the review.
+3. Show a before/after diff against the selected account revision. Require resolution of unmatched/ambiguous position rows before commit; never hide rows from the review. Implement correction/remapping/acknowledgement and cancellation with captured review revisions.
 4. Deduplicate by content hash plus source/account/snapshot identity; parser-version reprocessing creates another attempt without another financial snapshot.
 5. Stage bounded hashed batches under a pending revision, verify reviewed counts/totals, and publish in one short expected-revision transaction.
 6. Make commit retries return the accepted result; interrupted staging/cancellation keeps the prior portfolio visible and permits safe recovery.
@@ -168,7 +231,7 @@ Manual valuation supports the entire offline release path. The optional live quo
 
 ### S1.2.1 — Implement manual fund-holdings import and identity review
 
-**Dependencies:** S1.1.1; reuse S1.1.3's import publication boundary when available.  
+**Dependencies:** S1.1.1 and S1.1.3's shared import publication boundary.
 **Modules:** funds, securities, private import storage; composition review.
 
 **Goal:** make ETF decomposition usable entirely offline.

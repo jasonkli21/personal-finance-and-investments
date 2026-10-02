@@ -51,6 +51,7 @@ Use the roadmap's work-package number when selecting a task, then follow its `S`
 - Build canonical generic position-CSV upload + column-mapping preview + duplicate detection + transactionally applied **snapshot** semantics.
 - Add quote provider interface with manual values and dated cached quote observations; integrate one optional free source after its usage rules are verified.
 - Display missing/stale quotes and unpriced assets; do not mix currencies without available FX.
+- Provide reviewed local security/identifier/issuer catalog authoring so a fresh install works without demo data. Position imports target one account/date, require resolution of unmatched rows, and support correction/cancel with captured review revisions.
 
 **Test:** Import the same account snapshot twice; quantities and NAV must not double. Switch to a later snapshot and preserve the prior one historically.
 
@@ -70,6 +71,7 @@ Use the roadmap's work-package number when selecting a task, then follow its `S`
 - Keep actual positions and look-through output separate; support account filters and top-N exposure ranking.
 - Render holdings table, portfolio NAV, effective issuer/security exposure, per-account/fund drill-down and freshness/coverage badges.
 - Add CSV export with calculation version, position/quote/fund-as-of and residual category.
+- Freeze report inputs (including issuer mappings/policies), results and filters durably under one calculation identity; pagination, drill-down and CSV remain consistent after new data and server restart. Incomplete totals and unsupported signed allocations never imply complete portfolio percentages.
 - Add Playwright demo from manual portfolio + uploaded ETF files to total-exposure drill-down.
 
 **Golden acceptance fixture:**
@@ -85,6 +87,8 @@ Use the roadmap's work-package number when selecting a task, then follow its `S`
 Expected NVDA look-through: `$30,000 + ($50,000 × 0.08) + ($20,000 × 0.06) = $35,200`, or `17.6% of NAV`. **Owned NAV remains $200,000**; no ETF constituents create new positions. An ETF with no current composition still counts toward NAV and appears in unclassified exposure.
 
 **Stage 1 local exit gate / first release:** From a fresh local install, a user imports/enters ETFs plus direct stocks, refreshes/uploads dated compositions, and sees correct source-traceable consolidated exposure. Offline use works from cached/manual data. **Stage 1 production gate additionally requires real DSQL tests** for imports, same snapshot idempotency, schema, FK/index readiness, numeric math and concurrency retries.
+
+The reviewed [Stage 1 plan](stage-1-implementation-plan.md#review-decisions-and-implementation-handoff) fixes selection, review, financial and safety policies and groups delivery into one coherent commit for each major package **1.1, 1.2 and 1.3**. Prerequisite Stage 0 gate fixes may have their own commit. Two official-format parsers remain mandatory; an official-download/upload route is acceptable when current evidence does not permit automatic retrieval. Optional quote integration and unexecuted cloud checks must be documented honestly rather than silently promoted to release dependencies.
 
 ## Stage 2 — Automated statement ingestion and personal finance
 

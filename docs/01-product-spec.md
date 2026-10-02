@@ -50,6 +50,8 @@ Stage 4 is an **optional deployment track** in timing, but the production databa
 
 **Accept when:** Reimporting the same CSV leaves account holdings unchanged. An upload that replaces 10 shares with 12 results in 12, not 22. Unmatched tickers stay in review.
 
+Stage 1 imports target one account/date; mixed files and duplicate security lines require correction. Unmatched/ambiguous position rows block commit, while unresolved fund constituents may remain residual after review. A fresh install must support reviewed local catalog creation without synthetic seeding. The [reviewed execution plan](stage-1-implementation-plan.md#review-decisions-and-implementation-handoff) defines correction/cancellation, captured revisions and duplicate uploads after a newer selected snapshot.
+
 ### P3 — Retrieve full ETF holdings and track freshness [MUST]
 
 - Begin with 2–3 supported ETF formats, one parser each, and a user-uploaded issuer-CSV fallback.
@@ -80,6 +82,8 @@ Stage 4 is an **optional deployment track** in timing, but the production databa
 - Explain unavailable quote/holdings data rather than silently filling it in. Display calculation methodology for exposure percentages.
 
 **Accept when:** Missing prices and missing/partial ETF holdings produce an incomplete-data banner and nonfabricated numbers, not a misleading 100%-coverage report.
+
+Incomplete USD valuation reports the included valued subtotal and exclusions; total-portfolio percentages remain unavailable. Attribution coverage and valuation completeness are distinct. Report pagination, drill-down and export retain one frozen calculation identity across data changes/restarts. Search/top-N filter visible rows without changing account-selected NAV. Signed/unsupported allocation policies and exact residual reconciliation are specified in the [Stage 1 plan](stage-1-implementation-plan.md#deterministic-selection-and-financial-policy).
 
 ## 4. Stage 2 — Automated ingestion and personal finance
 
