@@ -45,7 +45,7 @@ Python worker/scheduler -> same domain services and interfaces
 
 **Client API typing:** generate the TypeScript HTTP client from FastAPI's OpenAPI schema using `openapi-typescript` or Orval. Avoid hand-written duplicate request/response interfaces when the backend contract can generate them.
 
-**Dual-engine execution:** configure the database at boot (`DATABASE_BACKEND=postgres|aurora_dsql`); create a separate DSQL SQLAlchemy engine with IAM-based token-on-connect and TLS hostname verification. Never reuse a stale auth token for new pooled connections. Alembic migration scripts must branch where DSQL requires separate transactions, one DDL statement per transaction and asynchronous indexes; domain methods should not branch on backend in ordinary business code.
+**Dual-engine execution:** configure the database at boot (`DATABASE_BACKEND=postgres|aurora_dsql`) through `DatabaseEngineFactory`; create a separate DSQL SQLAlchemy engine with the official connector, scoped IAM token-on-connect and TLS hostname verification. DSQL rejects `DATABASE_URL`; the migration identity is configured separately from the app role. Never reuse a stale auth token for new pooled connections. PostgreSQL uses Alembic; DSQL uses the versioned runner with separate DDL/DML transactions, one DDL statement per transaction and asynchronous index readiness. Domain methods should not branch on backend in ordinary business code.
 
 ## 3. Proposed repository layout
 

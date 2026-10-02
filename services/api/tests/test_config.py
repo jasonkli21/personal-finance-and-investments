@@ -1,4 +1,4 @@
-"""Keep unimplemented cloud configuration from silently using local PostgreSQL."""
+"""Validate explicit database backend and bounded connection settings."""
 
 import pytest
 
@@ -18,6 +18,14 @@ def clear_database_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "POSTGRES_USER",
         "POSTGRES_PASSWORD",
         "POSTGRES_DB",
+        "AWS_REGION",
+        "AURORA_DSQL_CLUSTER_ENDPOINT",
+        "AURORA_DSQL_DB_USER",
+        "AURORA_DSQL_MIGRATION_DB_USER",
+        "DATABASE_POOL_SIZE",
+        "DATABASE_MAX_OVERFLOW",
+        "DATABASE_POOL_RECYCLE_SECONDS",
+        "DATABASE_CONNECT_TIMEOUT_SECONDS",
     ):
         monkeypatch.delenv(key, raising=False)
 
@@ -27,7 +35,59 @@ def test_dsql_backend_is_explicitly_unavailable(
 ) -> None:
     clear_database_env(monkeypatch)
     monkeypatch.setenv("DATABASE_BACKEND", "aurora_dsql")
-    with pytest.raises(ValueError, match="Stage 0.4"):
+    with pytest.raises(ValueError, match="AURORA_DSQL_CLUSTER_ENDPOINT"):
+        load_settings()
+
+
+def test_unknown_database_backend_fails_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clear_database_env(monkeypatch)
+    monkeypatch.setenv("DATABASE_BACKEND", "mysql")
+
+    with pytest.raises(ValueError, match="DATABASE_BACKEND"):
+        load_settings()
+
+
+def test_dsql_requires_scoped_application_and_distinct_migration_roles(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clear_database_env(monkeypatch)
+    monkeypatch.setenv("DATABASE_BACKEND", "aurora_dsql")
+    monkeypatch.setenv("AWS_REGION", "us-east-1")
+    monkeypatch.setenv("AURORA_DSQL_CLUSTER_ENDPOINT", "cluster.dsql.us-east-1.on.aws")
+    monkeypatch.setenv("AURORA_DSQL_DB_USER", "portfolio_app")
+    monkeypatch.setenv("AURORA_DSQL_MIGRATION_DB_USER", "portfolio_app")
+
+    with pytest.raises(ValueError, match="must differ"):
+        load_settings()
+
+
+def test_dsql_rejects_password_bearing_database_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clear_database_env(monkeypatch)
+    monkeypatch.setenv("DATABASE_BACKEND", "aurora_dsql")
+    monkeypatch.setenv("AWS_REGION", "us-east-1")
+    monkeypatch.setenv("AURORA_DSQL_CLUSTER_ENDPOINT", "cluster.dsql.us-east-1.on.aws")
+    monkeypatch.setenv("AURORA_DSQL_DB_USER", "portfolio_app")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://user:secret@example/db")
+
+    with pytest.raises(ValueError, match="DATABASE_URL"):
+        load_settings()
+
+
+@pytest.mark.parametrize("value", ["admin", "ADMIN"])
+def test_dsql_rejects_admin_application_role(
+    monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    clear_database_env(monkeypatch)
+    monkeypatch.setenv("DATABASE_BACKEND", "aurora_dsql")
+    monkeypatch.setenv("AWS_REGION", "us-east-1")
+    monkeypatch.setenv("AURORA_DSQL_CLUSTER_ENDPOINT", "cluster.dsql.us-east-1.on.aws")
+    monkeypatch.setenv("AURORA_DSQL_DB_USER", value)
+
+    with pytest.raises(ValueError, match="scoped application role"):
         load_settings()
 
 
@@ -60,6 +120,14 @@ def test_nonempty_database_url_is_explicit_override(
 
     assert settings.database_url == "postgresql://explicit-host/explicit-db"
     assert settings.database_host == "ignored-host"
+
+
+def test_pool_bounds_are_validated(monkeypatch: pytest.MonkeyPatch) -> None:
+    clear_database_env(monkeypatch)
+    monkeypatch.setenv("DATABASE_POOL_SIZE", "40")
+
+    with pytest.raises(ValueError, match="DATABASE_POOL_SIZE"):
+        load_settings()
 
 
 @pytest.mark.parametrize("value", ["0", "65536", "not-a-port"])

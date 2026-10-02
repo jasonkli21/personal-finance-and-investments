@@ -1,6 +1,6 @@
 # Aurora DSQL compatibility contract
 
-**Status:** Proposed, mandatory for production | **Verified against AWS official documentation:** 2026-09-25  
+**Status:** DSQL boundary implemented; live cluster remains unverified | **Verified against AWS/PyPI official documentation:** 2026-10-01
 **Architecture:** PostgreSQL 16 locally and for personal/offline operation; **single-Region Amazon Aurora DSQL in production**. The same FastAPI domain logic must support both. No claim is made that a live DSQL cluster has been tested yet.
 
 This file is the authoritative DSQL-specific companion to [`02-architecture.md`](02-architecture.md), [`05-roadmap.md`](05-roadmap.md), and [`06-security-and-deployment.md`](06-security-and-deployment.md). Recheck the official links before implementing: Aurora DSQL is adding PostgreSQL features frequently.
@@ -27,12 +27,17 @@ DATABASE_URL=postgresql+psycopg://app:local-only@127.0.0.1:5432/portfolio
 # DATABASE_BACKEND=aurora_dsql
 # AWS_REGION=us-west-2
 # AURORA_DSQL_CLUSTER_ENDPOINT=<cluster-endpoint>
-# AURORA_DSQL_DB_USER=<least-privilege-role>
+# AURORA_DSQL_DB_USER=<least-privilege-application-role>
+# AURORA_DSQL_MIGRATION_DB_USER=<separate-schema-migration-role>
 # AWS credentials from task/instance role, never an embedded AWS key
+# DATABASE_POOL_SIZE=5
+# DATABASE_MAX_OVERFLOW=5
+# DATABASE_POOL_RECYCLE_SECONDS=3000
 ```
 
-- For DSQL use AWS's [Aurora DSQL SQLAlchemy dialect](https://github.com/awslabs/aurora-dsql-orms/tree/main/python/sqlalchemy) (`aurora-dsql-sqlalchemy`) and its `create_dsql_engine` helper or AWS's [Python connector](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/SECTION_program-with-dsql-connector-for-python.html). Verify package version, driver compatibility, SSL configuration and connection pooling against official examples rather than pasting a static bearer token into a standard database URL.
-- DSQL uses IAM-based login tokens (typically **15-minute token validity for *new connections***); a successfully established connection can remain valid after the token expires, subject to DSQL's connection lifetime. Regenerate tokens **when establishing new connections**, use an IAM role assigned to the deployed compute, and verify TLS hostname (`sslmode=verify-full`) in production. [AWS token guide](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/SECTION_authentication-token.html), [TLS guidance](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/configure-root-certificates.html).
+- As checked on 2026-10-01, PyPI's current AWS SQLAlchemy dialect is `aurora-dsql-sqlalchemy` **1.3.0** (released 2026-09-24); the locked Python connector is **0.2.7**. The implementation requires the official `create_dsql_engine` helper, psycopg 3, and `psycopg[binary,pool]`; see [dialect documentation](https://pypi.org/project/aurora-dsql-sqlalchemy/) and [connector documentation](https://pypi.org/project/aurora-dsql-python-connector/). The helper obtains IAM tokens when opening connections and defaults to TLS certificate and hostname verification (`sslmode=verify-full`, `sslrootcert=system`).
+- Configure AWS Region, cluster endpoint and a scoped application role. `DATABASE_URL` is rejected for DSQL so a password or stale token cannot be embedded in a URL. `AURORA_DSQL_MIGRATION_DB_USER` must differ from the app role and is required by the migration command. AWS credentials come from the standard AWS credential chain or an assigned workload role. [AWS token guide](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/SECTION_authentication-token.html), [TLS guidance](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/configure-root-certificates.html).
+- The engine pool defaults to 5 connections plus at most 5 overflow connections. Connection attempts time out after 3 seconds, pool checkout after 3 seconds, and pooled connections recycle after 3,000 seconds, below DSQL's documented 60-minute maximum connection duration. Readiness uses the selected SQLAlchemy engine, including DSQL; health checks do not call external services.
 - Use one cluster's built-in `postgres` database in production. Use schemas if justified but be aware of [DSQL quotas](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/CHAP_quotas.html).
 
 ## 3. SQL compatibility: design for the intersection
@@ -43,29 +48,31 @@ DATABASE_URL=postgresql+psycopg://app:local-only@127.0.0.1:5432/portfolio
 | Numeric / JSON | `NUMERIC`, `UUID`, `JSONB` for bounded metadata; keep raw artifacts in files/S3 | Massive JSON blobs and unsupported PostgreSQL extensions |
 | Aggregation | Portable `JOIN`, `GROUP BY`, CTEs, decimal calculations, simple window queries supported by both | Unverified PostgreSQL-only functions, procedures or index operators |
 | Data manipulation | Idempotent upserts when verified, explicit transaction boundaries | Reliance on triggers, `TRUNCATE`, or temporary tables |
-| Schema changes | Alembic migration plan with a tested DSQL branch | Assuming a normal multi-DDL migration works unchanged |
+| Schema changes | Versioned DSQL migration runner with separate transactions | Applying PostgreSQL Alembic migration unchanged |
 | Indexes | DSQL `CREATE INDEX ASYNC` with readiness verification | Treating an index as immediately available after DDL starts |
 | Research search | Source metadata filter plus portable application-level text matching or another independently designed search provider | Requiring `pgvector`, GIN/`tsvector` or any extension in DSQL |
 
-**Feature-state corrections:** Aurora DSQL **does support foreign keys** (released August 26, 2026) and **JSONB** (released June 8, 2026). Sequences/identity columns and more DDL operations also exist, but application UUIDs reduce distribution/portability surprises. Verify [release notes](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/release-notes.html) before treating an older limitations list as current. [Supported SQL](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/working-with-postgresql-compatibility-supported-sql-features.html), [data types](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/working-with-postgresql-compatibility-supported-data-types.html).
+**Feature-state corrections:** AWS's current SQL/type references support foreign keys and their `CASCADE`, `RESTRICT`, and `SET NULL` actions, `CHECK` constraints, UUID, NUMERIC, and JSONB. The core model's `NUMERIC(24,10)` and `NUMERIC(28,10)` fit current limits. Verify [release notes](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/release-notes.html) before treating an older limitations list as current. [Supported SQL](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/working-with-postgresql-compatibility-supported-sql-features.html), [data types](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/working-with-postgresql-compatibility-supported-data-types.html).
 
 Do not assume **PostgreSQL extensions** work: Aurora DSQL is managed and does not expose PostgreSQL extension catalogs as a supported general extension-install mechanism. `pgvector` remains an optional **local PostgreSQL-only experiment** unless the production retrieval design includes a separate portable provider.
 
 ## 4. Transaction design and ingestion
 
-### Stage 0.3 core schema migration plan
+### Stage 0.4 core schema migration plan and evidence
 
-The local Alembic revision `0001_core_portfolio_schema` creates `issuers`, `accounts`, `issuer_aliases`, `securities`, `position_snapshots`, `quotes`, and `position_snapshot_lines`. It uses application-supplied UUID primary keys, `NUMERIC` quantities/prices/values, bounded JSONB quote metadata, source and quality fields, and relational constraints. The local revision uses PostgreSQL's JSONB type spelling, which DSQL also supports.
+The PostgreSQL Alembic revision `0001_core_portfolio_schema` creates `issuers`, `accounts`, `issuer_aliases`, `securities`, `position_snapshots`, `quotes`, and `position_snapshot_lines`. The separate, versioned DSQL plan in `app/db/dsql_migrations.py` mirrors that schema with seven table steps and four asynchronous index steps. The official DSQL dialect compiles all seven SQLAlchemy tables and four indexes locally without opening a connection.
 
-The future DSQL migration runner must translate the revision into a versioned DSQL plan: execute each `CREATE TABLE` as its own DDL transaction, then each standalone `CREATE INDEX ASYNC` as a separate DDL transaction and wait for readiness before advancing. DML to update the migration ledger must run only after DDL transactions complete. Fresh install and upgrade paths must verify FK actions, unique/check constraints, JSONB and index readiness on a real cluster. In particular, confirm support for `ON DELETE CASCADE`/`SET NULL` and `CHECK` constraints against current DSQL behavior before using the migration in production. Stage 0.3's local Alembic environment rejects `DATABASE_BACKEND=aurora_dsql` so it cannot accidentally send PostgreSQL migration DDL to DSQL. **No DSQL migration or integration test has run; DSQL is unverified.**
+The DSQL runner creates a migration ledger in its own DDL transaction, executes each table or index DDL statement in a separate transaction, waits for each asynchronous index job, then records that step with separate DML. It checks object state and statement checksums to resume if a process stops between a DDL commit and its ledger write; an unfinished invalid index created by the plan is removed in its own DDL transaction before retry. Alembic continues to reject `DATABASE_BACKEND=aurora_dsql` and cannot send PostgreSQL migrations to DSQL. The actual DSQL command is `uv run --directory services/api --locked python -m app.db.migrate_dsql` with both configured roles and the AWS credential chain available.
 
-As of 2026-09-25, [AWS DSQL limits](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/CHAP_quotas.html) include **10 MiB of changed data**, **3,000 modified rows** and **five minutes per transaction**. DSQL uses optimistic concurrency and the fixed Repeatable Read isolation level; conflicting transactions may abort and need a whole-unit retry. Connections can expire after 60 minutes. These are upper limits, **not** recommended targets.
+As verified on 2026-10-01, [AWS DSQL limits](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/CHAP_quotas.html) include **10 MiB of changed data**, **3,000 modified rows**, **five minutes per transaction**, and **60 minutes per connection**. DSQL uses optimistic concurrency and fixed Repeatable Read isolation; conflicting transactions may abort and need a whole-unit retry. These are upper limits, **not** recommended targets.
 
 - Keep transaction scopes brief. Prefer batches of a few hundred rows (configurable and measured), with a safety margin for secondary-index changes, provider payload size and latency. Never hold a transaction open while downloading a PDF, calling AI, fetching holdings, or waiting for review.
 - Stage parsed data in `imports` and line tables. Preserve original documents/files privately and compute source hash and idempotency key **before** transaction commit. Commit each bounded import batch idempotently; publish the completed position/fund snapshot only after all batches validate.
 - For large imports, write to a `PENDING` snapshot identifier in bounded commits; a final small transaction marks it `ACTIVE`. All normal portfolio queries filter for a fully published revision. On failure, rerun only uncommitted batches; schedule cleanup of orphaned staging data.
-- Retrying after serialization/OCC conflict must start a *new session/transaction* and repeat **only database work**, not re-upload files, re-call models or enqueue duplicates. Use unique idempotency keys and an upper retry bound with exponential backoff/jitter.
+- `app/db/transactions.py` retries SQLSTATE `40001` and DSQL `OC001` only, with a fresh session per attempt, at most three attempts by default (five maximum), and capped exponential backoff with jitter. The helper contract is database-only; provider/model/file work must finish before the retried unit begins.
 - DSQL handles [DDL separately from DML](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/working-with-ddl.html); only one DDL statement per transaction. `CREATE INDEX ASYNC` needs a waiting/verification step before subsequent migration assumptions. Adapt Alembic or write explicit DSQL migration sequences; keep a versioned migration ledger and test fresh-install plus upgrade from previous schema versions.
+
+**Verification status:** local configuration, engine-factory, dialect-compilation, migration-plan/resumption, and bounded-retry tests pass. The credentialed suite at `services/api/tests/test_dsql_integration.py` is opt-in (`RUN_DSQL_INTEGRATION=1`, `DSQL_TEST_CLUSTER=disposable`) and covers migration, synthetic CRUD, decimal/UUID/JSONB/FK behavior, and a real concurrent OCC retry. It was not run because no disposable AWS DSQL cluster was provided. **DSQL remains unverified and production remains blocked.**
 
 ## 5. Background tasks without PostgreSQL lock dependence
 

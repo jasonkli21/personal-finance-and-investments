@@ -1,19 +1,36 @@
 """HTTP entry point for the Stage 0 API."""
 
-import psycopg
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import Engine, text
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.config import load_settings
+from app.db.engine import DatabaseEngineFactory
 
 
 class HealthResponse(BaseModel):
     status: str
 
 
-def create_app() -> FastAPI:
+def create_app(*, engine: Engine | None = None) -> FastAPI:
     settings = load_settings()
-    app = FastAPI(title="Portfolio Intelligence API", version="0.1.0")
+    database_engine = engine or DatabaseEngineFactory.create(settings)
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        try:
+            yield
+        finally:
+            database_engine.dispose()
+
+    app = FastAPI(
+        title="Portfolio Intelligence API", version="0.1.0", lifespan=lifespan
+    )
+    app.state.database_engine = database_engine
 
     @app.get("/health", response_model=HealthResponse)
     def health() -> HealthResponse:
@@ -22,22 +39,9 @@ def create_app() -> FastAPI:
     @app.get("/health/ready", response_model=HealthResponse)
     def ready() -> HealthResponse:
         try:
-            if settings.database_url is not None:
-                connection = psycopg.connect(
-                    conninfo=settings.database_url, connect_timeout=2
-                )
-            else:
-                connection = psycopg.connect(
-                    host=settings.database_host,
-                    port=settings.database_port,
-                    user=settings.database_user,
-                    password=settings.database_password,
-                    dbname=settings.database_name,
-                    connect_timeout=2,
-                )
-            with connection:
-                connection.execute("SELECT 1")
-        except psycopg.Error as exc:
+            with database_engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+        except SQLAlchemyError as exc:
             raise HTTPException(status_code=503, detail="Database unavailable") from exc
         return HealthResponse(status="ready")
 

@@ -1,1 +1,1 @@
-"""Database schema and persistence primitives."""
+"""Database engine, schema, transaction, and migration boundaries."""

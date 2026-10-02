@@ -1,6 +1,6 @@
 # Stage 0 implementation plan
 
-**Status:** Execution backlog; existing scaffold and quality tooling recorded in the docs index  
+**Status:** S0.4 local DSQL boundary implemented; live DSQL remains unverified
 **Updated:** 2026-10-01  
 **Roadmap coverage:** Work packages 0.1–0.6
 
@@ -194,6 +194,8 @@ S0.4 has a local contract/tooling deliverable and a separate credentialed execut
 - If AWS access is unavailable, deliver the runner/config/test contract and mark the real-cluster gate **unverified**; production remains blocked.
 
 **Out of scope:** application deployment, production financial data, multi-region clusters, and treating a local PostgreSQL pass as cloud evidence.
+
+**S0.4 delivery evidence (2026-10-01):** `DatabaseEngineFactory` uses the official `aurora-dsql-sqlalchemy` 1.3.0 dialect/connector with token-on-connect, `verify-full` TLS, separate app and migration roles, bounded pooling, and a 3,000-second recycle. The versioned DSQL core plan uses seven single-statement table DDL transactions, four asynchronous index DDL transactions with `sys.wait_for_job`, and standalone ledger DML. Local tests check configuration, official dialect compilation, migration step boundaries/resumption, and capped retry. The real DSQL integration suite is explicitly opt-in for a disposable cluster and was not run; production remains blocked pending that evidence.
 
 ### S0.5 — Deliver account and manual-position API/UI
 

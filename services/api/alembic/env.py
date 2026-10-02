@@ -11,8 +11,8 @@ config = context.config
 backend = environ.get("DATABASE_BACKEND", "postgres")
 if backend != "postgres":
     raise CommandError(
-        "Stage 0.3 migrations support DATABASE_BACKEND=postgres only; "
-        "Aurora DSQL requires the Stage 0.4 migration runner."
+        "Alembic migrations support DATABASE_BACKEND=postgres only; "
+        "use `python -m app.db.migrate_dsql` for Aurora DSQL."
     )
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
