@@ -23,6 +23,21 @@ A private tool to track stocks, ETFs, cash, and eventually broader personal fina
 | [`06-security-and-deployment.md`](06-security-and-deployment.md) | Local security, AWS/DSQL deployment, cost gates, backups and migration |
 | [`07-aurora-dsql-compatibility.md`](07-aurora-dsql-compatibility.md) | **Mandatory production compatibility contract:** DSQL features/limits, IAM, migration, batching, research and testing |
 
+## Stage implementation plans
+
+The plans below expand the roadmap into execution backlogs using the phase-plan structure in `personal-ai-system/docs`: scope boundaries, delivery conventions, verification matrices, required contracts/artifacts, dependency maps, task goals/work/requirements/acceptance criteria, and completion reviews. They are plans, not evidence of delivered capabilities. The source-of-truth hierarchy below still applies.
+
+| Plan | Coverage / first demonstrable slice |
+| --- | --- |
+| [`stage-0-implementation-plan.md`](stage-0-implementation-plan.md) | 0.1–0.6: local tooling/schema, DSQL boundary, account → manual holding → reload |
+| [`stage-1-implementation-plan.md`](stage-1-implementation-plan.md) | 1.1–1.3: reviewed position/fund CSVs, valuation, reconciled exposure and export; first local MVP |
+| [`stage-2-implementation-plan.md`](stage-2-implementation-plan.md) | 2.1–2.6: private statement review, OCR/local fallback, transactions, finance, optional sync and durable jobs |
+| [`stage-3-implementation-plan.md`](stage-3-implementation-plan.md) | 3.1–3.5: history/returns, supplied tax lots, hypothetical sale/exposure and planning comparisons |
+| [`stage-4-implementation-plan.md`](stage-4-implementation-plan.md) | 4.1–4.6: optional authenticated AWS/DSQL deployment, cost gates, real-cluster tests and portable recovery |
+| [`stage-5-implementation-plan.md`](stage-5-implementation-plan.md) | 5.1–5.6: public filings/facts, portfolio/thesis context, portable retrieval, cited research and optional monitoring |
+
+Task IDs follow roadmap packages (`S0.3` corresponds to 0.3); dotted subtask suffixes split a package into smaller slices. `S3.R` is the Stage 3 completion/evaluation task, not a new product stage. Dependency order takes precedence over numeric order. Stage 4 may follow Stage 1; research requires reliable portfolio data and only consumes later history/jobs when those features are available. Local completion never substitutes for the real-DSQL production gate.
+
 ## Product principles
 
 1. **Look-through first.** Deliver a reliable consolidated company-exposure dashboard before expanding into a general finance suite.

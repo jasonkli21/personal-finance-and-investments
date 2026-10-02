@@ -5,6 +5,21 @@
 
 Each work package should produce a small PR or coherent series of PRs, include unit/integration/e2e tests where applicable, and be independently demonstrable. Prioritize a working vertical slice rather than creating empty abstractions for the entire future roadmap.
 
+## Detailed execution plans
+
+This roadmap defines stage scope, sequence, and exit gates. The companion plans expand each package into contracts, modules, fixtures, dependencies, implementation work, negative/retry cases, acceptance criteria, exclusions, and completion handoffs; they do not mark future work as implemented or authorize cloud provisioning.
+
+| Stage | Execution plan |
+| --- | --- |
+| 0 — Local foundation | [Stage 0 implementation plan](stage-0-implementation-plan.md) |
+| 1 — Portfolio MVP | [Stage 1 implementation plan](stage-1-implementation-plan.md) |
+| 2 — Statement ingestion and personal finance | [Stage 2 implementation plan](stage-2-implementation-plan.md) |
+| 3 — Tax lots, history and decision support | [Stage 3 implementation plan](stage-3-implementation-plan.md) |
+| 4 — Optional AWS production deployment track | [Stage 4 implementation plan](stage-4-implementation-plan.md) |
+| 5 — Portfolio-aware research and AI | [Stage 5 implementation plan](stage-5-implementation-plan.md) |
+
+Use the roadmap's work-package number when selecting a task, then follow its `S`-prefixed package/subtasks in the companion plan. Stage 0–1 remain the local MVP; real DSQL checks remain independently required before production. Provider facts in the requirements retain their original verification dates and must be rechecked during integration work.
+
 ## Stage 0 — Local foundation
 
 **Goal:** Reproducible React/FastAPI/PostgreSQL 16 local app, architected and documented for production DSQL; no paid services required to develop locally.
