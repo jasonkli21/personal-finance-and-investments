@@ -1,6 +1,6 @@
 # Stage 2 implementation plan
 
-**Status:** In progress; S2.1 local text-PDF preview slice and S2.3 local transaction workflow are partial; S2.2 gated; S2.5 evaluated and deferred; S2.4 and S2.6 pending
+**Status:** In progress; S2.1 local text-PDF preview slice, S2.3 local transaction workflow, and S2.4 summary/balance views are partial; S2.2 gated; S2.5 evaluated and deferred; S2.6 pending
 **Updated:** 2026-10-02
 **Roadmap coverage:** Work packages 2.1–2.6
 
@@ -216,6 +216,8 @@ S2.5 is optional; no exit gate for the local document workflow depends on produc
 **Acceptance criteria:** category subtotals equal canonical categorized/uncategorized spending under the documented transfer/refund policy; cash flow matches accepted transactions; card liability and payment treatment do not inflate net worth; account/date filters reproduce drill-down; stale/missing balances are labelled; zero/empty months render meaningfully.
 
 **Out of scope:** forward planning, tax estimates, guaranteed complete finances, and investment returns.
+
+**Implementation status (2026-10-02):** Monthly cash-flow and category totals use posted dates, preserve imported signs, and exclude confirmed transfers and card-payment classifications. Exact split lines feed the category summary. Dated manual balance observations preserve source, quality, currency, and revision; net worth uses those observations or owned-position valuations, excludes a balance when a position snapshot is available, and presents currencies separately. Missing, stale, estimated, unreviewed, and unpriced values remain visible as gaps. This partial slice does not convert currencies or provide historical returns; database/browser acceptance and live DSQL remain unverified.
 
 ### S2.5 — Evaluate optional read-only account synchronization
 

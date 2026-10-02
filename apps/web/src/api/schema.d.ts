@@ -161,6 +161,40 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/finance/balances': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Post Balance Observation */
+    post: operations['post_balance_observation_v1_finance_balances_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/finance/summary': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Finance Summary */
+    get: operations['get_finance_summary_v1_finance_summary_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/fund-imports/{import_id}/publish': {
     parameters: {
       query?: never
@@ -746,6 +780,74 @@ export interface paths {
 export type webhooks = Record<string, never>
 export interface components {
   schemas: {
+    /** AccountBalanceCreate */
+    AccountBalanceCreate: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Amount */
+      amount: string
+      /**
+       * As Of
+       * Format: date
+       */
+      as_of: string
+      /**
+       * Balance Kind
+       * @enum {string}
+       */
+      balance_kind: 'asset' | 'liability'
+      /** Currency */
+      currency: string
+      /** Idempotency Key */
+      idempotency_key: string
+      /**
+       * Quality Status
+       * @default reported
+       * @enum {string}
+       */
+      quality_status: 'reported' | 'estimated' | 'stale'
+      /** Source */
+      source: string
+    }
+    /** AccountBalanceRead */
+    AccountBalanceRead: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Amount */
+      amount: string
+      /**
+       * As Of
+       * Format: date
+       */
+      as_of: string
+      /**
+       * Balance Kind
+       * @enum {string}
+       */
+      balance_kind: 'asset' | 'liability'
+      /** Currency */
+      currency: string
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /**
+       * Quality Status
+       * @enum {string}
+       */
+      quality_status: 'reported' | 'estimated' | 'stale'
+      /** Revision */
+      revision: number
+      /** Source */
+      source: string
+    }
     /** AccountCreate */
     AccountCreate: {
       /** Account Type */
@@ -911,6 +1013,57 @@ export interface components {
       percentage: string | null
       /** Total */
       total: string
+    }
+    /** FinanceCategoryTotal */
+    FinanceCategoryTotal: {
+      /** Category Id */
+      category_id: string | null
+      /** Category Name */
+      category_name: string
+      /** Currency */
+      currency: string
+      /** Net Spending */
+      net_spending: string
+    }
+    /** FinanceCurrencyTotal */
+    FinanceCurrencyTotal: {
+      /** Currency */
+      currency: string
+      /** Income */
+      income: string
+      /** Net Cash Flow */
+      net_cash_flow: string
+      /** Net Spending */
+      net_spending: string
+      /** Transaction Count */
+      transaction_count: number
+    }
+    /** FinanceSummaryRead */
+    FinanceSummaryRead: {
+      /**
+       * As Of
+       * Format: date
+       */
+      as_of: string
+      /** Balances */
+      balances: components['schemas']['NetWorthLine'][]
+      /** Category Totals */
+      category_totals: components['schemas']['FinanceCategoryTotal'][]
+      /** Coverage Gaps */
+      coverage_gaps: string[]
+      /** Currency Totals */
+      currency_totals: components['schemas']['FinanceCurrencyTotal'][]
+      /** Exclusions */
+      exclusions: string[]
+      /**
+       * Month
+       * Format: date
+       */
+      month: string
+      /** Net Worth */
+      net_worth: components['schemas']['NetWorthCurrencyTotal'][]
+      /** Transaction Policy */
+      transaction_policy: string
     }
     /** FundCorrection */
     FundCorrection: {
@@ -1140,6 +1293,50 @@ export interface components {
        * Format: uuid
        */
       id: string
+    }
+    /** NetWorthCurrencyTotal */
+    NetWorthCurrencyTotal: {
+      /**
+       * Completeness
+       * @enum {string}
+       */
+      completeness: 'complete' | 'incomplete'
+      /** Currency */
+      currency: string
+      /** Known Amount */
+      known_amount: string
+    }
+    /** NetWorthLine */
+    NetWorthLine: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Account Name */
+      account_name: string
+      /** Account Type */
+      account_type: string
+      /** Amount */
+      amount: string | null
+      /** As Of */
+      as_of: string | null
+      /** Currency */
+      currency: string | null
+      /** Detail */
+      detail: string | null
+      /** Included */
+      included: boolean
+      /** Quality Status */
+      quality_status: string
+      /** Source */
+      source: string | null
+      /**
+       * Status
+       * @enum {string}
+       */
+      status:
+        'valued' | 'unavailable' | 'unpriced' | 'stale' | 'foreign_currency'
     }
     /** OwnedPortfolioRead */
     OwnedPortfolioRead: {
@@ -2570,6 +2767,127 @@ export interface operations {
         }
       }
       /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  post_balance_observation_v1_finance_balances_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AccountBalanceCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['AccountBalanceRead']
+        }
+      }
+      /** @description Requested record not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or identity conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  get_finance_summary_v1_finance_summary_get: {
+    parameters: {
+      query: {
+        /** @description Any date in the month to summarize */
+        month: string
+        as_of?: string | null
+        account_id?: string | null
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['FinanceSummaryRead']
+        }
+      }
+      /** @description Requested record not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or identity conflict */
       409: {
         headers: {
           [name: string]: unknown

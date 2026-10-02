@@ -1722,6 +1722,43 @@ TABLE_CONSTRAINTS["active_transfer_transactions"] = (
         ("foreignkey(transfer_id)referencestransfer_matches(id)ondelete cascade",),
     ),
 )
+TABLE_COLUMNS["account_balance_observations"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("account_id", "uuid", "NO", None, None, None),
+    ("as_of", "date", "NO", None, None, None),
+    ("revision", "integer", "NO", None, None, None),
+    ("balance_kind", "character varying", "NO", 12, None, None),
+    ("amount", "numeric", "NO", None, 24, 10),
+    ("currency", "character varying", "NO", 3, None, None),
+    ("source", "character varying", "NO", 100, None, None),
+    ("quality_status", "character varying", "NO", 24, None, None),
+    ("idempotency_key", "character varying", "NO", 128, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+    ("updated_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["account_balance_observations"] = (
+    (
+        "account_balance_observations_pkey",
+        "PRIMARY KEY",
+        ("primarykey(id)",),
+    ),
+    ("ck_account_balance_nonnegative", "CHECK", ("amount", ">=", "0")),
+    (
+        "account_balance_observations_account_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(account_id)referencesaccounts(id)ondelete restrict",),
+    ),
+    (
+        "uq_account_balance_revision",
+        "UNIQUE",
+        ("unique(account_id,as_of,revision)",),
+    ),
+    (
+        "uq_account_balance_idempotency",
+        "UNIQUE",
+        ("unique(idempotency_key)",),
+    ),
+)
 
 STAGE2_TRANSACTIONS = DsqlMigration(
     "0008_stage2_transactions",
@@ -2049,6 +2086,50 @@ DSQL_MIGRATIONS = (
     STAGE1_REPORTS,
     STAGE2_DOCUMENT_INGESTION,
     STAGE2_TRANSACTIONS,
+    DsqlMigration(
+        "0009_stage2_finance_balances",
+        (
+            DsqlMigrationStep(
+                "create_account_balance_observations",
+                "table",
+                """CREATE TABLE account_balance_observations (
+                    id uuid NOT NULL,
+                    account_id uuid NOT NULL,
+                    as_of date NOT NULL,
+                    revision integer NOT NULL,
+                    balance_kind varchar(12) NOT NULL,
+                    amount numeric(24, 10) NOT NULL,
+                    currency varchar(3) NOT NULL,
+                    source varchar(100) NOT NULL,
+                    quality_status varchar(24) NOT NULL,
+                    idempotency_key varchar(128) NOT NULL,
+                    created_at timestamptz NOT NULL,
+                    updated_at timestamptz NOT NULL,
+                    CONSTRAINT account_balance_observations_pkey PRIMARY KEY (id),
+                    CONSTRAINT ck_account_balance_nonnegative CHECK (amount >= 0),
+                    CONSTRAINT uq_account_balance_revision
+                        UNIQUE (account_id, as_of, revision),
+                    CONSTRAINT uq_account_balance_idempotency UNIQUE (idempotency_key),
+                    CONSTRAINT account_balance_observations_account_id_fkey
+                        FOREIGN KEY (account_id) REFERENCES accounts(id)
+                        ON DELETE RESTRICT
+                )""",
+                "account_balance_observations",
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = current_schema() AND table_name = :object_name)",
+            ),
+            DsqlMigrationStep(
+                "index_account_balances_account_date",
+                "index",
+                "CREATE INDEX ASYNC ix_account_balances_account_date "
+                "ON account_balance_observations (account_id, as_of)",
+                "ix_account_balances_account_date",
+                "SELECT true",
+                expected_index_table="account_balance_observations",
+                expected_index_columns=("account_id", "as_of"),
+            ),
+        ),
+    ),
 )
 LEDGER_DDL = """CREATE TABLE IF NOT EXISTS dsql_schema_migration_steps (
     revision varchar(128) NOT NULL,

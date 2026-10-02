@@ -1,6 +1,137 @@
 {
   "components": {
     "schemas": {
+      "AccountBalanceCreate": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "amount": {
+            "maxLength": 40,
+            "pattern": "^\\d+(?:\\.\\d{1,10})?$",
+            "title": "Amount",
+            "type": "string"
+          },
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "balance_kind": {
+            "enum": [
+              "asset",
+              "liability"
+            ],
+            "title": "Balance Kind",
+            "type": "string"
+          },
+          "currency": {
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "quality_status": {
+            "default": "reported",
+            "enum": [
+              "reported",
+              "estimated",
+              "stale"
+            ],
+            "title": "Quality Status",
+            "type": "string"
+          },
+          "source": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "as_of",
+          "balance_kind",
+          "amount",
+          "currency",
+          "source",
+          "idempotency_key"
+        ],
+        "title": "AccountBalanceCreate",
+        "type": "object"
+      },
+      "AccountBalanceRead": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "amount": {
+            "title": "Amount",
+            "type": "string"
+          },
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "balance_kind": {
+            "enum": [
+              "asset",
+              "liability"
+            ],
+            "title": "Balance Kind",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "quality_status": {
+            "enum": [
+              "reported",
+              "estimated",
+              "stale"
+            ],
+            "title": "Quality Status",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "account_id",
+          "as_of",
+          "revision",
+          "balance_kind",
+          "amount",
+          "currency",
+          "source",
+          "quality_status"
+        ],
+        "title": "AccountBalanceRead",
+        "type": "object"
+      },
       "AccountCreate": {
         "properties": {
           "account_type": {
@@ -379,6 +510,148 @@
           "included_valued_percentage"
         ],
         "title": "ExposureRowRead",
+        "type": "object"
+      },
+      "FinanceCategoryTotal": {
+        "properties": {
+          "category_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category Id"
+          },
+          "category_name": {
+            "title": "Category Name",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "net_spending": {
+            "title": "Net Spending",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category_id",
+          "category_name",
+          "currency",
+          "net_spending"
+        ],
+        "title": "FinanceCategoryTotal",
+        "type": "object"
+      },
+      "FinanceCurrencyTotal": {
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "income": {
+            "title": "Income",
+            "type": "string"
+          },
+          "net_cash_flow": {
+            "title": "Net Cash Flow",
+            "type": "string"
+          },
+          "net_spending": {
+            "title": "Net Spending",
+            "type": "string"
+          },
+          "transaction_count": {
+            "title": "Transaction Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "currency",
+          "income",
+          "net_spending",
+          "net_cash_flow",
+          "transaction_count"
+        ],
+        "title": "FinanceCurrencyTotal",
+        "type": "object"
+      },
+      "FinanceSummaryRead": {
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "balances": {
+            "items": {
+              "$ref": "#/components/schemas/NetWorthLine"
+            },
+            "title": "Balances",
+            "type": "array"
+          },
+          "category_totals": {
+            "items": {
+              "$ref": "#/components/schemas/FinanceCategoryTotal"
+            },
+            "title": "Category Totals",
+            "type": "array"
+          },
+          "coverage_gaps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Coverage Gaps",
+            "type": "array"
+          },
+          "currency_totals": {
+            "items": {
+              "$ref": "#/components/schemas/FinanceCurrencyTotal"
+            },
+            "title": "Currency Totals",
+            "type": "array"
+          },
+          "exclusions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Exclusions",
+            "type": "array"
+          },
+          "month": {
+            "format": "date",
+            "title": "Month",
+            "type": "string"
+          },
+          "net_worth": {
+            "items": {
+              "$ref": "#/components/schemas/NetWorthCurrencyTotal"
+            },
+            "title": "Net Worth",
+            "type": "array"
+          },
+          "transaction_policy": {
+            "title": "Transaction Policy",
+            "type": "string"
+          }
+        },
+        "required": [
+          "month",
+          "as_of",
+          "transaction_policy",
+          "currency_totals",
+          "category_totals",
+          "net_worth",
+          "balances",
+          "coverage_gaps",
+          "exclusions"
+        ],
+        "title": "FinanceSummaryRead",
         "type": "object"
       },
       "FundCorrection": {
@@ -1094,6 +1367,140 @@
           "display_name"
         ],
         "title": "IssuerRead",
+        "type": "object"
+      },
+      "NetWorthCurrencyTotal": {
+        "properties": {
+          "completeness": {
+            "enum": [
+              "complete",
+              "incomplete"
+            ],
+            "title": "Completeness",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "known_amount": {
+            "title": "Known Amount",
+            "type": "string"
+          }
+        },
+        "required": [
+          "currency",
+          "known_amount",
+          "completeness"
+        ],
+        "title": "NetWorthCurrencyTotal",
+        "type": "object"
+      },
+      "NetWorthLine": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "account_name": {
+            "title": "Account Name",
+            "type": "string"
+          },
+          "account_type": {
+            "title": "Account Type",
+            "type": "string"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "included": {
+            "title": "Included",
+            "type": "boolean"
+          },
+          "quality_status": {
+            "title": "Quality Status",
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "status": {
+            "enum": [
+              "valued",
+              "unavailable",
+              "unpriced",
+              "stale",
+              "foreign_currency"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "account_name",
+          "account_type",
+          "as_of",
+          "currency",
+          "amount",
+          "source",
+          "quality_status",
+          "status",
+          "included",
+          "detail"
+        ],
+        "title": "NetWorthLine",
         "type": "object"
       },
       "OwnedPortfolioRead": {
@@ -4252,6 +4659,180 @@
           }
         },
         "summary": "Get Private File Preview"
+      }
+    },
+    "/v1/finance/balances": {
+      "post": {
+        "operationId": "post_balance_observation_v1_finance_balances_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountBalanceCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccountBalanceRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested record not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Revision or identity conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Database unavailable"
+          }
+        },
+        "summary": "Post Balance Observation"
+      }
+    },
+    "/v1/finance/summary": {
+      "get": {
+        "operationId": "get_finance_summary_v1_finance_summary_get",
+        "parameters": [
+          {
+            "description": "Any date in the month to summarize",
+            "in": "query",
+            "name": "month",
+            "required": true,
+            "schema": {
+              "description": "Any date in the month to summarize",
+              "format": "date",
+              "title": "Month",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "as_of",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "As Of"
+            }
+          },
+          {
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FinanceSummaryRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested record not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Revision or identity conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Database unavailable"
+          }
+        },
+        "summary": "Get Finance Summary"
       }
     },
     "/v1/fund-imports/{import_id}/publish": {

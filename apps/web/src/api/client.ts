@@ -343,6 +343,23 @@ export async function fetchTransferCandidates() {
   return unwrap(await api.GET('/v1/transfers/candidates'))
 }
 
+export async function fetchFinanceSummary(input: {
+  month: string
+  asOf: string
+}) {
+  return unwrap(
+    await api.GET('/v1/finance/summary', {
+      params: { query: { month: input.month, as_of: input.asOf } },
+    }),
+  )
+}
+
+export async function createAccountBalance(
+  input: components['schemas']['AccountBalanceCreate'],
+) {
+  return unwrap(await api.POST('/v1/finance/balances', { body: input }))
+}
+
 export async function confirmTransfer(
   firstTransactionId: string,
   secondTransactionId: string,

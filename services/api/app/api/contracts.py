@@ -191,6 +191,91 @@ class DocumentImportRead(BaseModel):
     filename: str
 
 
+class AccountBalanceCreate(BaseModel):
+    account_id: UUID
+    as_of: date
+    balance_kind: Literal["asset", "liability"]
+    amount: str = Field(max_length=40, pattern=r"^\d+(?:\.\d{1,10})?$")
+    currency: str = Field(pattern=r"^[A-Z]{3}$")
+    source: str = Field(min_length=1, max_length=100)
+    quality_status: Literal["reported", "estimated", "stale"] = "reported"
+    idempotency_key: str = Field(min_length=1, max_length=128)
+
+    @field_validator("amount")
+    @classmethod
+    def balance_amount_precision(cls, value: str) -> str:
+        if len(value.split(".")[0]) > 14:
+            raise ValueError("Balance exceeds NUMERIC(24, 10) precision")
+        return value
+
+    @field_validator("source")
+    @classmethod
+    def trim_balance_source(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Balance source cannot be blank")
+        return normalized
+
+
+class AccountBalanceRead(BaseModel):
+    id: UUID
+    account_id: UUID
+    as_of: date
+    revision: int
+    balance_kind: Literal["asset", "liability"]
+    amount: str
+    currency: str
+    source: str
+    quality_status: Literal["reported", "estimated", "stale"]
+
+
+class FinanceCurrencyTotal(BaseModel):
+    currency: str
+    income: str
+    net_spending: str
+    net_cash_flow: str
+    transaction_count: int
+
+
+class FinanceCategoryTotal(BaseModel):
+    category_id: UUID | None
+    category_name: str
+    currency: str
+    net_spending: str
+
+
+class NetWorthLine(BaseModel):
+    account_id: UUID
+    account_name: str
+    account_type: str
+    as_of: date | None
+    currency: str | None
+    amount: str | None
+    source: str | None
+    quality_status: str
+    status: Literal["valued", "unavailable", "unpriced", "stale", "foreign_currency"]
+    included: bool
+    detail: str | None
+
+
+class NetWorthCurrencyTotal(BaseModel):
+    currency: str
+    known_amount: str
+    completeness: Literal["complete", "incomplete"]
+
+
+class FinanceSummaryRead(BaseModel):
+    month: date
+    as_of: date
+    transaction_policy: str
+    currency_totals: list[FinanceCurrencyTotal]
+    category_totals: list[FinanceCategoryTotal]
+    net_worth: list[NetWorthCurrencyTotal]
+    balances: list[NetWorthLine]
+    coverage_gaps: list[str]
+    exclusions: list[str]
+
+
 class SpendingCategoryCreate(BaseModel):
     slug: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{0,79}$")
     display_name: str = Field(min_length=1, max_length=120)

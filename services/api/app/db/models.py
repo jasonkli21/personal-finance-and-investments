@@ -102,6 +102,35 @@ class Account(TimestampMixin, Base):
     )
 
 
+class AccountBalanceObservation(TimestampMixin, Base):
+    """Dated source observation for accounts without a holdings snapshot."""
+
+    __tablename__ = "account_balance_observations"
+    __table_args__ = (
+        UniqueConstraint(
+            "account_id", "as_of", "revision", name="uq_account_balance_revision"
+        ),
+        UniqueConstraint("idempotency_key", name="uq_account_balance_idempotency"),
+        CheckConstraint("amount >= 0", name="ck_account_balance_nonnegative"),
+        Index("ix_account_balances_account_date", "account_id", "as_of"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    account_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("accounts.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    as_of: Mapped[date] = mapped_column(Date, nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    balance_kind: Mapped[str] = mapped_column(String(12), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(24, 10), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    source: Mapped[str] = mapped_column(String(100), nullable=False)
+    quality_status: Mapped[str] = mapped_column(String(24), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+
+
 class Security(TimestampMixin, Base):
     __tablename__ = "securities"
     __table_args__ = (

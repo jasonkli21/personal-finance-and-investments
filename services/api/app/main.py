@@ -48,6 +48,9 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
     app.state.personal_ai_client = DisabledPersonalAIClient()
     app.include_router(api_router)
     app.include_router(transaction_router)
+    from app.api.finance_routes import router as finance_router
+
+    app.include_router(finance_router)
     from app.api.fund_routes import router as fund_router
 
     app.include_router(fund_router)
