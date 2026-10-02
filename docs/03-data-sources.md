@@ -1,0 +1,101 @@
+# Data sources and free-tier strategy
+
+**Status:** Research shortlist, not integrated | **Official pages checked:** 2026-09-25  
+**Rule:** Prices, download shapes, terms of use, eligibility and quotas change. Reverify the official page before implementing or deploying a connector. Links here are evidence of published availability, **not** permission to scrape, redistribute, or automate a download.
+
+## 1. Source-selection policy
+
+For each provider, implement a separate adapter exposing: `provider_id`, stable source URL, instrument/identifier mapping, reporting `as_of`, `fetched_at`, parsed data, quality flags, retry policy, and raw response or content hash. Record credentials and usage limits outside source control. Prefer official issuer disclosures and authenticated user exports over unofficial scraping. Keep CSV/manual fallback for every external integration.
+
+**Reliability order for personally held positions:** confirmed manual entry / user-uploaded brokerage export; optional consented account API; PDFs/OCR after review. Do not let ETF look-through material create actual user positions or tax lots.
+
+## 2. ETF constituent portfolios — Stage 1 priority
+
+| Provider | Published evidence | Proposed handling | Important caveat |
+| --- | --- | --- | --- |
+| **BlackRock iShares** | [IVV official fund page](https://www.ishares.com/us/products/239726/ishares-core-sp-500-etf-ivv): downloadable holdings CSV, effective date, ticker, weight, CUSIP/ISIN | Build one issuer adapter for 1–2 popular funds; snapshot and parse available full holdings | Export links/formats and permitted automated retrieval may change. Prefer official download or user-provided CSV. |
+| **State Street SPDR** | [SPY official fund page](https://www.ssga.com/us/en/individual/etfs/state-street-spdr-sp-500-etf-trust-spy): daily full-holdings download | Second issuer adapter after iShares | Distinguish **fund holdings** from displayed **index holdings**. Verify terms and data date. |
+| **Vanguard** | [VOO official advisor page](https://advisors.vanguard.com/investments/products/voo/vanguard-sp-500-etf): *Export full holdings* and dated portfolio details, historically monthly | Third adapter or manual portfolio-composition export; don't assume daily data | Some exports may depend on page/client behavior; verify intended personal-use access. |
+| **Invesco QQQ** | [Invesco QQQ](https://www.invesco.com/qqq-etf/en/home.html) | Evaluate after the first three; manual full-holdings file acceptable | Confirm currently offered machine-readable **full** holdings and access terms at implementation time; top-ten is insufficient for look-through. |
+| **US SEC Form N-PORT** | [Public N-PORT datasets](https://www.sec.gov/data-research/sec-markets-data/form-n-port-data-sets) | Longer-term regulatory fallback and historical validation | Public datasets are published quarterly; may include lagged information, huge files and complex asset definitions. **Not a substitute for current issuer daily portfolios**. |
+| **User upload** | Brokerage/fund issuer CSV or XLSX supplied by the user | Mandatory Stage 1 fallback | Persist user-provided as-of date; avoid claiming provenance is issuer-verified. |
+
+**Issuer onboarding checklist:** verify full constituents (not top holdings), effective date, fund vs index, identifiers, cash/derivatives, total reported weights, file format, usage restrictions, user-agent/rate expectations, reproducible parser fixture, changed-format detection, and independent source-link visibility in UI. Unsupported funds remain opaque, not excluded from net worth.
+
+**MVP scope:** a small allowlist of supported ETF symbols; two official issuer adapters + manual CSV is sufficient to finish Stage 1. Source expansion should follow actual user holdings, not raw number of supported funds.
+
+## 3. Quotes, prices and FX
+
+| Candidate | Free/usage facts as checked | Default decision |
+| --- | --- | --- |
+| **Manual position or quote price** | No vendor quota; clearly dated | **Mandatory offline fallback**; label as manually supplied, not live |
+| **Alpha Vantage** | [Official support page](https://www.alphavantage.co/support/) publishes 25 free API requests/day for most datasets; US real-time and 15-minute-delayed data are premium-only | Optional first API for small portfolios; batch/cache; never advertise real-time prices |
+| **Brokerage statement prices** | As-of-statement historical snapshot values | Useful for initial import, not continuous quotes |
+| **User CSV** | End-of-day prices/FX manually exported | Reliable fallback when the free quote budget is insufficient |
+| **Yahoo/yfinance and other unofficial sources** | May be convenient, but API access, stability, and data rights may be unofficial or conditional | Research-only experiment if vetted; **not the sole production price dependency** |
+
+**Policy:** cache quotes by security, provider, and timestamp. Display market-close/as-of timestamps. On provider outage, serve last-known values as *stale*, allow manual update, and exclude unpriced positions from a falsely precise percentage unless user approves a transparent approximation. Start USD-only in calculations if necessary; retain original foreign-currency metadata for later FX support.
+
+## 4. Brokerage / bank connections — optional Stage 2
+
+**Plaid**
+
+- [Official Trial vs Sandbox policy](https://plaid.com/docs/account/billing/): for eligible **new US/Canada developer teams created on/after April 15, 2026**, Trial includes access to real production data for up to **10 lifetime Production Items**. Deleting an Item does **not** return a slot. Eligibility and institution support vary; legacy teams have different paths.
+- Trial-listed products include [Investments](https://plaid.com/docs/investments/), Transactions, Balance, Statements and others; Sandbox uses mock data and is free.
+- [Investments API reference](https://plaid.com/docs/api/products/investments/): position quantity/value and nullable aggregate `cost_basis`; `tax_lots` are present **only when the institution provides them**, and an empty array means lot data unavailable. Coverage varies by institution.
+- [Plaid billing](https://plaid.com/docs/account/billing/): upgrading may introduce recurring per-Item fees for products such as Investments or Transactions. Check approved feature scope/fees before activating production or requesting refreshes.
+
+**MVP alternative:** do **not** block local Stage 1 or Stage 2 on Plaid approval. Manual entry + CSV/PDF import must remain first-class. Never scrape credential-protected brokerage sites or store online-banking credentials directly.
+
+## 5. Company financials and regulatory research — Stage 5
+
+**SEC EDGAR** — [Official API documentation](https://www.sec.gov/search-filings/edgar-application-programming-interfaces). Public, keyless `data.sec.gov` endpoints include company filing submissions and XBRL `companyfacts`/`companyconcept` JSON. SEC explicitly notes that `data.sec.gov` **does not support CORS**, so retrieve from Python backend, not the SPA. Identify the app in `User-Agent`, follow SEC fair-access guidelines, cache results, and favor SEC bulk archives when doing large-scale work. [SEC access policy](https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data) and [N-PORT data](https://www.sec.gov/data-research/sec-markets-data/form-n-port-data-sets).
+
+The SEC provides documents and standardized reported facts, not a fully normalized investment-research narrative. Record accession number, filing date, publication/retrieval time, CIK and original URL. Corrections/re-filings must not be silently merged into old facts.
+
+**Optional web search:** [Tavily pricing](https://www.tavily.com/pricing) or [Brave Search API pricing](https://brave.com/search/api/). Evaluate whichever currently offers a viable no-cost quota. Do not assume either quota is permanent; do not make uncited model knowledge the source of financial news. Record full source URL, retrieval time and publication date when available.
+
+**Other possible sources:** official company IR pages, corporate earnings releases, user-supplied reports and publicly licensed datasets; each gets a separate provenance tag and rights review.
+
+## 6. AI model/inference sources — Stage 2 and Stage 5
+
+| Provider | Role | Free-first and privacy note |
+| --- | --- | --- |
+| **Ollama (local)** | Primary optional model adapter for structured extraction and research prototypes | Zero API fee, consumes local CPU/RAM/GPU. [Schema-constrained JSON](https://docs.ollama.com/capabilities/structured-outputs). Verify local model license and hardware fit. |
+| **GroqCloud** | Optional fast remote text inference for *non-sensitive* or consented content | [Official free-plan limits](https://console.groq.com/docs/rate-limits) vary **per model** and may change; enforce model allowlist, budgets and backoff. Review [privacy policies](https://groq.com/privacy-policy/). |
+| **Google Gemini API** | Optional document/image experiments on synthetic or thoroughly redacted data | [Official pricing](https://ai.google.dev/gemini-api/docs/pricing) and [terms](https://ai.google.dev/gemini-api/terms). **Unpaid-tier submissions may be used to improve Google products and reviewed by humans; do not send real personal statements.** Paid-service data terms differ, but paid use is not the default. |
+| **OpenRouter / Cloudflare Workers AI** | Optional future model comparison or cloud inference | Verify current free eligible models, rate/compute limits, retention, and third-party routing before use. No essential feature should depend on them. |
+
+**Never** treat a consumer chatbot subscription as free application API credits. No cloud model is needed for basic manual/CSV Stage 1 portfolio tracking.
+
+## 7. Data lineage and freshness contract
+
+Every external observation stores:
+
+```text
+provider_id, source_url, retrieved_at, effective_as_of,
+source_format, import_job_id, parse_version, raw_hash,
+validation_status, errors_or_warnings, manual_override_if_any
+```
+
+Data display rules:
+
+- **Freshness:** explicit as-of and fetched times, with per-source configurable stale thresholds (do not assign one threshold to all issuers).
+- **Completeness:** show percent of holdings weight recognized and percent of portfolio NAV attributed; unknown/derivative/cash residuals are real output categories.
+- **Conflicts:** if two sources disagree on a security or price, retain both observations and expose the selected precedence; do not overwrite the underlying raw records.
+- **Failure:** backoff on rate limits; respect `Retry-After`; avoid repeated retries of user-auth/permission failures. Stale cached/manual data remains usable offline.
+- **Currency:** do not aggregate foreign currencies without an as-of FX rate; preserve unmatched data for review.
+
+## 8. Cost policy
+
+- Stage 0–1 must succeed with **$0 external service spend** and no mandatory signup; local hardware/electricity excluded.
+- External free tiers are **optional accelerators**, not hard dependencies; track calls/tokens/items in-app if connected.
+- Introduce a hard configuration flag `ALLOW_PAID_PROVIDERS=false` by default; reject unknown or billable model/provider fallbacks.
+- Record date of last cost/terms verification in each adapter's documentation; re-check before any cloud deployment, high-volume refresh or subscription activation.
+## 9. Aurora DSQL as production structured-data store (not an external market-data provider)
+
+- **Local PostgreSQL 16 is always available** with manual/CSV data and cached ETF snapshots. Production uses Aurora DSQL with the same source adapters; moving to AWS does not magically grant new market-data rights, data freshness or account access.
+- [Official Aurora DSQL pricing](https://aws.amazon.com/rds/aurora/dsql/pricing/) (verified 2026-09-25): ongoing **100,000 DPUs + 1 GB-month storage per month**. Excess usage and unrelated AWS services (EC2/Lambda, S3, CloudFront, AWS Backup, network endpoints, logging) can cost money. Track **per-source refreshes as potential database DPU consumption**, not merely HTTP API quotas.
+- Retain bounded structured snapshots in DSQL, and put raw issuer holdings downloads, brokerage statement PDFs, screenshot images and archive exports in **private S3**. Avoid storing megabyte-scale raw provider JSON in DSQL. Use immutable provenance hashes and S3 object keys in the database.
+- Optimize polling/refresh schedules with as-of-aware conditional downloads and cache hits; refreshing the same ETF every minute creates cost without improving a daily holdings snapshot.
+- See [`07-aurora-dsql-compatibility.md`](07-aurora-dsql-compatibility.md) for write batching, search restrictions, and DSQL test requirements.

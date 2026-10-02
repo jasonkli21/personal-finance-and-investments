@@ -1,0 +1,13 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+node_modules/
+dist/
+*.tsbuildinfo
+.private/
+.DS_Store
+.ruff_cache/
+.mypy_cache/
+coverage/
