@@ -153,5 +153,5 @@ def put_positions(
     except IntegrityError as exc:
         raise HTTPException(
             status_code=409,
-            detail="A snapshot already exists for that effective date; reload first.",
+            detail="The position revision could not be saved; reload before retrying.",
         ) from exc

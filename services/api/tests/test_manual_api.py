@@ -1,6 +1,7 @@
 """Synthetic API coverage for accounts and revision-checked manual positions."""
 
 from collections.abc import Iterator
+from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID, uuid4
 
@@ -10,7 +11,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from app.db.models import Base, Security
+from app.api.contracts import PositionReplace
+from app.db.models import Base, PositionSnapshot, Security
+from app.domains import portfolio
 from app.main import create_app
 
 
@@ -289,3 +292,150 @@ def test_manual_valuation_rounds_half_up_to_numeric_scale(
 
     assert response.status_code == 200
     assert response.json()["positions"][0]["reported_value"] == "1.5000000002"
+
+
+def test_two_tabs_and_background_refetch_keep_the_draft_base_revision(
+    api_context: tuple[TestClient, UUID, UUID],
+) -> None:
+    client, security_id, _cash_id = api_context
+    account = create_account(client, "Synthetic concurrent account")
+    path = f"/v1/accounts/{account['id']}/positions"
+
+    first_tab_initial = client.get(path).json()
+    draft_base_revision = first_tab_initial["current_revision"]
+    assert draft_base_revision == 0
+
+    second_tab_save = client.put(
+        path,
+        json=position_payload(
+            security_id,
+            expected_revision=first_tab_initial["current_revision"],
+            quantity="4",
+            price="12",
+        ),
+    )
+    assert second_tab_save.status_code == 200
+    assert second_tab_save.json()["revision"] == 1
+
+    # Model a focus-triggered refresh while the first tab still owns a dirty
+    # draft. The draft keeps its captured base even though server state is new.
+    refreshed = client.get(path).json()
+    assert refreshed["current_revision"] == 1
+    first_tab_save = client.put(
+        path,
+        json=position_payload(
+            security_id,
+            expected_revision=draft_base_revision,
+            quantity="9",
+            price="13",
+        ),
+    )
+    assert first_tab_save.status_code == 409
+    current = client.get(path).json()
+    assert current["current_revision"] == 1
+    assert current["snapshot"]["positions"][0]["quantity"] == "4.0000000000"
+
+
+def test_same_date_replacement_appends_and_retains_previous_snapshot_lines(
+    api_context: tuple[TestClient, UUID, UUID],
+) -> None:
+    client, security_id, _cash_id = api_context
+    account = create_account(client, "Synthetic snapshot history")
+    path = f"/v1/accounts/{account['id']}/positions"
+    first = client.put(
+        path,
+        json=position_payload(
+            security_id, expected_revision=None, quantity="2", price="10"
+        ),
+    )
+    second = client.put(
+        path,
+        json=position_payload(
+            security_id, expected_revision=1, quantity="3", price="11"
+        ),
+    )
+    assert first.status_code == second.status_code == 200
+    assert first.json()["id"] != second.json()["id"]
+    assert first.json()["revision"] == 1
+    assert second.json()["revision"] == 2
+
+    factory = cast(Any, client.app).state.session_factory
+    with factory() as session:
+        earlier = session.get(PositionSnapshot, UUID(first.json()["id"]))
+        assert earlier is not None
+        assert earlier.status == "superseded"
+        old_lines = portfolio._snapshot_lines(session, earlier.id)
+        assert len(old_lines) == 1
+        assert old_lines[0][0].quantity == Decimal("2.0000000000")
+
+
+def test_maximum_individual_inputs_return_safe_422_before_any_write(
+    api_context: tuple[TestClient, UUID, UUID],
+) -> None:
+    client, security_id, _cash_id = api_context
+    account = create_account(client, "Synthetic overflow account")
+    path = f"/v1/accounts/{account['id']}/positions"
+    unsafe = position_payload(
+        security_id,
+        expected_revision=None,
+        quantity="999999999999999999.9999999999",
+        price="99999999999999.9999999999",
+    )
+    rejected = client.put(path, json=unsafe)
+    assert rejected.status_code == 422
+    assert rejected.json() == {
+        "detail": "The reported value exceeds the supported decimal precision."
+    }
+    after = client.get(path).json()
+    assert after["current_revision"] == 0
+    assert after["snapshot"] is None
+
+
+def test_manual_valuation_rounding_boundary_and_failed_transaction_rollback(
+    api_context: tuple[TestClient, UUID, UUID],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, security_id, _cash_id = api_context
+    account = create_account(client, "Synthetic rollback account")
+    path = f"/v1/accounts/{account['id']}/positions"
+    first = client.put(
+        path,
+        json=position_payload(
+            security_id,
+            expected_revision=None,
+            quantity="0.0000000001",
+            price="0.5000000000",
+        ),
+    )
+    assert first.status_code == 200
+    assert Decimal(first.json()["positions"][0]["reported_value"]) == Decimal(
+        "0.0000000001"
+    )
+
+    def fail_after_snapshot_flush(*_args: object, **_kwargs: object) -> object:
+        raise RuntimeError("synthetic response assembly failure")
+
+    factory = cast(Any, client.app).state.session_factory
+    with monkeypatch.context() as patcher:
+        patcher.setattr(portfolio, "_snapshot_lines", fail_after_snapshot_flush)
+        with factory() as session, pytest.raises(RuntimeError, match="synthetic"):
+            with session.begin():
+                portfolio.replace_positions(
+                    session,
+                    UUID(account["id"]),
+                    PositionReplace.model_validate(
+                        position_payload(
+                            security_id,
+                            expected_revision=1,
+                            quantity="8",
+                            price="10",
+                        )
+                    ),
+                )
+
+    latest = client.get(path).json()
+    assert latest["current_revision"] == 1
+    assert latest["snapshot"]["id"] == first.json()["id"]
+    assert Decimal(latest["snapshot"]["positions"][0]["quantity"]) == Decimal(
+        "0.0000000001"
+    )

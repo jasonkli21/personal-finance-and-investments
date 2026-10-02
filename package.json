@@ -16,6 +16,7 @@
     "test": "pnpm test:web && uv run --directory services/api --locked pytest -q",
     "openapi:export": "uv run --directory services/api --locked python -m app.export_openapi",
     "api:generate": "pnpm openapi:export && pnpm --filter web generate:api",
-    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build:web"
+    "api:check": "node scripts/check-generated-api.mjs",
+    "check": "pnpm api:check && pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build:web"
   }
 }

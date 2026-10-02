@@ -8,7 +8,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import UUID, uuid5
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import load_settings
@@ -284,6 +284,7 @@ def seed_demo_data(session: Session) -> SeedResult:
         account = session.get(Account, account_id)
         assert account is not None
         account.current_position_revision = 1
+        account.current_position_snapshot_id = snapshot_id
         for index, position in enumerate(account_fixture.positions):
             security_id = fixture_id("security", position.security_key)
             value = (
@@ -388,6 +389,11 @@ def reset_demo_data(session: Session) -> int:
             .where(PositionSnapshotLine.snapshot_id.in_(snapshot_ids))
         )
         or 0
+    )
+    session.execute(
+        update(Account)
+        .where(Account.id.in_(account_ids))
+        .values(current_position_snapshot_id=None)
     )
     session.execute(
         delete(PositionSnapshotLine).where(

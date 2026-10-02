@@ -1,6 +1,6 @@
 # Aurora DSQL compatibility contract
 
-**Status:** DSQL boundary implemented; live cluster remains unverified | **Verified against AWS/PyPI official documentation:** 2026-10-01
+**Status:** DSQL boundary implemented; live cluster remains unverified | **Verified against AWS/PyPI official documentation:** 2026-10-02
 **Architecture:** PostgreSQL 16 locally and for personal/offline operation; **single-Region Amazon Aurora DSQL in production**. The same FastAPI domain logic must support both. No claim is made that a live DSQL cluster has been tested yet.
 
 This file is the authoritative DSQL-specific companion to [`02-architecture.md`](02-architecture.md), [`05-roadmap.md`](05-roadmap.md), and [`06-security-and-deployment.md`](06-security-and-deployment.md). Recheck the official links before implementing: Aurora DSQL is adding PostgreSQL features frequently.
@@ -60,11 +60,13 @@ Do not assume **PostgreSQL extensions** work: Aurora DSQL is managed and does no
 
 ### Stage 0.4 core schema migration plan and evidence
 
-The PostgreSQL Alembic revision `0001_core_portfolio_schema` creates `issuers`, `accounts`, `issuer_aliases`, `securities`, `position_snapshots`, `quotes`, and `position_snapshot_lines`. The separate, versioned DSQL plan in `app/db/dsql_migrations.py` mirrors that schema with seven table steps and four asynchronous index steps. The official DSQL dialect compiles all seven SQLAlchemy tables and four indexes locally without opening a connection.
+The PostgreSQL Alembic revision `0001_core_portfolio_schema` creates `issuers`, `accounts`, `issuer_aliases`, `securities`, `position_snapshots`, `quotes`, and `position_snapshot_lines`. The separate, versioned DSQL plan in `app/db/dsql_migrations.py` mirrors that schema with seven table steps and four asynchronous index steps. Migration `0003_immutable_position_revisions_and_identifiers` adds the eighth table, three more asynchronous indexes, scoped identifier/alias identity, immutable selected revisions, and a bounded revision/counter backfill; it has not been run on a live cluster. The current SQLAlchemy metadata compiles eight tables and five explicit indexes through the official DSQL dialect locally without opening a connection.
 
-The Stage 0.5 Alembic revision `0002_position_snapshot_revision` adds `accounts.current_position_revision` and `position_snapshots.revision`, both with portable integer defaults. Its DSQL counterpart records two separate `ALTER TABLE` steps under the same checksummed migration ledger. Account-level compare-and-swap protects the first snapshot and later replacements even when the user selects a different effective date. PostgreSQL migration `0001` remains immutable.
+The Stage 0.5 Alembic revision `0002_position_snapshot_revision` adds `accounts.current_position_revision` and `position_snapshots.revision`, both with portable integer defaults. A follow-up migration adds namespace-scoped security identifiers and issuer-alias review fields, an explicit account current-snapshot pointer, unique per-account snapshot revisions, and removes the one-row-per-effective-date identity constraint. Replacement inserts a new revision and moves the pointer in the same transaction. Prior revision payloads and lines are immutable; lifecycle status may transition from accepted to superseded. The follow-up upgrade deterministically reconciles existing accepted snapshots and account counters. PostgreSQL migrations `0001` and `0002` remain immutable.
 
-The DSQL runner creates a migration ledger in its own DDL transaction, executes each table, alter or index DDL statement in a separate transaction, waits for each asynchronous index job, then records that step with separate DML. It checks object state and statement checksums to resume if a process stops between a DDL commit and its ledger write; an unfinished invalid index created by the plan is removed in its own DDL transaction before retry. Alembic continues to reject `DATABASE_BACKEND=aurora_dsql` and cannot send PostgreSQL migrations to DSQL. The actual DSQL command is `uv run --directory services/api --locked python -m app.db.migrate_dsql` with both configured roles and the AWS credential chain available.
+Migration ledger checksums retain the original executable-step algorithm for compatibility with recorded 0001/0002 steps. Evolving schema validation metadata does not change prior checksums; object definitions are checked independently on resume.
+
+The DSQL runner creates a migration ledger in its own DDL transaction, executes each table, alter or index DDL statement in a separate transaction, waits for each asynchronous index job, then records that step with separate DML. It checksums statements and validates expected columns, types, nullability, constraints and index key definitions before adopting an unrecorded pre-existing object. Incompatible drift fails with the migration and object name; it is never treated as complete because a name exists. Data backfills use idempotent, bounded DML transactions separate from DDL. An unfinished invalid index created by the plan is removed in its own DDL transaction before retry. For constraint validation, DSQL adds the FK as `NOT VALID`, then runs `ALTER TABLE ASYNC ... VALIDATE CONSTRAINT` and waits for its job before recording completion, following [AWS's documented ALTER TABLE syntax](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/alter-table-syntax-support.html). Alembic continues to reject `DATABASE_BACKEND=aurora_dsql` and cannot send PostgreSQL migrations to DSQL. The actual DSQL command is `uv run --directory services/api --locked python -m app.db.migrate_dsql` with both configured roles and the AWS credential chain available.
 
 As verified on 2026-10-01, [AWS DSQL limits](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/CHAP_quotas.html) include **10 MiB of changed data**, **3,000 modified rows**, **five minutes per transaction**, and **60 minutes per connection**. DSQL uses optimistic concurrency and fixed Repeatable Read isolation; conflicting transactions may abort and need a whole-unit retry. These are upper limits, **not** recommended targets.
 
@@ -74,7 +76,7 @@ As verified on 2026-10-01, [AWS DSQL limits](https://docs.aws.amazon.com/aurora-
 - `app/db/transactions.py` retries SQLSTATE `40001` and DSQL `OC001` only, with a fresh session per attempt, at most three attempts by default (five maximum), and capped exponential backoff with jitter. The helper contract is database-only; provider/model/file work must finish before the retried unit begins.
 - DSQL handles [DDL separately from DML](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/working-with-ddl.html); only one DDL statement per transaction. `CREATE INDEX ASYNC` needs a waiting/verification step before subsequent migration assumptions. Adapt Alembic or write explicit DSQL migration sequences; keep a versioned migration ledger and test fresh-install plus upgrade from previous schema versions.
 
-**Verification status:** local configuration, engine-factory, dialect-compilation, migration-plan/resumption, and bounded-retry tests pass. The credentialed suite at `services/api/tests/test_dsql_integration.py` is opt-in (`RUN_DSQL_INTEGRATION=1`, `DSQL_TEST_CLUSTER=disposable`) and covers migration, synthetic CRUD, decimal/UUID/JSONB/FK behavior, and a real concurrent OCC retry. It was not run because no disposable AWS DSQL cluster was provided. **DSQL remains unverified and production remains blocked.**
+**Verification status:** local configuration, engine-factory, dialect-compilation, migration-plan/resumption, schema-drift, and bounded-retry tests pass. The credentialed suite at `services/api/tests/test_dsql_integration.py` is opt-in (`RUN_DSQL_INTEGRATION=1`, `DSQL_TEST_CLUSTER=disposable`) and includes migration, synthetic CRUD, decimal/UUID/JSONB/FK behavior, OCC retry, manual same-date replacement/history/rollback, and scoped identifier/alias uniqueness. Live populated-upgrade preservation, IAM reconnection after token expiry, and the expanded suite have not yet been run because no disposable AWS DSQL cluster was provided. **DSQL remains unverified and production remains blocked.**
 
 ## 5. Background tasks without PostgreSQL lock dependence
 
@@ -109,6 +111,11 @@ SQS, Lambda, schedules, VPC interface endpoints and log ingestion can incur thei
 | Connect with appropriate credentials, long-lived pool/new connection after 15-minute token expiry | Password local | **IAM token refresh + TLS** |
 | `Decimal` value and UUID/JSONB round-trips | Required | **Required** |
 | Same position snapshot imported twice | Required | **Required** |
+| Manual same-date replacement appends a revision and retains previous lines; rollback preserves selected pointer | Required | **Required** |
+| Populated upgrade with multiple accounts/dates, accepted and superseded snapshots, identifiers and aliases | Required | **Required** |
+| Scoped identifier/alias uniqueness and unresolved cross-issuer ambiguity | Required | **Required** |
+| Existing table/column/constraint/index definition drift is rejected before adoption | Mock and structural tests | **Required** |
+| New IAM-authenticated connection after a token expires; TLS hostname verification | N/A | **Required** |
 | 500-row ETF import and subsequent revision publish | Required | **Required** |
 | Inject OCC conflict and assert bounded retry / idempotency | Simulate | **Required** |
 | Query exposure NAV and unknown residual; both match golden fixture | Required | **Required** |
@@ -117,6 +124,8 @@ SQS, Lambda, schedules, VPC interface endpoints and log ingestion can incur thei
 | AWS cost and backup/export drill | N/A | **Required** before real data |
 
 CI runs all local tests on ordinary PRs. Run DSQL integration smoke tests on a gated workflow using ephemeral/test-only credentials and a deliberately capped small fixture, or run them manually before promotion if ongoing cloud CI would violate the budget. Never falsely mark DSQL compatibility as tested when the cloud suite was skipped.
+
+The DSQL live contract remains intentionally broader than the current opt-in suite: populated-upgrade preservation and IAM token-expiry reconnection are still pending explicit live tests/evidence. Do not count the new local schema-drift unit tests as live DSQL evidence.
 
 ## 9. Official reference index
 

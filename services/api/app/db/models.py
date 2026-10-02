@@ -1,6 +1,6 @@
 """Portable SQLAlchemy mappings for the core portfolio schema."""
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -8,6 +8,7 @@ from uuid import UUID
 from sqlalchemy import (
     JSON,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -51,7 +52,12 @@ class Issuer(TimestampMixin, Base):
 class IssuerAlias(Base):
     __tablename__ = "issuer_aliases"
     __table_args__ = (
-        UniqueConstraint("issuer_id", "normalized_alias", name="uq_issuer_alias"),
+        UniqueConstraint(
+            "issuer_id",
+            "alias_namespace",
+            "normalized_alias",
+            name="uq_issuer_alias_scoped",
+        ),
         Index("ix_issuer_aliases_normalized_alias", "normalized_alias"),
     )
 
@@ -61,7 +67,13 @@ class IssuerAlias(Base):
     )
     alias: Mapped[str] = mapped_column(String(200), nullable=False)
     normalized_alias: Mapped[str] = mapped_column(String(200), nullable=False)
+    alias_namespace: Mapped[str] = mapped_column(
+        String(40), nullable=False, default="name", server_default="name"
+    )
     source: Mapped[str] = mapped_column(String(100), nullable=False)
+    review_status: Mapped[str] = mapped_column(
+        String(24), nullable=False, default="unreviewed", server_default="unreviewed"
+    )
 
 
 class Account(TimestampMixin, Base):
@@ -74,6 +86,15 @@ class Account(TimestampMixin, Base):
     active: Mapped[bool] = mapped_column(nullable=False, default=True)
     current_position_revision: Mapped[int] = mapped_column(
         nullable=False, default=0, server_default="0"
+    )
+    current_position_snapshot_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey(
+            "position_snapshots.id",
+            ondelete="RESTRICT",
+            use_alter=True,
+            name="fk_accounts_current_position_snapshot",
+        ),
     )
     source_type: Mapped[str] = mapped_column(
         String(40), nullable=False, default="manual"
@@ -97,6 +118,41 @@ class Security(TimestampMixin, Base):
         Uuid(as_uuid=True), ForeignKey("issuers.id", ondelete="SET NULL")
     )
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
+
+
+class SecurityIdentifier(Base):
+    """A source-backed identifier scoped by its namespace and venue."""
+
+    __tablename__ = "security_identifiers"
+    __table_args__ = (
+        UniqueConstraint(
+            "namespace",
+            "exchange",
+            "normalized_value",
+            "valid_from",
+            name="uq_security_identifier_scoped_start",
+        ),
+        CheckConstraint(
+            "valid_to IS NULL OR valid_to >= valid_from",
+            name="ck_security_identifier_validity",
+        ),
+        Index("ix_security_identifiers_security", "security_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    security_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("securities.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    namespace: Mapped[str] = mapped_column(String(40), nullable=False)
+    exchange: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    value: Mapped[str] = mapped_column(String(128), nullable=False)
+    normalized_value: Mapped[str] = mapped_column(String(128), nullable=False)
+    valid_from: Mapped[date] = mapped_column(Date, nullable=False)
+    valid_to: Mapped[date | None] = mapped_column(Date)
+    source: Mapped[str] = mapped_column(String(100), nullable=False)
+    review_status: Mapped[str] = mapped_column(String(24), nullable=False)
 
 
 class Quote(TimestampMixin, Base):
@@ -134,7 +190,7 @@ class PositionSnapshot(TimestampMixin, Base):
     __tablename__ = "position_snapshots"
     __table_args__ = (
         UniqueConstraint(
-            "account_id", "snapshot_at", "source", name="uq_position_snapshot_identity"
+            "account_id", "source", "revision", name="uq_position_snapshot_revision"
         ),
         Index("ix_position_snapshots_account_asof", "account_id", "snapshot_at"),
     )

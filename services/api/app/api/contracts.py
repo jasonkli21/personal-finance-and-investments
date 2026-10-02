@@ -96,7 +96,7 @@ class PositionInput(BaseModel):
 
 
 class PositionReplace(BaseModel):
-    expected_revision: int | None = Field(ge=1)
+    expected_revision: int | None = Field(ge=0)
     effective_date: date
     positions: list[PositionInput] = Field(max_length=500)
 
@@ -124,3 +124,4 @@ class PositionSnapshotRead(BaseModel):
 
 class PositionsEnvelope(BaseModel):
     snapshot: PositionSnapshotRead | None
+    current_revision: int

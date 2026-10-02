@@ -1,10 +1,10 @@
 """Manual position snapshot reads and revision checked replacements."""
 
 from datetime import UTC, datetime, time
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation, localcontext
 from uuid import UUID, uuid4
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.api.contracts import (
@@ -111,20 +111,20 @@ def read_positions(session: Session, account_id: UUID) -> PositionsEnvelope:
     account = session.get(Account, account_id)
     if account is None:
         raise AccountNotFound
-    snapshot = session.scalar(
-        select(PositionSnapshot)
-        .where(
-            PositionSnapshot.account_id == account_id,
-            PositionSnapshot.source == MANUAL_SOURCE,
-            PositionSnapshot.status == "accepted",
-        )
-        .order_by(PositionSnapshot.revision.desc(), PositionSnapshot.accepted_at.desc())
-        .limit(1)
+    snapshot = (
+        session.get(PositionSnapshot, account.current_position_snapshot_id)
+        if account.current_position_snapshot_id is not None
+        else None
     )
     if snapshot is None:
-        return PositionsEnvelope(snapshot=None)
+        return PositionsEnvelope(
+            snapshot=None, current_revision=account.current_position_revision
+        )
     rows = _snapshot_lines(session, snapshot.id)
-    return PositionsEnvelope(snapshot=_as_read(snapshot, rows))
+    return PositionsEnvelope(
+        snapshot=_as_read(snapshot, rows),
+        current_revision=account.current_position_revision,
+    )
 
 
 def _load_positions(
@@ -160,20 +160,40 @@ def replace_positions(
     if account.current_position_revision != expected_revision:
         raise StaleRevision
 
-    current = session.scalar(
-        select(PositionSnapshot)
-        .where(
-            PositionSnapshot.account_id == account_id,
-            PositionSnapshot.source == MANUAL_SOURCE,
-            PositionSnapshot.status == "accepted",
-        )
-        .order_by(PositionSnapshot.revision.desc(), PositionSnapshot.accepted_at.desc())
-        .limit(1)
-    )
     loaded = _load_positions(session, data.positions)
     snapshot_at = datetime.combine(data.effective_date, time.min, tzinfo=UTC)
     now = utc_now()
     next_revision = expected_revision + 1
+
+    # NUMERIC(28,10) has 18 integral digits. Individual request fields are
+    # valid within NUMERIC(28,10)/NUMERIC(24,10), but their product may exceed
+    # the value column. Use a bounded explicit context and reject before the
+    # scale-changing quantize so Decimal's process-default precision cannot
+    # leak an InvalidOperation through the API.
+    calculated: list[tuple[PositionInput, Security, Decimal | None]] = []
+    value_limit = Decimal("1e18")
+    try:
+        with localcontext() as context:
+            context.prec = 80
+            for position, security in loaded:
+                if security.security_type == "cash":
+                    value = Decimal(position.quantity)
+                elif position.reported_price is not None:
+                    value = Decimal(position.quantity) * Decimal(
+                        position.reported_price
+                    )
+                else:
+                    value = None
+                if value is not None and abs(value) >= value_limit:
+                    raise ValuationOutOfRange
+                if value is not None:
+                    value = value.quantize(VALUATION_QUANTUM, rounding=ROUND_HALF_UP)
+                    if abs(value) >= value_limit:
+                        raise ValuationOutOfRange
+                calculated.append((position, security, value))
+    except InvalidOperation as exc:
+        raise ValuationOutOfRange from exc
+
     account_update = session.execute(
         update(Account)
         .where(
@@ -187,81 +207,45 @@ def replace_positions(
         raise StaleRevision
     account.current_position_revision = next_revision
     account.updated_at = now
-
-    target = session.scalar(
-        select(PositionSnapshot).where(
-            PositionSnapshot.account_id == account_id,
-            PositionSnapshot.source == MANUAL_SOURCE,
-            PositionSnapshot.snapshot_at == snapshot_at,
-        )
-    )
-    if current is not None and current.id != (target.id if target else None):
+    if account.current_position_snapshot_id is not None:
         session.execute(
             update(PositionSnapshot)
             .where(
-                PositionSnapshot.id == current.id,
+                PositionSnapshot.id == account.current_position_snapshot_id,
                 PositionSnapshot.status == "accepted",
             )
             .values(status="superseded", updated_at=now)
             .execution_options(synchronize_session=False)
         )
-        current.status = "superseded"
-        current.updated_at = now
+        previous = session.get(PositionSnapshot, account.current_position_snapshot_id)
+        if previous is not None:
+            previous.status = "superseded"
+            previous.updated_at = now
 
-    if target is None:
-        snapshot = PositionSnapshot(
-            id=uuid4(),
-            account_id=account_id,
-            snapshot_at=snapshot_at,
-            source=MANUAL_SOURCE,
-            valuation_source="manual",
-            status="accepted",
-            revision=next_revision,
-            accepted_at=now,
+    snapshot = PositionSnapshot(
+        id=uuid4(),
+        account_id=account_id,
+        snapshot_at=snapshot_at,
+        source=MANUAL_SOURCE,
+        valuation_source="manual",
+        status="accepted",
+        revision=next_revision,
+        accepted_at=now,
+    )
+    session.add(snapshot)
+    session.flush()
+    session.execute(
+        update(Account)
+        .where(
+            Account.id == account_id,
+            Account.current_position_revision == next_revision,
         )
-        session.add(snapshot)
-        session.flush()
-    else:
-        session.execute(
-            update(PositionSnapshot)
-            .where(
-                PositionSnapshot.id == target.id,
-            )
-            .values(
-                revision=next_revision,
-                snapshot_at=snapshot_at,
-                valuation_source="manual",
-                status="accepted",
-                accepted_at=now,
-                updated_at=now,
-            )
-            .execution_options(synchronize_session=False)
-        )
-        target.revision = next_revision
-        target.snapshot_at = snapshot_at
-        target.valuation_source = "manual"
-        target.status = "accepted"
-        target.accepted_at = now
-        target.updated_at = now
-        snapshot = target
-        session.execute(
-            delete(PositionSnapshotLine).where(
-                PositionSnapshotLine.snapshot_id == snapshot.id
-            )
-        )
+        .values(current_position_snapshot_id=snapshot.id, updated_at=now)
+        .execution_options(synchronize_session=False)
+    )
+    account.current_position_snapshot_id = snapshot.id
 
-    for position, security in loaded:
-        value: Decimal | None
-        if security.security_type == "cash":
-            value = Decimal(position.quantity)
-        elif position.reported_price is not None:
-            value = Decimal(position.quantity) * Decimal(position.reported_price)
-        else:
-            value = None
-        if value is not None:
-            value = value.quantize(VALUATION_QUANTUM, rounding=ROUND_HALF_UP)
-        if value is not None and abs(value) >= Decimal("1e18"):
-            raise ValuationOutOfRange
+    for position, security, value in calculated:
         session.add(
             PositionSnapshotLine(
                 id=uuid4(),

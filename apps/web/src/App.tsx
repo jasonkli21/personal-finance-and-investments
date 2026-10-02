@@ -10,6 +10,7 @@ import {
   updateAccount,
 } from './api/client'
 import type { components } from './api/schema'
+import { captureDraftBaseRevision } from './position-draft'
 import { startReadinessPolling, type ApiStatus } from './readiness'
 
 type Security = components['schemas']['SecurityRead']
@@ -212,6 +213,12 @@ export default function App() {
   const [holdingDrafts, setHoldingDrafts] = useState<
     Record<string, DraftHolding[]>
   >({})
+  const [holdingBaseRevisions, setHoldingBaseRevisions] = useState<
+    Record<string, number>
+  >({})
+  const [positionConflicts, setPositionConflicts] = useState<
+    Record<string, boolean>
+  >({})
   const [notice, setNotice] = useState('')
   const [formError, setFormError] = useState('')
 
@@ -249,6 +256,21 @@ export default function App() {
       [])
     : []
 
+  function capturePositionBaseRevision(accountId: string) {
+    const currentRevision = positionsQuery.data?.current_revision ?? 0
+    setHoldingBaseRevisions((current) =>
+      current[accountId] === undefined
+        ? {
+            ...current,
+            [accountId]: captureDraftBaseRevision(
+              current[accountId],
+              currentRevision,
+            ),
+          }
+        : current,
+    )
+  }
+
   function updateAccountDraft(patch: Partial<AccountDraft>) {
     if (!selectedAccount || !selectedAccountDraft) return
     setAccountDrafts((current) => ({
@@ -261,6 +283,7 @@ export default function App() {
     transform: (current: DraftHolding[]) => DraftHolding[],
   ) {
     if (!selectedAccount) return
+    capturePositionBaseRevision(selectedAccount.id)
     setHoldingDrafts((current) => ({
       ...current,
       [selectedAccount.id]: transform(
@@ -273,6 +296,7 @@ export default function App() {
 
   function updateEffectiveDate(value: string) {
     if (!selectedAccount) return
+    capturePositionBaseRevision(selectedAccount.id)
     setEffectiveDates((current) => ({
       ...current,
       [selectedAccount.id]: value,
@@ -287,6 +311,7 @@ export default function App() {
       setAccountDrafts((current) => withoutKey(current, account.id))
       setEffectiveDates((current) => withoutKey(current, account.id))
       setHoldingDrafts((current) => withoutKey(current, account.id))
+      setHoldingBaseRevisions((current) => withoutKey(current, account.id))
       setNewAccountName('')
       setNotice('Account created.')
       setFormError('')
@@ -334,9 +359,10 @@ export default function App() {
           'Choose a local security and enter a quantity for every row.',
         )
       }
-      const snapshot = positionsQuery.data.snapshot
       return replacePositions(selectedAccount.id, {
-        expected_revision: snapshot?.revision ?? null,
+        expected_revision:
+          holdingBaseRevisions[selectedAccount.id] ??
+          positionsQuery.data.current_revision,
         effective_date: effectiveDate,
         positions: holdings.map((holding) => ({
           security_id: holding.security!.id,
@@ -347,9 +373,16 @@ export default function App() {
       })
     },
     onSuccess: async (snapshot) => {
-      queryClient.setQueryData(['positions', selectedAccountId], { snapshot })
+      queryClient.setQueryData(['positions', selectedAccountId], {
+        snapshot,
+        current_revision: snapshot.revision,
+      })
       setEffectiveDates((current) => withoutKey(current, selectedAccountId))
       setHoldingDrafts((current) => withoutKey(current, selectedAccountId))
+      setHoldingBaseRevisions((current) =>
+        withoutKey(current, selectedAccountId),
+      )
+      setPositionConflicts((current) => withoutKey(current, selectedAccountId))
       setNotice(
         `Saved revision ${snapshot.revision}. Values are dated ${snapshot.effective_date}.`,
       )
@@ -357,13 +390,15 @@ export default function App() {
     },
     onError: async (error) => {
       if (error instanceof ApiError && error.status === 409) {
+        setPositionConflicts((current) => ({
+          ...current,
+          [selectedAccountId]: true,
+        }))
         await queryClient.invalidateQueries({
           queryKey: ['positions', selectedAccountId],
         })
-        setEffectiveDates((current) => withoutKey(current, selectedAccountId))
-        setHoldingDrafts((current) => withoutKey(current, selectedAccountId))
         setFormError(
-          'The saved revision changed. The latest version has been reloaded; review it before submitting again.',
+          'The saved revision changed. Your draft is preserved but cannot be saved against the newer revision. Reload latest to discard this draft.',
         )
         return
       }
@@ -450,6 +485,12 @@ export default function App() {
                   withoutKey(current, nextAccountId),
                 )
                 setHoldingDrafts((current) =>
+                  withoutKey(current, nextAccountId),
+                )
+                setHoldingBaseRevisions((current) =>
+                  withoutKey(current, nextAccountId),
+                )
+                setPositionConflicts((current) =>
                   withoutKey(current, nextAccountId),
                 )
                 setNotice('')
@@ -693,10 +734,43 @@ export default function App() {
             >
               {positionsQuery.data?.snapshot && (
                 <p className="rounded-lg bg-blue-50 px-4 py-3 text-sm text-blue-900">
-                  Loaded revision {positionsQuery.data.snapshot.revision};
-                  source: manual; as of{' '}
-                  {positionsQuery.data.snapshot.effective_date}.
+                  {holdingBaseRevisions[selectedAccountId] !== undefined
+                    ? `Draft based on revision ${holdingBaseRevisions[selectedAccountId]}; server revision ${positionsQuery.data.current_revision}.`
+                    : `Loaded revision ${positionsQuery.data.current_revision};`}{' '}
+                  source: manual; as of {currentSnapshot?.effective_date}.
                 </p>
+              )}
+              {positionConflicts[selectedAccountId] && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                  <span>
+                    This draft is stale. Review and reload the latest saved
+                    positions before making another change.
+                  </span>
+                  <button
+                    className="rounded-lg border border-amber-700 px-3 py-1.5 font-semibold hover:bg-amber-100"
+                    type="button"
+                    onClick={async () => {
+                      await queryClient.invalidateQueries({
+                        queryKey: ['positions', selectedAccountId],
+                      })
+                      setEffectiveDates((current) =>
+                        withoutKey(current, selectedAccountId),
+                      )
+                      setHoldingDrafts((current) =>
+                        withoutKey(current, selectedAccountId),
+                      )
+                      setHoldingBaseRevisions((current) =>
+                        withoutKey(current, selectedAccountId),
+                      )
+                      setPositionConflicts((current) =>
+                        withoutKey(current, selectedAccountId),
+                      )
+                      setFormError('')
+                    }}
+                  >
+                    Discard draft and reload latest
+                  </button>
+                </div>
               )}
               <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <label
@@ -752,6 +826,7 @@ export default function App() {
                   disabled={
                     !selectedAccount?.active ||
                     savePositionsMutation.isPending ||
+                    positionConflicts[selectedAccountId] ||
                     !positionsQuery.data
                   }
                 >

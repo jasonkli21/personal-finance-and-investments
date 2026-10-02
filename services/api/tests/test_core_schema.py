@@ -2,15 +2,37 @@
 
 import subprocess
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from os import environ
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
+
+
+def _migrate(database_url: str, revision: str = "head") -> None:
+    api_dir = Path(__file__).parents[1]
+    migration_env = environ.copy()
+    migration_env["DATABASE_URL"] = database_url
+    migration_env["DATABASE_BACKEND"] = "postgres"
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", revision],
+        cwd=api_dir,
+        env=migration_env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _reset_schema(engine: Engine) -> None:
+    with engine.begin() as connection:
+        connection.execute(text("DROP SCHEMA public CASCADE"))
+        connection.execute(text("CREATE SCHEMA public"))
 
 
 def test_core_schema_migration_and_round_trip() -> None:
@@ -18,19 +40,9 @@ def test_core_schema_migration_and_round_trip() -> None:
     if database_url is None:
         pytest.skip("set TEST_DATABASE_URL to a disposable PostgreSQL 16 database")
 
-    api_dir = Path(__file__).parents[1]
-    migration_env = environ.copy()
-    migration_env["DATABASE_URL"] = database_url
-    migration_env["DATABASE_BACKEND"] = "postgres"
-    subprocess.run(
-        [sys.executable, "-m", "alembic", "upgrade", "head"],
-        cwd=api_dir,
-        env=migration_env,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
     engine = create_engine(database_url)
+    _reset_schema(engine)
+    _migrate(database_url)
     now = datetime(2026, 10, 1, tzinfo=UTC)
     issuer_id, security_id, account_id, snapshot_id = [uuid4() for _ in range(4)]
     normalized_name = f"synthetic {issuer_id}"
@@ -171,7 +183,8 @@ def test_core_schema_migration_and_round_trip() -> None:
         assert unresolved.quantity == Decimal("-0.5000000000")
         assert unresolved.reported_value == Decimal("0E-10")
 
-        # Source-scoped snapshot identity prevents the same import being duplicated.
+        # A per-account/source revision is unique while the same date can be
+        # retained in multiple immutable published revisions.
         with pytest.raises(IntegrityError):
             with connection.begin_nested():
                 connection.execute(
@@ -225,4 +238,323 @@ def test_core_schema_migration_and_round_trip() -> None:
                     ),
                     {"id": uuid4(), "security_id": security_id, "now": now},
                 )
+    engine.dispose()
+
+
+def test_populated_0002_upgrade_reconciles_revisions_and_preserves_manual_history() -> (
+    None
+):
+    """Upgrade realistic accepted data from the previous deployed schema."""
+    database_url = environ.get("TEST_DATABASE_URL")
+    if database_url is None:
+        pytest.skip("set TEST_DATABASE_URL to a disposable PostgreSQL 16 database")
+
+    from fastapi.testclient import TestClient
+    from sqlalchemy import event
+
+    from app.main import create_app
+
+    engine = create_engine(database_url)
+    _reset_schema(engine)
+    _migrate(database_url, "0002_position_snapshot_revision")
+
+    account_a, account_b, issuer_a, issuer_b, security_id = [uuid4() for _ in range(5)]
+    snapshots_a = [uuid4() for _ in range(3)]
+    snapshot_b = uuid4()
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    with engine.begin() as connection:
+        for account_id, name, current_revision in (
+            (account_a, "Upgrade taxable", 3),
+            (account_b, "Upgrade IRA", 0),
+        ):
+            connection.execute(
+                text(
+                    "INSERT INTO accounts (id, name, account_type, base_currency, "
+                    "active, current_position_revision, source_type, created_at, "
+                    "updated_at) VALUES (:id, :name, 'taxable', 'USD', true, "
+                    ":current_revision, 'manual', :now, :now)"
+                ),
+                {
+                    "id": account_id,
+                    "name": name,
+                    "current_revision": current_revision,
+                    "now": now,
+                },
+            )
+        for issuer_id, name in (
+            (issuer_a, "upgrade issuer a"),
+            (issuer_b, "upgrade issuer b"),
+        ):
+            connection.execute(
+                text(
+                    "INSERT INTO issuers (id, normalized_name, display_name, "
+                    "created_at, updated_at) "
+                    "VALUES (:id, :normalized, :display, :now, :now)"
+                ),
+                {
+                    "id": issuer_id,
+                    "normalized": name,
+                    "display": name.title(),
+                    "now": now,
+                },
+            )
+        # A shared alias value across issuers is intentionally retained as an
+        # unresolved ambiguity rather than merged by a ticker/name shortcut.
+        for issuer_id in (issuer_a, issuer_b):
+            connection.execute(
+                text(
+                    "INSERT INTO issuer_aliases (id, issuer_id, alias, "
+                    "normalized_alias, source) "
+                    "VALUES (:id, :issuer_id, 'Shared Example', 'shared example', "
+                    "'fixture')"
+                ),
+                {"id": uuid4(), "issuer_id": issuer_id},
+            )
+        connection.execute(
+            text(
+                "INSERT INTO securities (id, security_type, display_ticker, name, "
+                "issuer_id, "
+                "currency, created_at, updated_at) VALUES (:id, 'equity', 'UPG', "
+                "'Upgrade Synthetic', :issuer_id, 'USD', :now, :now)"
+            ),
+            {"id": security_id, "issuer_id": issuer_a, "now": now},
+        )
+
+        snapshot_rows = [
+            (
+                snapshots_a[0],
+                account_a,
+                datetime(2026, 1, 5, tzinfo=UTC),
+                "superseded",
+                datetime(2026, 1, 6, tzinfo=UTC),
+                1,
+            ),
+            (
+                snapshots_a[1],
+                account_a,
+                datetime(2026, 2, 5, tzinfo=UTC),
+                "accepted",
+                datetime(2026, 2, 6, tzinfo=UTC),
+                2,
+            ),
+            (
+                snapshots_a[2],
+                account_a,
+                datetime(2026, 3, 5, tzinfo=UTC),
+                "accepted",
+                datetime(2026, 3, 6, tzinfo=UTC),
+                3,
+            ),
+            (
+                snapshot_b,
+                account_b,
+                datetime(2026, 4, 5, tzinfo=UTC),
+                "accepted",
+                datetime(2026, 4, 6, tzinfo=UTC),
+                1,
+            ),
+        ]
+        for (
+            snapshot_id,
+            account_id,
+            snapshot_at,
+            status,
+            accepted_at,
+            revision,
+        ) in snapshot_rows:
+            connection.execute(
+                text(
+                    "INSERT INTO position_snapshots (id, account_id, snapshot_at, "
+                    "source, status, revision, accepted_at, created_at, updated_at) "
+                    "VALUES (:id, :account_id, :snapshot_at, 'manual', :status, "
+                    ":revision, "
+                    ":accepted_at, :snapshot_at, :snapshot_at)"
+                ),
+                {
+                    "id": snapshot_id,
+                    "account_id": account_id,
+                    "snapshot_at": snapshot_at,
+                    "status": status,
+                    "accepted_at": accepted_at,
+                    "revision": revision,
+                },
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO position_snapshot_lines (id, snapshot_id, "
+                    "security_id, quantity, "
+                    "reported_value, reported_price, currency, source, quality_status) "
+                    "VALUES (:id, :snapshot_id, :security_id, :quantity, :value, "
+                    "10, 'USD', "
+                    "'manual', 'manual')"
+                ),
+                {
+                    "id": uuid4(),
+                    "snapshot_id": snapshot_id,
+                    "security_id": security_id,
+                    "quantity": Decimal("1.25"),
+                    "value": Decimal("12.5"),
+                },
+            )
+
+    _migrate(database_url)
+    with engine.connect() as connection:
+        accounts = connection.execute(
+            text(
+                "SELECT id, current_position_revision, current_position_snapshot_id "
+                "FROM accounts ORDER BY id"
+            )
+        ).all()
+        account_a_row = next(row for row in accounts if row.id == account_a)
+        account_b_row = next(row for row in accounts if row.id == account_b)
+        assert account_a_row.current_position_revision == 3
+        assert account_a_row.current_position_snapshot_id == snapshots_a[2]
+        assert account_b_row.current_position_revision == 1
+        assert account_b_row.current_position_snapshot_id == snapshot_b
+
+        revisions = connection.execute(
+            text(
+                "SELECT id, revision, status FROM position_snapshots "
+                "WHERE account_id = :account_id AND source = 'manual' ORDER BY revision"
+            ),
+            {"account_id": account_a},
+        ).all()
+        assert [row.revision for row in revisions] == [1, 2, 3]
+        assert revisions[0].status == "superseded"
+        assert revisions[1].status == "superseded"
+        assert revisions[2].status == "accepted"
+        assert (
+            connection.execute(
+                text(
+                    "SELECT count(*) FROM position_snapshot_lines l "
+                    "JOIN position_snapshots s ON s.id = l.snapshot_id "
+                    "WHERE s.account_id = :account_id AND s.source = 'manual'"
+                ),
+                {"account_id": account_a},
+            ).scalar_one()
+            == 3
+        )
+        alias_state = connection.execute(
+            text(
+                "SELECT count(*) AS total, "
+                "count(DISTINCT alias_namespace) AS namespaces, "
+                "count(DISTINCT review_status) AS review_states FROM issuer_aliases "
+                "WHERE normalized_alias = 'shared example'"
+            )
+        ).one()
+        assert alias_state.total == 2
+        assert alias_state.namespaces == alias_state.review_states == 1
+        for exchange in ("NYSE", "NASDAQ"):
+            connection.execute(
+                text(
+                    "INSERT INTO security_identifiers (id, security_id, "
+                    "namespace, exchange, "
+                    "value, normalized_value, valid_from, source, review_status) "
+                    "VALUES (:id, :security_id, 'ticker', :exchange, 'UPG', 'upg', "
+                    ":valid_from, 'fixture', 'reviewed')"
+                ),
+                {
+                    "id": uuid4(),
+                    "security_id": security_id,
+                    "exchange": exchange,
+                    "valid_from": date(2026, 1, 1),
+                },
+            )
+        with pytest.raises(IntegrityError):
+            with connection.begin_nested():
+                connection.execute(
+                    text(
+                        "INSERT INTO security_identifiers (id, security_id, "
+                        "namespace, exchange, "
+                        "value, normalized_value, valid_from, source, review_status) "
+                        "VALUES (:id, :security_id, 'ticker', 'NYSE', 'UPG', 'upg', "
+                        ":valid_from, 'fixture', 'reviewed')"
+                    ),
+                    {
+                        "id": uuid4(),
+                        "security_id": security_id,
+                        "valid_from": date(2026, 1, 1),
+                    },
+                )
+
+    app = create_app(engine=engine)
+    with TestClient(app, raise_server_exceptions=False) as client:
+        path = f"/v1/accounts/{account_a}/positions"
+        saved = client.put(
+            path,
+            json={
+                "expected_revision": 3,
+                "effective_date": "2026-03-05",
+                "positions": [
+                    {
+                        "security_id": str(security_id),
+                        "quantity": "5",
+                        "reported_price": "20",
+                        "currency": "USD",
+                    }
+                ],
+            },
+        )
+        assert saved.status_code == 200
+        assert saved.json()["revision"] == 4
+        latest_id = UUID(saved.json()["id"])
+
+        factory = app.state.session_factory
+        failed_once = False
+
+        def fail_commit_once(session: object) -> None:
+            nonlocal failed_once
+            if not failed_once:
+                failed_once = True
+                raise RuntimeError("synthetic commit interruption")
+
+        event.listen(factory, "before_commit", fail_commit_once)
+        failed = client.put(
+            path,
+            json={
+                "expected_revision": 4,
+                "effective_date": "2026-03-05",
+                "positions": [
+                    {
+                        "security_id": str(security_id),
+                        "quantity": "7",
+                        "reported_price": "20",
+                        "currency": "USD",
+                    }
+                ],
+            },
+        )
+        event.remove(factory, "before_commit", fail_commit_once)
+        assert failed.status_code == 500
+
+        with factory() as session:
+            account = session.execute(
+                text(
+                    "SELECT current_position_revision, current_position_snapshot_id "
+                    "FROM accounts WHERE id = :id"
+                ),
+                {"id": account_a},
+            ).one()
+            assert account.current_position_revision == 4
+            assert account.current_position_snapshot_id == latest_id
+            assert (
+                session.execute(
+                    text(
+                        "SELECT count(*) FROM position_snapshots "
+                        "WHERE account_id = :id AND source = 'manual'"
+                    ),
+                    {"id": account_a},
+                ).scalar_one()
+                == 4
+            )
+            assert (
+                session.execute(
+                    text(
+                        "SELECT count(*) FROM position_snapshot_lines "
+                        "WHERE snapshot_id = :id"
+                    ),
+                    {"id": snapshots_a[2]},
+                ).scalar_one()
+                == 1
+            )
     engine.dispose()

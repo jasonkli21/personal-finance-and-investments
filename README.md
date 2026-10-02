@@ -32,7 +32,9 @@ curl http://127.0.0.1:8000/health/ready
 
 `/health` checks the API process. `/health/ready` runs `SELECT 1` against the configured database backend and returns HTTP 503 if it cannot connect. Compose publishes PostgreSQL and the API only on `127.0.0.1`; the API binds inside its container so Compose can reach it. The sample credentials are for isolated local development only.
 
-Generate the exported FastAPI schema and TypeScript types after changing routes with `pnpm api:generate`.
+The first bootstrap downloads the locked Node/Python dependencies and PostgreSQL image. Once installed and the synthetic catalog is seeded, the app runtime makes no market-data, bank, model, or other provider calls and works offline. Ordinary API startup and migrations create an empty security catalog; the manual-position screen needs the explicit synthetic demo seed below, or user-added catalog data, before a security can be selected.
+
+Generate the exported FastAPI schema and TypeScript types after changing routes with `pnpm api:generate`. `pnpm check` regenerates both into a temporary directory and fails if either committed contract is stale.
 
 ### Synthetic offline demo
 
@@ -63,11 +65,11 @@ uv sync --directory services/api --locked
 pnpm check
 ```
 
-`pnpm check` runs ESLint and Ruff, Prettier and Ruff formatting checks, strict TypeScript and mypy checks, Vitest and pytest, then the production web build. It exits on the first failed check. Run `pnpm format` to apply formatting, or run `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm test`, and `pnpm build:web` separately. The ordinary tests use synthetic data and mocked database connections; these quality checks need no running containers or credentials. The opt-in schema integration test is skipped unless `TEST_DATABASE_URL` is set.
+`pnpm check` first regenerates OpenAPI and TypeScript contracts into a temporary directory and fails if the committed generated files differ. It then runs ESLint and Ruff, Prettier and Ruff formatting checks, strict TypeScript and mypy checks, Vitest and pytest, then the production web build. Run `pnpm api:generate` to refresh contracts. The ordinary tests use synthetic data; PostgreSQL schema tests run when `TEST_DATABASE_URL` is set. GitHub Actions provides a disposable PostgreSQL 16 service for every quality run.
 
-The API tests cover health/readiness, account and manual-position routes, revision conflicts, generated OpenAPI, explicit backend and DSQL role validation, engine TLS/pool configuration, dialect compilation, migration-plan resumption, and capped OCC retry. The web tests cover proxy port configuration and readiness timeouts, recovery, status changes, non-overlapping requests, and cleanup. The Compose services and Vite-to-API readiness proxy were smoke-tested with PostgreSQL 16 on 2026-10-01. A real DSQL suite is skipped unless `RUN_DSQL_INTEGRATION=1` and `DSQL_TEST_CLUSTER=disposable` are set.
+The API tests cover health/readiness, account and manual-position routes, stale two-client writes after refetch, immutable replacement history, arithmetic overflow/rounding/rollback, scoped identifier and alias identities, generated OpenAPI freshness, explicit backend and DSQL role validation, engine TLS/pool configuration, schema-drift rejection, migration-plan resumption, and capped OCC retry. Ordinary GitHub Actions CI provisions PostgreSQL 16 and runs fresh install plus populated `0001 → head` upgrade/manual replacement checks. A real DSQL suite remains gated on `RUN_DSQL_INTEGRATION=1` and `DSQL_TEST_CLUSTER=disposable`.
 
-The latest `pnpm check` passed on 2026-10-02: 7 Vitest tests, 37 pytest tests, and a successful web build. Three database integration tests were skipped (one requires PostgreSQL 16 and two require a disposable DSQL cluster). Alembic generated PostgreSQL upgrade SQL offline; the new migration has not yet run against a live PostgreSQL 16 test database. The S0.6 SQLite-backed browser/API transcript is in [`docs/stage-0-demo-transcript.md`](docs/stage-0-demo-transcript.md); SQLite is not PostgreSQL or DSQL evidence.
+The review follow-up adds PostgreSQL 16 fresh-install and populated-upgrade tests to ordinary CI. This local environment has no Docker client, PostgreSQL client/server, or `TEST_DATABASE_URL`, so PostgreSQL runtime migration tests cannot run here; the Stage 0 local exit gate remains incomplete until CI reports those tests passing. The S0.6 SQLite-backed browser/API transcript is in [`docs/stage-0-demo-transcript.md`](docs/stage-0-demo-transcript.md); SQLite is not PostgreSQL or DSQL evidence. Live DSQL remains unverified.
 
 ## Database schema
 
@@ -79,7 +81,7 @@ uv run --directory services/api --locked alembic upgrade head
 
 Export `DATABASE_URL` (using `postgresql+psycopg://`) or the `DATABASE_*` connection fields to choose local PostgreSQL. The opt-in PostgreSQL schema test uses `TEST_DATABASE_URL` and checks UUID, decimal, JSONB, provenance, uniqueness, and FK behavior.
 
-Migration `0002_position_snapshot_revision` adds a per-account compare-and-swap counter and a manual-snapshot revision. It is separate from the already-applied `0001` migration. DSQL applies each `ALTER TABLE` statement in its own DDL transaction.
+Migrations `0001` and `0002` remain immutable. Migration `0003_immutable_position_revisions_and_identifiers` appends manual snapshot revisions, selects the current snapshot through an account pointer, reconciles existing counters, and adds issuer alias namespaces/review state plus scoped security identifiers. Prior revision payloads and lines stay unchanged; lifecycle status transitions from accepted to superseded as the pointer moves. DSQL applies each `ALTER TABLE`/table/index statement in its own DDL transaction and backfills existing revision state in bounded DML transactions.
 
 Aurora DSQL uses the official `aurora-dsql-sqlalchemy` dialect and Python connector. Set `DATABASE_BACKEND=aurora_dsql`, `AWS_REGION`, `AURORA_DSQL_CLUSTER_ENDPOINT`, and `AURORA_DSQL_DB_USER`; obtain AWS credentials through the standard AWS credential chain or workload role. DSQL rejects `DATABASE_URL`. Schema migration also requires a separate `AURORA_DSQL_MIGRATION_DB_USER` role. Apply the versioned DSQL plan with:
 
@@ -96,7 +98,7 @@ The GitHub Actions workflow in `.github/workflows/quality.yml` installs locked d
 - `apps/web`: React, TypeScript, Vite, Tailwind, generated OpenAPI schema, and account/position workflow.
 - `services/api`: FastAPI routes/domains, selected-backend readiness probe, and tests.
 - `compose.yaml`: local PostgreSQL 16 and API containers.
-- `docs/05-roadmap.md`: staged implementation plan.
+- `docs/05-roadmap.md`: staged implementation plan; Stage 1 remains gated by the Stage 0 local exit criteria.
 - `fixtures/stage-0/`: synthetic positions/fund-holdings CSV examples and expected Decimal totals.
 
-Aurora DSQL configuration keys in `.env.example` are placeholders and are not needed for local development. The current plan, verification status, checked package versions and AWS references are recorded in [`docs/07-aurora-dsql-compatibility.md`](docs/07-aurora-dsql-compatibility.md). Stage 1 CSV import and exposure work is next; its implementation plan is in [`docs/stage-1-implementation-plan.md`](docs/stage-1-implementation-plan.md).
+Aurora DSQL configuration keys in `.env.example` are placeholders and are not needed for local development. The current plan, verification status, checked package versions and AWS references are recorded in [`docs/07-aurora-dsql-compatibility.md`](docs/07-aurora-dsql-compatibility.md). Finish Stage 0 PostgreSQL 16 CI verification before starting Stage 1 CSV import and exposure work; its implementation plan is in [`docs/stage-1-implementation-plan.md`](docs/stage-1-implementation-plan.md).

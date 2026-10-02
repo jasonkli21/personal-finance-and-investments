@@ -240,6 +240,8 @@ export interface components {
     }
     /** PositionsEnvelope */
     PositionsEnvelope: {
+      /** Current Revision */
+      current_revision: number
       snapshot: components['schemas']['PositionSnapshotRead'] | null
     }
     /** SecurityRead */

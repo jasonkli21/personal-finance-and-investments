@@ -1,6 +1,6 @@
 # Personal Finance & Portfolio Intelligence — Docs
 
-**Status:** Stage 0 local foundation through S0.6 implemented; live DSQL unverified
+**Status:** Stage 0 code through S0.6 delivered; local exit gate incomplete pending PostgreSQL 16 runtime verification and review fixes; live DSQL unverified
 **Last reviewed:** 2026-10-02
 **Databases:** PostgreSQL 16 local/personal; Aurora DSQL required for production  
 **Deployment:** local indefinitely; AWS deployment optional until ready, with production targeting DSQL  
@@ -70,7 +70,7 @@ Task IDs follow roadmap packages (`S0.3` corresponds to 0.3); dotted subtask suf
 
 ## Current implementation and next task
 
-Stage 0.1 source and lockfiles are present. The web build, API tests, PostgreSQL 16 and API Compose startup, and Vite-to-API readiness proxy passed locally on 2026-10-01. Stage 0.2 adds Ruff, strict mypy, ESLint, Prettier, strict TypeScript, Vitest, and a shared `pnpm check` command. Stage 0.3 adds SQLAlchemy/Alembic mappings and a PostgreSQL migration for issuers and aliases, accounts, securities, quotes, and owned position snapshots/lines. Stage 0.4 adds a separate official DSQL engine, checksummed/resumable migration runner, IAM/TLS configuration, bounded OCC retry, and an explicitly gated real-cluster suite. Stage 0.5 adds account and manual-position routes, revision-safe replacements, OpenAPI-generated TypeScript schemas, and the local entry/reload UI. Stage 0.6 adds explicit demo-mode seeding, stable synthetic rows, reset protection, fixture files, and handoff documentation. The 2026-10-02 local gate passed (7 Vitest, 37 pytest, web build); the SQLite-backed browser transcript is in [`stage-0-demo-transcript.md`](stage-0-demo-transcript.md). One PostgreSQL and two DSQL database tests remained skipped; live DSQL remains unverified. Next is **Stage 1**, beginning with the packages in [`stage-1-implementation-plan.md`](stage-1-implementation-plan.md).
+Stage 0.1–0.6 code is present, including the local stack, SQLAlchemy/Alembic schema, DSQL boundary, manual account/position workflow, and explicit synthetic demo seeding. The 2026-10-02 local `pnpm check` passed (8 Vitest, 45 pytest passed, 5 PostgreSQL/DSQL integration tests skipped, and a successful web build). The latest PostgreSQL migrations and manual replacement workflow have not yet been exercised against PostgreSQL 16. The Stage 0 local exit gate is therefore **incomplete** until fresh and populated-upgrade PostgreSQL 16 tests pass in CI. The SQLite-backed browser transcript is in [`stage-0-demo-transcript.md`](stage-0-demo-transcript.md); SQLite is not PostgreSQL evidence. Live DSQL remains unverified and production-blocked. Finish the Stage 0 remediation and verification checklist in [`stage-0-implementation-plan.md`](stage-0-implementation-plan.md) before beginning Stage 1.
 
 ## Documentation maintenance
 
