@@ -18,6 +18,7 @@ import ReportWorkspace from './ReportWorkspace'
 import SpendingWorkspace from './SpendingWorkspace'
 import FinanceWorkspace from './FinanceWorkspace'
 import HistoryPerformanceWorkspace from './HistoryPerformanceWorkspace'
+import TaxLotWorkspace from './TaxLotWorkspace'
 
 type Security = components['schemas']['SecurityRead']
 type PositionLine = components['schemas']['PositionLineRead']
@@ -936,6 +937,7 @@ export default function App() {
       <SpendingWorkspace />
       <FinanceWorkspace />
       <HistoryPerformanceWorkspace />
+      <TaxLotWorkspace />
     </main>
   )
 }

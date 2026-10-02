@@ -182,6 +182,109 @@ def test_core_schema_migration_and_round_trip() -> None:
         assert event.is_external_flow is False
         assert event.raw_quantity == "0.25"
 
+        file_id, lot_import_id, lot_row_id, lot_id, adjustment_id = [
+            uuid4() for _ in range(5)
+        ]
+        file_hash = f"{file_id.hex:0<64}"[:64]
+        connection.execute(
+            text(
+                "INSERT INTO private_files (id, content_hash, storage_key, "
+                "original_name, content_type, byte_size, created_at, updated_at) "
+                "VALUES (:id, :hash, :key, 'lots.csv', 'text/csv', 64, :now, :now)"
+            ),
+            {"id": file_id, "hash": file_hash, "key": f"{file_hash}.blob", "now": now},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO tax_lot_imports (id, account_id, file_id, source_label, "
+                "parser_version, file_sha256, idempotency_key, review_revision, "
+                "row_count, status, diagnostics, published_at, created_at, updated_at) "
+                "VALUES (:id, :account, :file, 'fixture', 'tax-lots-csv-v1', :hash, "
+                ":key, 1, 1, 'published', '{}'::jsonb, :now, :now, :now)"
+            ),
+            {
+                "id": lot_import_id,
+                "account": account_id,
+                "file": file_id,
+                "hash": file_hash,
+                "key": f"synthetic-tax-lot-import-{lot_import_id}",
+                "now": now,
+            },
+        )
+        connection.execute(
+            text(
+                "INSERT INTO tax_lot_import_rows (id, import_id, row_number, "
+                "raw_payload, raw_ticker, raw_source_lot_id, security_id, acquired_at, "
+                "initial_quantity, remaining_quantity, initial_basis, remaining_basis, "
+                "basis_currency, evidence_ref, quality_status, row_status, "
+                "diagnostics, "
+                "created_at, updated_at) VALUES (:id, :import, 1, CAST(:raw AS jsonb), "
+                "'ACME', 'LOT-1', :security, :date, 1.25, 1.0, 123.45, 98.76, 'USD', "
+                "'fixture:line-1', 'reported', 'published', '{}'::jsonb, :now, :now)"
+            ),
+            {
+                "id": lot_row_id,
+                "import": lot_import_id,
+                "security": security_id,
+                "date": date(2020, 2, 3),
+                "raw": '{"Shares":"1.0"}',
+                "now": now,
+            },
+        )
+        connection.execute(
+            text(
+                "INSERT INTO tax_lots (id, account_id, security_id, import_id, "
+                "import_row_id, source_label, source_lot_id, identity_key, "
+                "acquired_at, "
+                "initial_quantity, remaining_quantity, initial_basis, remaining_basis, "
+                "basis_currency, evidence_ref, quality_status, created_at, updated_at) "
+                "VALUES (:id, :account, :security, :import, :row, 'fixture', 'LOT-1', "
+                ":identity, :date, 1.25, 1.0, 123.45, 98.76, 'USD', 'fixture:line-1', "
+                "'reported', :now, :now)"
+            ),
+            {
+                "id": lot_id,
+                "account": account_id,
+                "security": security_id,
+                "import": lot_import_id,
+                "row": lot_row_id,
+                "identity": f"{lot_id.hex:0<64}"[:64],
+                "date": date(2020, 2, 3),
+                "now": now,
+            },
+        )
+        connection.execute(
+            text(
+                "INSERT INTO tax_lot_adjustments (id, tax_lot_id, adjustment_type, "
+                "quantity_delta, basis_delta, basis_currency, effective_date, "
+                "source_label, reason, evidence_ref, idempotency_key, raw_values, "
+                "created_at) VALUES (:id, :lot, 'correction', -0.25, -24.69, 'USD', "
+                ":date, 'fixture', 'synthetic partial disposition', 'fixture:line-2', "
+                ":key, '{}'::jsonb, :now)"
+            ),
+            {
+                "id": adjustment_id,
+                "lot": lot_id,
+                "date": date(2026, 1, 2),
+                "key": f"synthetic-tax-lot-adjustment-{adjustment_id}",
+                "now": now,
+            },
+        )
+        saved_lot = connection.execute(
+            text(
+                "SELECT l.remaining_quantity + a.quantity_delta AS quantity, "
+                "l.remaining_basis + a.basis_delta AS basis, "
+                "r.raw_payload ->> 'Shares' AS raw_quantity FROM tax_lots l "
+                "JOIN tax_lot_adjustments a ON a.tax_lot_id = l.id "
+                "JOIN tax_lot_import_rows r ON r.id = l.import_row_id "
+                "WHERE l.id = :id"
+            ),
+            {"id": lot_id},
+        ).one()
+        assert saved_lot.quantity == Decimal("0.7500000000")
+        assert saved_lot.basis == Decimal("74.0700000000")
+        assert saved_lot.raw_quantity == "1.0"
+
         snapshot_revision = connection.execute(
             text(
                 "SELECT a.current_position_revision, p.revision "

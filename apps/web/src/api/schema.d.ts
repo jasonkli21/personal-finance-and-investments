@@ -314,6 +314,23 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/imports/tax-lots/preview': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Preview Tax Lots */
+    post: operations['preview_tax_lots_v1_imports_tax_lots_preview_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/imports/transactions/preview': {
     parameters: {
       query?: never
@@ -688,6 +705,91 @@ export interface paths {
     head?: never
     /** Patch Security Issuer */
     patch: operations['patch_security_issuer_v1_securities__security_id__issuer_patch']
+    trace?: never
+  }
+  '/v1/tax-lot-imports/{import_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Read Tax Lot Import */
+    get: operations['read_tax_lot_import_v1_tax_lot_imports__import_id__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/tax-lot-imports/{import_id}/publish': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Publish Tax Lot Import */
+    post: operations['publish_tax_lot_import_v1_tax_lot_imports__import_id__publish_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/tax-lot-imports/{import_id}/rows/{row_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /** Correct Tax Lot Row */
+    patch: operations['correct_tax_lot_row_v1_tax_lot_imports__import_id__rows__row_id__patch']
+    trace?: never
+  }
+  '/v1/tax-lots': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** List Tax Lots */
+    get: operations['list_tax_lots_v1_tax_lots_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/tax-lots/{lot_id}/adjustments': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Add Tax Lot Adjustment */
+    post: operations['add_tax_lot_adjustment_v1_tax_lots__lot_id__adjustments_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
     trace?: never
   }
   '/v1/transaction-imports/{import_id}': {
@@ -2152,6 +2254,280 @@ export interface components {
       /** Slug */
       slug: string
     }
+    /** TaxLotAdjustmentCreate */
+    TaxLotAdjustmentCreate: {
+      /**
+       * Adjustment Type
+       * @enum {string}
+       */
+      adjustment_type:
+        | 'split'
+        | 'basis_adjustment'
+        | 'return_of_capital'
+        | 'correction'
+        | 'other'
+      /** Basis Currency */
+      basis_currency?: string | null
+      /** Basis Delta */
+      basis_delta?: string | null
+      /**
+       * Effective Date
+       * Format: date
+       */
+      effective_date: string
+      /** Evidence Ref */
+      evidence_ref?: string | null
+      /** Idempotency Key */
+      idempotency_key: string
+      /** Quantity Delta */
+      quantity_delta?: string | null
+      /** Raw Values */
+      raw_values?: {
+        [key: string]: unknown
+      }
+      /** Reason */
+      reason: string
+      /** Source Label */
+      source_label: string
+    }
+    /** TaxLotAdjustmentRead */
+    TaxLotAdjustmentRead: {
+      /** Adjustment Type */
+      adjustment_type: string
+      /** Basis Currency */
+      basis_currency: string | null
+      /** Basis Delta */
+      basis_delta: string | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /**
+       * Effective Date
+       * Format: date
+       */
+      effective_date: string
+      /** Evidence Ref */
+      evidence_ref: string | null
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Quantity Delta */
+      quantity_delta: string | null
+      /** Reason */
+      reason: string
+      /** Source Label */
+      source_label: string
+      /**
+       * Tax Lot Id
+       * Format: uuid
+       */
+      tax_lot_id: string
+    }
+    /** TaxLotImportCorrection */
+    TaxLotImportCorrection: {
+      /** Acquired At */
+      acquired_at?: string | null
+      /** Basis Currency */
+      basis_currency?: string | null
+      /** Evidence Ref */
+      evidence_ref?: string | null
+      /** Expected Revision */
+      expected_revision: number
+      /** Initial Basis */
+      initial_basis?: string | null
+      /** Initial Quantity */
+      initial_quantity?: string | null
+      /** Reason */
+      reason: string
+      /** Remaining Basis */
+      remaining_basis?: string | null
+      /** Remaining Quantity */
+      remaining_quantity?: string | null
+      /** Security Id */
+      security_id?: string | null
+      /** Source Lot Id */
+      source_lot_id?: string | null
+    }
+    /** TaxLotImportCreated */
+    TaxLotImportCreated: {
+      /** Duplicate */
+      duplicate: boolean
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Review Revision */
+      review_revision: number
+      /** Row Count */
+      row_count: number
+      /** Status */
+      status: string
+    }
+    /** TaxLotImportPublish */
+    TaxLotImportPublish: {
+      /**
+       * Acknowledge Quantity Differences
+       * @default false
+       */
+      acknowledge_quantity_differences: boolean
+      /** Expected Revision */
+      expected_revision: number
+      /** Reason */
+      reason: string
+    }
+    /** TaxLotImportReviewRead */
+    TaxLotImportReviewRead: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Diagnostics */
+      diagnostics: {
+        [key: string]: unknown
+      }
+      /** File Sha256 */
+      file_sha256: string
+      /** Gaps */
+      gaps: string[]
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Quantity Differences */
+      quantity_differences: components['schemas']['TaxLotQuantityDifference'][]
+      /** Review Revision */
+      review_revision: number
+      /** Row Count */
+      row_count: number
+      /** Rows */
+      rows: components['schemas']['TaxLotImportRowRead'][]
+      /** Source Label */
+      source_label: string
+      /** Status */
+      status: string
+    }
+    /** TaxLotImportRowRead */
+    TaxLotImportRowRead: {
+      /** Acquired At */
+      acquired_at: string | null
+      /** Basis Currency */
+      basis_currency: string | null
+      /** Diagnostics */
+      diagnostics: {
+        [key: string]: unknown
+      }
+      /** Evidence Ref */
+      evidence_ref: string | null
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Initial Basis */
+      initial_basis: string | null
+      /** Initial Quantity */
+      initial_quantity: string | null
+      /** Quality Status */
+      quality_status: string
+      /** Raw Payload */
+      raw_payload: {
+        [key: string]: unknown
+      }
+      /** Raw Source Lot Id */
+      raw_source_lot_id: string | null
+      /** Raw Ticker */
+      raw_ticker: string | null
+      /** Remaining Basis */
+      remaining_basis: string | null
+      /** Remaining Quantity */
+      remaining_quantity: string | null
+      /** Row Number */
+      row_number: number
+      /** Row Status */
+      row_status: string
+      /** Security Id */
+      security_id: string | null
+      /** Tax Lot Id */
+      tax_lot_id?: string | null
+      /** Ticker */
+      ticker: string | null
+    }
+    /** TaxLotQuantityDifference */
+    TaxLotQuantityDifference: {
+      /** Difference */
+      difference: string | null
+      /** Lot Quantity */
+      lot_quantity: string
+      /** Position Quantity */
+      position_quantity: string | null
+      /**
+       * Security Id
+       * Format: uuid
+       */
+      security_id: string
+      /** Ticker */
+      ticker: string | null
+    }
+    /** TaxLotRead */
+    TaxLotRead: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Acquired At */
+      acquired_at: string | null
+      /** Adjustments */
+      adjustments: components['schemas']['TaxLotAdjustmentRead'][]
+      /** Basis Currency */
+      basis_currency: string | null
+      /** Current Remaining Basis */
+      current_remaining_basis: string | null
+      /** Current Remaining Quantity */
+      current_remaining_quantity: string
+      /** Evidence Ref */
+      evidence_ref: string | null
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /**
+       * Import Id
+       * Format: uuid
+       */
+      import_id: string
+      /** Initial Basis */
+      initial_basis: string | null
+      /** Initial Quantity */
+      initial_quantity: string | null
+      /** Quality Status */
+      quality_status: string
+      /** Remaining Basis */
+      remaining_basis: string | null
+      /** Remaining Quantity */
+      remaining_quantity: string
+      /**
+       * Security Id
+       * Format: uuid
+       */
+      security_id: string
+      /** Security Name */
+      security_name: string
+      /** Source Label */
+      source_label: string
+      /** Source Lot Id */
+      source_lot_id: string | null
+      /** Ticker */
+      ticker: string | null
+    }
     /** TransactionImportAction */
     TransactionImportAction: {
       /** Expected Review Revision */
@@ -3580,6 +3956,40 @@ export interface operations {
       }
     }
   }
+  preview_tax_lots_v1_imports_tax_lots_preview_post: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Account-Id': string
+        'X-Source-Label': string
+        'Idempotency-Key': string
+        'X-Column-Mapping'?: string
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TaxLotImportCreated']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   post_transaction_import_preview_v1_imports_transactions_preview_post: {
     parameters: {
       query?: never
@@ -4771,6 +5181,176 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  read_tax_lot_import_v1_tax_lot_imports__import_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        import_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TaxLotImportReviewRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  publish_tax_lot_import_v1_tax_lot_imports__import_id__publish_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        import_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TaxLotImportPublish']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TaxLotImportReviewRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  correct_tax_lot_row_v1_tax_lot_imports__import_id__rows__row_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        import_id: string
+        row_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TaxLotImportCorrection']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TaxLotImportReviewRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  list_tax_lots_v1_tax_lots_get: {
+    parameters: {
+      query?: {
+        account_id?: string | null
+        security_id?: string | null
+        quality_status?: ('reported' | 'incomplete') | null
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TaxLotRead'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  add_tax_lot_adjustment_v1_tax_lots__lot_id__adjustments_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        lot_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TaxLotAdjustmentCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TaxLotAdjustmentRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
         }
       }
     }

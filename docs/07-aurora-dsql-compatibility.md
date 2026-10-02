@@ -72,6 +72,8 @@ The DSQL runner creates a migration ledger in its own DDL transaction, executes 
 
 Stage 3.1 adds `investment_events` in PostgreSQL migration `0012_stage3_investment_events` and the corresponding DSQL step with separate asynchronous account/date and security/date indexes. Structural plan coverage plus gated synthetic PostgreSQL/DSQL event round trips are checked in. These additions are not evidence of a live DSQL migration or data round trip; see [Stage 3 release status](stage-3-release.md).
 
+Stage 3.2 adds reviewed tax-lot imports, raw staged rows, published lots, append-only adjustments, and review audit events in PostgreSQL migration `0013_stage3_tax_lots` and the matching DSQL plan. The plan has one table/index statement per step and waits for each async index before dependent work. Structural plan tests and an opt-in live-DSQL lot/adjustment round trip are checked in. Neither gated tests nor local SQLite checks establish live DSQL or PostgreSQL migration evidence; see [Stage 3 release status](stage-3-release.md).
+
 As verified on 2026-10-01, [AWS DSQL limits](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/CHAP_quotas.html) include **10 MiB of changed data**, **3,000 modified rows**, **five minutes per transaction**, and **60 minutes per connection**. DSQL uses optimistic concurrency and fixed Repeatable Read isolation; conflicting transactions may abort and need a whole-unit retry. These are upper limits, **not** recommended targets.
 
 - Keep transaction scopes brief. Prefer batches of a few hundred rows (configurable and measured), with a safety margin for secondary-index changes, provider payload size and latency. Never hold a transaction open while downloading a PDF, calling AI, fetching holdings, or waiting for review.

@@ -315,6 +315,187 @@ class InvestmentEvent(TimestampMixin, Base):
     )
 
 
+class TaxLotImport(TimestampMixin, Base):
+    """Private, unpublished review for a supplied tax-lot CSV."""
+
+    __tablename__ = "tax_lot_imports"
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_tax_lot_import_idempotency"),
+        UniqueConstraint(
+            "account_id", "source_label", "file_sha256", name="uq_tax_lot_import_file"
+        ),
+        Index("ix_tax_lot_imports_account_created", "account_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    account_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("accounts.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    file_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("private_files.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    source_label: Mapped[str] = mapped_column(String(100), nullable=False)
+    parser_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    file_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    review_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    diagnostics: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), nullable=False, default=dict
+    )
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class TaxLotImportRow(TimestampMixin, Base):
+    """Raw lot row plus a correctable finance-owned interpretation."""
+
+    __tablename__ = "tax_lot_import_rows"
+    __table_args__ = (
+        UniqueConstraint("import_id", "row_number", name="uq_tax_lot_import_row"),
+        Index("ix_tax_lot_import_rows_import", "import_id", "row_number"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    import_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("tax_lot_imports.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    row_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    raw_payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), nullable=False
+    )
+    raw_ticker: Mapped[str | None] = mapped_column(String(200))
+    raw_source_lot_id: Mapped[str | None] = mapped_column(String(200))
+    security_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("securities.id", ondelete="RESTRICT")
+    )
+    acquired_at: Mapped[date | None] = mapped_column(Date)
+    initial_quantity: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
+    remaining_quantity: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
+    initial_basis: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
+    remaining_basis: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
+    basis_currency: Mapped[str | None] = mapped_column(String(3))
+    evidence_ref: Mapped[str | None] = mapped_column(String(500))
+    quality_status: Mapped[str] = mapped_column(String(24), nullable=False)
+    row_status: Mapped[str] = mapped_column(String(24), nullable=False)
+    diagnostics: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), nullable=False, default=dict
+    )
+
+
+class TaxLot(TimestampMixin, Base):
+    """A supplied acquisition lot for an actual held security and account."""
+
+    __tablename__ = "tax_lots"
+    __table_args__ = (
+        UniqueConstraint(
+            "account_id", "source_label", "identity_key", name="uq_tax_lot_identity"
+        ),
+        UniqueConstraint("import_row_id", name="uq_tax_lot_import_row"),
+        Index("ix_tax_lots_account_security", "account_id", "security_id"),
+        Index("ix_tax_lots_security_acquired", "security_id", "acquired_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    account_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("accounts.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    security_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("securities.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    import_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("tax_lot_imports.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    import_row_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("tax_lot_import_rows.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    source_label: Mapped[str] = mapped_column(String(100), nullable=False)
+    source_lot_id: Mapped[str | None] = mapped_column(String(200))
+    identity_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    acquired_at: Mapped[date | None] = mapped_column(Date)
+    initial_quantity: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
+    remaining_quantity: Mapped[Decimal] = mapped_column(Numeric(28, 10), nullable=False)
+    initial_basis: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
+    remaining_basis: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
+    basis_currency: Mapped[str | None] = mapped_column(String(3))
+    evidence_ref: Mapped[str | None] = mapped_column(String(500))
+    quality_status: Mapped[str] = mapped_column(String(24), nullable=False)
+
+
+class TaxLotAdjustment(Base):
+    """Append-only supplied quantity/basis change with an audit reason."""
+
+    __tablename__ = "tax_lot_adjustments"
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_tax_lot_adjustment_idempotency"),
+        Index("ix_tax_lot_adjustments_lot_date", "tax_lot_id", "effective_date"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    tax_lot_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("tax_lots.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    adjustment_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    quantity_delta: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
+    basis_delta: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
+    basis_currency: Mapped[str | None] = mapped_column(String(3))
+    effective_date: Mapped[date] = mapped_column(Date, nullable=False)
+    source_label: Mapped[str] = mapped_column(String(100), nullable=False)
+    reason: Mapped[str] = mapped_column(String(500), nullable=False)
+    evidence_ref: Mapped[str | None] = mapped_column(String(500))
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    raw_values: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), nullable=False, default=dict
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class TaxLotReviewEvent(Base):
+    """Append-only audit of tax-lot import corrections and publication."""
+
+    __tablename__ = "tax_lot_review_events"
+    __table_args__ = (
+        Index("ix_tax_lot_review_events_import", "import_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    import_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("tax_lot_imports.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    import_row_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("tax_lot_import_rows.id", ondelete="CASCADE")
+    )
+    review_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    action: Mapped[str] = mapped_column(String(32), nullable=False)
+    reason: Mapped[str] = mapped_column(String(500), nullable=False)
+    change_payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
 class PrivateFile(TimestampMixin, Base):
     """A private local file and its content identity; bytes stay outside SQL."""
 

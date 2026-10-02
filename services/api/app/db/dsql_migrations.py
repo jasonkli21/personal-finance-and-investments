@@ -1852,6 +1852,179 @@ TABLE_CONSTRAINTS["investment_events"] = (
         ("unique(idempotency_key)",),
     ),
 )
+TABLE_COLUMNS["tax_lot_imports"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("account_id", "uuid", "NO", None, None, None),
+    ("file_id", "uuid", "NO", None, None, None),
+    ("source_label", "character varying", "NO", 100, None, None),
+    ("parser_version", "character varying", "NO", 80, None, None),
+    ("file_sha256", "character varying", "NO", 64, None, None),
+    ("idempotency_key", "character varying", "NO", 128, None, None),
+    ("review_revision", "integer", "NO", None, None, None),
+    ("row_count", "integer", "NO", None, None, None),
+    ("status", "character varying", "NO", 24, None, None),
+    ("diagnostics", "jsonb", "NO", None, None, None),
+    ("published_at", "timestamp with time zone", "YES", None, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+    ("updated_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["tax_lot_imports"] = (
+    ("tax_lot_imports_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    ("uq_tax_lot_import_idempotency", "UNIQUE", ("unique(idempotency_key)",)),
+    (
+        "uq_tax_lot_import_file",
+        "UNIQUE",
+        ("unique(account_id,source_label,file_sha256)",),
+    ),
+    (
+        "tax_lot_imports_account_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(account_id)referencesaccounts(id)ondelete restrict",),
+    ),
+    (
+        "tax_lot_imports_file_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(file_id)referencesprivate_files(id)ondelete restrict",),
+    ),
+)
+TABLE_COLUMNS["tax_lot_import_rows"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("import_id", "uuid", "NO", None, None, None),
+    ("row_number", "integer", "NO", None, None, None),
+    ("raw_payload", "jsonb", "NO", None, None, None),
+    ("raw_ticker", "character varying", "YES", 200, None, None),
+    ("raw_source_lot_id", "character varying", "YES", 200, None, None),
+    ("security_id", "uuid", "YES", None, None, None),
+    ("acquired_at", "date", "YES", None, None, None),
+    ("initial_quantity", "numeric", "YES", None, 28, 10),
+    ("remaining_quantity", "numeric", "YES", None, 28, 10),
+    ("initial_basis", "numeric", "YES", None, 28, 10),
+    ("remaining_basis", "numeric", "YES", None, 28, 10),
+    ("basis_currency", "character varying", "YES", 3, None, None),
+    ("evidence_ref", "character varying", "YES", 500, None, None),
+    ("quality_status", "character varying", "NO", 24, None, None),
+    ("row_status", "character varying", "NO", 24, None, None),
+    ("diagnostics", "jsonb", "NO", None, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+    ("updated_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["tax_lot_import_rows"] = (
+    ("tax_lot_import_rows_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    ("uq_tax_lot_import_row", "UNIQUE", ("unique(import_id,row_number)",)),
+    (
+        "tax_lot_import_rows_import_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(import_id)referencestax_lot_imports(id)ondelete cascade",),
+    ),
+    (
+        "tax_lot_import_rows_security_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(security_id)referencessecurities(id)ondelete restrict",),
+    ),
+)
+TABLE_COLUMNS["tax_lots"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("account_id", "uuid", "NO", None, None, None),
+    ("security_id", "uuid", "NO", None, None, None),
+    ("import_id", "uuid", "NO", None, None, None),
+    ("import_row_id", "uuid", "NO", None, None, None),
+    ("source_label", "character varying", "NO", 100, None, None),
+    ("source_lot_id", "character varying", "YES", 200, None, None),
+    ("identity_key", "character varying", "NO", 64, None, None),
+    ("acquired_at", "date", "YES", None, None, None),
+    ("initial_quantity", "numeric", "YES", None, 28, 10),
+    ("remaining_quantity", "numeric", "NO", None, 28, 10),
+    ("initial_basis", "numeric", "YES", None, 28, 10),
+    ("remaining_basis", "numeric", "YES", None, 28, 10),
+    ("basis_currency", "character varying", "YES", 3, None, None),
+    ("evidence_ref", "character varying", "YES", 500, None, None),
+    ("quality_status", "character varying", "NO", 24, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+    ("updated_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["tax_lots"] = (
+    ("tax_lots_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    (
+        "uq_tax_lot_identity",
+        "UNIQUE",
+        ("unique(account_id,source_label,identity_key)",),
+    ),
+    ("uq_tax_lot_import_row", "UNIQUE", ("unique(import_row_id)",)),
+    (
+        "tax_lots_account_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(account_id)referencesaccounts(id)ondelete restrict",),
+    ),
+    (
+        "tax_lots_security_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(security_id)referencessecurities(id)ondelete restrict",),
+    ),
+    (
+        "tax_lots_import_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(import_id)referencestax_lot_imports(id)ondelete restrict",),
+    ),
+    (
+        "tax_lots_import_row_id_fkey",
+        "FOREIGN KEY",
+        (
+            "foreignkey(import_row_id)referencestax_lot_import_rows(id)"
+            "ondelete restrict",
+        ),
+    ),
+)
+TABLE_COLUMNS["tax_lot_adjustments"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("tax_lot_id", "uuid", "NO", None, None, None),
+    ("adjustment_type", "character varying", "NO", 32, None, None),
+    ("quantity_delta", "numeric", "YES", None, 28, 10),
+    ("basis_delta", "numeric", "YES", None, 28, 10),
+    ("basis_currency", "character varying", "YES", 3, None, None),
+    ("effective_date", "date", "NO", None, None, None),
+    ("source_label", "character varying", "NO", 100, None, None),
+    ("reason", "character varying", "NO", 500, None, None),
+    ("evidence_ref", "character varying", "YES", 500, None, None),
+    ("idempotency_key", "character varying", "NO", 128, None, None),
+    ("raw_values", "jsonb", "NO", None, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["tax_lot_adjustments"] = (
+    ("tax_lot_adjustments_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    (
+        "uq_tax_lot_adjustment_idempotency",
+        "UNIQUE",
+        ("unique(idempotency_key)",),
+    ),
+    (
+        "tax_lot_adjustments_tax_lot_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(tax_lot_id)referencestax_lots(id)ondelete restrict",),
+    ),
+)
+TABLE_COLUMNS["tax_lot_review_events"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("import_id", "uuid", "NO", None, None, None),
+    ("import_row_id", "uuid", "YES", None, None, None),
+    ("review_revision", "integer", "NO", None, None, None),
+    ("action", "character varying", "NO", 32, None, None),
+    ("reason", "character varying", "NO", 500, None, None),
+    ("change_payload", "jsonb", "NO", None, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["tax_lot_review_events"] = (
+    ("tax_lot_review_events_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    (
+        "tax_lot_review_events_import_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(import_id)referencestax_lot_imports(id)ondelete cascade",),
+    ),
+    (
+        "tax_lot_review_events_import_row_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(import_row_id)referencestax_lot_import_rows(id)ondelete cascade",),
+    ),
+)
 
 STAGE2_TRANSACTIONS = DsqlMigration(
     "0008_stage2_transactions",
@@ -2334,6 +2507,226 @@ DSQL_MIGRATIONS = (
                 "SELECT true",
                 expected_index_table="investment_events",
                 expected_index_columns=("security_id", "effective_date"),
+            ),
+        ),
+    ),
+    DsqlMigration(
+        "0013_stage3_tax_lots",
+        (
+            DsqlMigrationStep(
+                "create_tax_lot_imports",
+                "table",
+                """CREATE TABLE tax_lot_imports (
+                    id uuid NOT NULL,
+                    account_id uuid NOT NULL,
+                    file_id uuid NOT NULL,
+                    source_label varchar(100) NOT NULL,
+                    parser_version varchar(80) NOT NULL,
+                    file_sha256 varchar(64) NOT NULL,
+                    idempotency_key varchar(128) NOT NULL,
+                    review_revision integer NOT NULL,
+                    row_count integer NOT NULL,
+                    status varchar(24) NOT NULL,
+                    diagnostics jsonb NOT NULL,
+                    published_at timestamptz,
+                    created_at timestamptz NOT NULL,
+                    updated_at timestamptz NOT NULL,
+                    CONSTRAINT tax_lot_imports_pkey PRIMARY KEY (id),
+                    CONSTRAINT uq_tax_lot_import_idempotency UNIQUE (idempotency_key),
+                    CONSTRAINT uq_tax_lot_import_file
+                        UNIQUE (account_id, source_label, file_sha256),
+                    CONSTRAINT tax_lot_imports_account_id_fkey FOREIGN KEY (account_id)
+                        REFERENCES accounts(id) ON DELETE RESTRICT,
+                    CONSTRAINT tax_lot_imports_file_id_fkey FOREIGN KEY (file_id)
+                        REFERENCES private_files(id) ON DELETE RESTRICT
+                )""",
+                "tax_lot_imports",
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = current_schema() AND table_name = :object_name)",
+            ),
+            DsqlMigrationStep(
+                "index_tax_lot_imports_account_created",
+                "index",
+                "CREATE INDEX ASYNC ix_tax_lot_imports_account_created "
+                "ON tax_lot_imports (account_id, created_at)",
+                "ix_tax_lot_imports_account_created",
+                "SELECT true",
+                expected_index_table="tax_lot_imports",
+                expected_index_columns=("account_id", "created_at"),
+            ),
+            DsqlMigrationStep(
+                "create_tax_lot_import_rows",
+                "table",
+                """CREATE TABLE tax_lot_import_rows (
+                    id uuid NOT NULL,
+                    import_id uuid NOT NULL,
+                    row_number integer NOT NULL,
+                    raw_payload jsonb NOT NULL,
+                    raw_ticker varchar(200),
+                    raw_source_lot_id varchar(200),
+                    security_id uuid,
+                    acquired_at date,
+                    initial_quantity numeric(28, 10),
+                    remaining_quantity numeric(28, 10),
+                    initial_basis numeric(28, 10),
+                    remaining_basis numeric(28, 10),
+                    basis_currency varchar(3),
+                    evidence_ref varchar(500),
+                    quality_status varchar(24) NOT NULL,
+                    row_status varchar(24) NOT NULL,
+                    diagnostics jsonb NOT NULL,
+                    created_at timestamptz NOT NULL,
+                    updated_at timestamptz NOT NULL,
+                    CONSTRAINT tax_lot_import_rows_pkey PRIMARY KEY (id),
+                    CONSTRAINT uq_tax_lot_import_row UNIQUE (import_id, row_number),
+                    CONSTRAINT tax_lot_import_rows_import_id_fkey FOREIGN KEY
+                        (import_id)
+                        REFERENCES tax_lot_imports(id) ON DELETE CASCADE,
+                    CONSTRAINT tax_lot_import_rows_security_id_fkey FOREIGN KEY
+                        (security_id) REFERENCES securities(id) ON DELETE RESTRICT
+                )""",
+                "tax_lot_import_rows",
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = current_schema() AND table_name = :object_name)",
+            ),
+            DsqlMigrationStep(
+                "index_tax_lot_import_rows_import",
+                "index",
+                "CREATE INDEX ASYNC ix_tax_lot_import_rows_import "
+                "ON tax_lot_import_rows (import_id, row_number)",
+                "ix_tax_lot_import_rows_import",
+                "SELECT true",
+                expected_index_table="tax_lot_import_rows",
+                expected_index_columns=("import_id", "row_number"),
+            ),
+            DsqlMigrationStep(
+                "create_tax_lots",
+                "table",
+                """CREATE TABLE tax_lots (
+                    id uuid NOT NULL,
+                    account_id uuid NOT NULL,
+                    security_id uuid NOT NULL,
+                    import_id uuid NOT NULL,
+                    import_row_id uuid NOT NULL,
+                    source_label varchar(100) NOT NULL,
+                    source_lot_id varchar(200),
+                    identity_key varchar(64) NOT NULL,
+                    acquired_at date,
+                    initial_quantity numeric(28, 10),
+                    remaining_quantity numeric(28, 10) NOT NULL,
+                    initial_basis numeric(28, 10),
+                    remaining_basis numeric(28, 10),
+                    basis_currency varchar(3),
+                    evidence_ref varchar(500),
+                    quality_status varchar(24) NOT NULL,
+                    created_at timestamptz NOT NULL,
+                    updated_at timestamptz NOT NULL,
+                    CONSTRAINT tax_lots_pkey PRIMARY KEY (id),
+                    CONSTRAINT uq_tax_lot_identity UNIQUE
+                        (account_id, source_label, identity_key),
+                    CONSTRAINT uq_tax_lot_import_row UNIQUE (import_row_id),
+                    CONSTRAINT tax_lots_account_id_fkey FOREIGN KEY (account_id)
+                        REFERENCES accounts(id) ON DELETE RESTRICT,
+                    CONSTRAINT tax_lots_security_id_fkey FOREIGN KEY (security_id)
+                        REFERENCES securities(id) ON DELETE RESTRICT,
+                    CONSTRAINT tax_lots_import_id_fkey FOREIGN KEY (import_id)
+                        REFERENCES tax_lot_imports(id) ON DELETE RESTRICT,
+                    CONSTRAINT tax_lots_import_row_id_fkey FOREIGN KEY (import_row_id)
+                        REFERENCES tax_lot_import_rows(id) ON DELETE RESTRICT
+                )""",
+                "tax_lots",
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = current_schema() AND table_name = :object_name)",
+            ),
+            DsqlMigrationStep(
+                "index_tax_lots_account_security",
+                "index",
+                "CREATE INDEX ASYNC ix_tax_lots_account_security "
+                "ON tax_lots (account_id, security_id)",
+                "ix_tax_lots_account_security",
+                "SELECT true",
+                expected_index_table="tax_lots",
+                expected_index_columns=("account_id", "security_id"),
+            ),
+            DsqlMigrationStep(
+                "index_tax_lots_security_acquired",
+                "index",
+                "CREATE INDEX ASYNC ix_tax_lots_security_acquired "
+                "ON tax_lots (security_id, acquired_at)",
+                "ix_tax_lots_security_acquired",
+                "SELECT true",
+                expected_index_table="tax_lots",
+                expected_index_columns=("security_id", "acquired_at"),
+            ),
+            DsqlMigrationStep(
+                "create_tax_lot_adjustments",
+                "table",
+                """CREATE TABLE tax_lot_adjustments (
+                    id uuid NOT NULL,
+                    tax_lot_id uuid NOT NULL,
+                    adjustment_type varchar(32) NOT NULL,
+                    quantity_delta numeric(28, 10),
+                    basis_delta numeric(28, 10),
+                    basis_currency varchar(3),
+                    effective_date date NOT NULL,
+                    source_label varchar(100) NOT NULL,
+                    reason varchar(500) NOT NULL,
+                    evidence_ref varchar(500),
+                    idempotency_key varchar(128) NOT NULL,
+                    raw_values jsonb NOT NULL,
+                    created_at timestamptz NOT NULL,
+                    CONSTRAINT tax_lot_adjustments_pkey PRIMARY KEY (id),
+                    CONSTRAINT uq_tax_lot_adjustment_idempotency UNIQUE
+                        (idempotency_key),
+                    CONSTRAINT tax_lot_adjustments_tax_lot_id_fkey FOREIGN KEY
+                        (tax_lot_id) REFERENCES tax_lots(id) ON DELETE RESTRICT
+                )""",
+                "tax_lot_adjustments",
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = current_schema() AND table_name = :object_name)",
+            ),
+            DsqlMigrationStep(
+                "index_tax_lot_adjustments_lot_date",
+                "index",
+                "CREATE INDEX ASYNC ix_tax_lot_adjustments_lot_date "
+                "ON tax_lot_adjustments (tax_lot_id, effective_date)",
+                "ix_tax_lot_adjustments_lot_date",
+                "SELECT true",
+                expected_index_table="tax_lot_adjustments",
+                expected_index_columns=("tax_lot_id", "effective_date"),
+            ),
+            DsqlMigrationStep(
+                "create_tax_lot_review_events",
+                "table",
+                """CREATE TABLE tax_lot_review_events (
+                    id uuid NOT NULL,
+                    import_id uuid NOT NULL,
+                    import_row_id uuid,
+                    review_revision integer NOT NULL,
+                    action varchar(32) NOT NULL,
+                    reason varchar(500) NOT NULL,
+                    change_payload jsonb NOT NULL,
+                    created_at timestamptz NOT NULL,
+                    CONSTRAINT tax_lot_review_events_pkey PRIMARY KEY (id),
+                    CONSTRAINT tax_lot_review_events_import_id_fkey FOREIGN KEY
+                        (import_id) REFERENCES tax_lot_imports(id) ON DELETE CASCADE,
+                    CONSTRAINT tax_lot_review_events_import_row_id_fkey FOREIGN KEY
+                        (import_row_id) REFERENCES tax_lot_import_rows(id)
+                        ON DELETE CASCADE
+                )""",
+                "tax_lot_review_events",
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = current_schema() AND table_name = :object_name)",
+            ),
+            DsqlMigrationStep(
+                "index_tax_lot_review_events_import",
+                "index",
+                "CREATE INDEX ASYNC ix_tax_lot_review_events_import "
+                "ON tax_lot_review_events (import_id, created_at)",
+                "ix_tax_lot_review_events_import",
+                "SELECT true",
+                expected_index_table="tax_lot_review_events",
+                expected_index_columns=("import_id", "created_at"),
             ),
         ),
     ),

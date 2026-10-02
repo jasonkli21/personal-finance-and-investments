@@ -3506,6 +3506,887 @@
         "title": "SpendingCategoryRead",
         "type": "object"
       },
+      "TaxLotAdjustmentCreate": {
+        "properties": {
+          "adjustment_type": {
+            "enum": [
+              "split",
+              "basis_adjustment",
+              "return_of_capital",
+              "correction",
+              "other"
+            ],
+            "title": "Adjustment Type",
+            "type": "string"
+          },
+          "basis_currency": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z]{3}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis Currency"
+          },
+          "basis_delta": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "pattern": "^-?\\d+(?:\\.\\d{1,10})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis Delta"
+          },
+          "effective_date": {
+            "format": "date",
+            "title": "Effective Date",
+            "type": "string"
+          },
+          "evidence_ref": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Ref"
+          },
+          "idempotency_key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "quantity_delta": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "pattern": "^-?\\d+(?:\\.\\d{1,10})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity Delta"
+          },
+          "raw_values": {
+            "additionalProperties": true,
+            "title": "Raw Values",
+            "type": "object"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "source_label": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Source Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "adjustment_type",
+          "effective_date",
+          "source_label",
+          "reason",
+          "idempotency_key"
+        ],
+        "title": "TaxLotAdjustmentCreate",
+        "type": "object"
+      },
+      "TaxLotAdjustmentRead": {
+        "properties": {
+          "adjustment_type": {
+            "title": "Adjustment Type",
+            "type": "string"
+          },
+          "basis_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis Currency"
+          },
+          "basis_delta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis Delta"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "effective_date": {
+            "format": "date",
+            "title": "Effective Date",
+            "type": "string"
+          },
+          "evidence_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Ref"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "quantity_delta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity Delta"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "source_label": {
+            "title": "Source Label",
+            "type": "string"
+          },
+          "tax_lot_id": {
+            "format": "uuid",
+            "title": "Tax Lot Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tax_lot_id",
+          "adjustment_type",
+          "quantity_delta",
+          "basis_delta",
+          "basis_currency",
+          "effective_date",
+          "source_label",
+          "reason",
+          "evidence_ref",
+          "created_at"
+        ],
+        "title": "TaxLotAdjustmentRead",
+        "type": "object"
+      },
+      "TaxLotImportCorrection": {
+        "properties": {
+          "acquired_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acquired At"
+          },
+          "basis_currency": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Z]{3}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis Currency"
+          },
+          "evidence_ref": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Ref"
+          },
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "initial_basis": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "pattern": "^\\d+(?:\\.\\d{1,10})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Basis"
+          },
+          "initial_quantity": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "pattern": "^\\d+(?:\\.\\d{1,10})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Quantity"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "remaining_basis": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "pattern": "^\\d+(?:\\.\\d{1,10})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Basis"
+          },
+          "remaining_quantity": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "pattern": "^\\d+(?:\\.\\d{1,10})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Quantity"
+          },
+          "security_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Security Id"
+          },
+          "source_lot_id": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Lot Id"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "reason"
+        ],
+        "title": "TaxLotImportCorrection",
+        "type": "object"
+      },
+      "TaxLotImportCreated": {
+        "properties": {
+          "duplicate": {
+            "title": "Duplicate",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "review_revision": {
+            "title": "Review Revision",
+            "type": "integer"
+          },
+          "row_count": {
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "row_count",
+          "review_revision",
+          "duplicate"
+        ],
+        "title": "TaxLotImportCreated",
+        "type": "object"
+      },
+      "TaxLotImportPublish": {
+        "properties": {
+          "acknowledge_quantity_differences": {
+            "default": false,
+            "title": "Acknowledge Quantity Differences",
+            "type": "boolean"
+          },
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "reason"
+        ],
+        "title": "TaxLotImportPublish",
+        "type": "object"
+      },
+      "TaxLotImportReviewRead": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "diagnostics": {
+            "additionalProperties": true,
+            "title": "Diagnostics",
+            "type": "object"
+          },
+          "file_sha256": {
+            "title": "File Sha256",
+            "type": "string"
+          },
+          "gaps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Gaps",
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "quantity_differences": {
+            "items": {
+              "$ref": "#/components/schemas/TaxLotQuantityDifference"
+            },
+            "title": "Quantity Differences",
+            "type": "array"
+          },
+          "review_revision": {
+            "title": "Review Revision",
+            "type": "integer"
+          },
+          "row_count": {
+            "title": "Row Count",
+            "type": "integer"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/TaxLotImportRowRead"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "source_label": {
+            "title": "Source Label",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "account_id",
+          "source_label",
+          "file_sha256",
+          "status",
+          "review_revision",
+          "row_count",
+          "diagnostics",
+          "rows",
+          "quantity_differences",
+          "gaps"
+        ],
+        "title": "TaxLotImportReviewRead",
+        "type": "object"
+      },
+      "TaxLotImportRowRead": {
+        "properties": {
+          "acquired_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acquired At"
+          },
+          "basis_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis Currency"
+          },
+          "diagnostics": {
+            "additionalProperties": true,
+            "title": "Diagnostics",
+            "type": "object"
+          },
+          "evidence_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Ref"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "initial_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Basis"
+          },
+          "initial_quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Quantity"
+          },
+          "quality_status": {
+            "title": "Quality Status",
+            "type": "string"
+          },
+          "raw_payload": {
+            "additionalProperties": true,
+            "title": "Raw Payload",
+            "type": "object"
+          },
+          "raw_source_lot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Source Lot Id"
+          },
+          "raw_ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Ticker"
+          },
+          "remaining_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Basis"
+          },
+          "remaining_quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Quantity"
+          },
+          "row_number": {
+            "title": "Row Number",
+            "type": "integer"
+          },
+          "row_status": {
+            "title": "Row Status",
+            "type": "string"
+          },
+          "security_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Security Id"
+          },
+          "tax_lot_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tax Lot Id"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          }
+        },
+        "required": [
+          "id",
+          "row_number",
+          "raw_payload",
+          "raw_ticker",
+          "raw_source_lot_id",
+          "security_id",
+          "ticker",
+          "acquired_at",
+          "initial_quantity",
+          "remaining_quantity",
+          "initial_basis",
+          "remaining_basis",
+          "basis_currency",
+          "evidence_ref",
+          "quality_status",
+          "row_status",
+          "diagnostics"
+        ],
+        "title": "TaxLotImportRowRead",
+        "type": "object"
+      },
+      "TaxLotQuantityDifference": {
+        "properties": {
+          "difference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference"
+          },
+          "lot_quantity": {
+            "title": "Lot Quantity",
+            "type": "string"
+          },
+          "position_quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position Quantity"
+          },
+          "security_id": {
+            "format": "uuid",
+            "title": "Security Id",
+            "type": "string"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          }
+        },
+        "required": [
+          "security_id",
+          "ticker",
+          "position_quantity",
+          "lot_quantity",
+          "difference"
+        ],
+        "title": "TaxLotQuantityDifference",
+        "type": "object"
+      },
+      "TaxLotRead": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "acquired_at": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acquired At"
+          },
+          "adjustments": {
+            "items": {
+              "$ref": "#/components/schemas/TaxLotAdjustmentRead"
+            },
+            "title": "Adjustments",
+            "type": "array"
+          },
+          "basis_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis Currency"
+          },
+          "current_remaining_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Remaining Basis"
+          },
+          "current_remaining_quantity": {
+            "title": "Current Remaining Quantity",
+            "type": "string"
+          },
+          "evidence_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Ref"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "import_id": {
+            "format": "uuid",
+            "title": "Import Id",
+            "type": "string"
+          },
+          "initial_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Basis"
+          },
+          "initial_quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Quantity"
+          },
+          "quality_status": {
+            "title": "Quality Status",
+            "type": "string"
+          },
+          "remaining_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Basis"
+          },
+          "remaining_quantity": {
+            "title": "Remaining Quantity",
+            "type": "string"
+          },
+          "security_id": {
+            "format": "uuid",
+            "title": "Security Id",
+            "type": "string"
+          },
+          "security_name": {
+            "title": "Security Name",
+            "type": "string"
+          },
+          "source_label": {
+            "title": "Source Label",
+            "type": "string"
+          },
+          "source_lot_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Lot Id"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          }
+        },
+        "required": [
+          "id",
+          "account_id",
+          "security_id",
+          "ticker",
+          "security_name",
+          "import_id",
+          "source_label",
+          "source_lot_id",
+          "acquired_at",
+          "initial_quantity",
+          "remaining_quantity",
+          "current_remaining_quantity",
+          "initial_basis",
+          "remaining_basis",
+          "current_remaining_basis",
+          "basis_currency",
+          "evidence_ref",
+          "quality_status",
+          "adjustments"
+        ],
+        "title": "TaxLotRead",
+        "type": "object"
+      },
       "TransactionImportAction": {
         "properties": {
           "expected_review_revision": {
@@ -6041,6 +6922,74 @@
         "summary": "Post Position Import Preview"
       }
     },
+    "/v1/imports/tax-lots/preview": {
+      "post": {
+        "operationId": "preview_tax_lots_v1_imports_tax_lots_preview_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "X-Account-Id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "X-Account-Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Source-Label",
+            "required": true,
+            "schema": {
+              "title": "X-Source-Label",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "X-Column-Mapping",
+            "required": false,
+            "schema": {
+              "default": "{}",
+              "title": "X-Column-Mapping",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxLotImportCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Tax Lots"
+      }
+    },
     "/v1/imports/transactions/preview": {
       "post": {
         "operationId": "post_transaction_import_preview_v1_imports_transactions_preview_post",
@@ -7782,6 +8731,294 @@
           }
         },
         "summary": "Patch Security Issuer"
+      }
+    },
+    "/v1/tax-lot-imports/{import_id}": {
+      "get": {
+        "operationId": "read_tax_lot_import_v1_tax_lot_imports__import_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Import Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxLotImportReviewRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Tax Lot Import"
+      }
+    },
+    "/v1/tax-lot-imports/{import_id}/publish": {
+      "post": {
+        "operationId": "publish_tax_lot_import_v1_tax_lot_imports__import_id__publish_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Import Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaxLotImportPublish"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxLotImportReviewRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Publish Tax Lot Import"
+      }
+    },
+    "/v1/tax-lot-imports/{import_id}/rows/{row_id}": {
+      "patch": {
+        "operationId": "correct_tax_lot_row_v1_tax_lot_imports__import_id__rows__row_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "import_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Import Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "row_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Row Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaxLotImportCorrection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxLotImportReviewRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Correct Tax Lot Row"
+      }
+    },
+    "/v1/tax-lots": {
+      "get": {
+        "operationId": "list_tax_lots_v1_tax_lots_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "account_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "security_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Security Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "quality_status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "reported",
+                    "incomplete"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Quality Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TaxLotRead"
+                  },
+                  "title": "Response List Tax Lots V1 Tax Lots Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Tax Lots"
+      }
+    },
+    "/v1/tax-lots/{lot_id}/adjustments": {
+      "post": {
+        "operationId": "add_tax_lot_adjustment_v1_tax_lots__lot_id__adjustments_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lot_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Lot Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaxLotAdjustmentCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxLotAdjustmentRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Tax Lot Adjustment"
       }
     },
     "/v1/transaction-imports/{import_id}": {

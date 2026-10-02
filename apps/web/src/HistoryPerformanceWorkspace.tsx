@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createInvestmentEvent,
@@ -64,37 +64,34 @@ export default function HistoryPerformanceWorkspace() {
   const [evidenceRef, setEvidenceRef] = useState('')
   const [notice, setNotice] = useState('')
 
-  useEffect(() => {
-    if (!accountId && accounts.length) setAccountId(accounts[0].id)
-  }, [accountId, accounts])
-
-  const request = { accountId, startDate, endDate }
+  const selectedAccountId = accountId || accounts[0]?.id || ''
+  const request = { accountId: selectedAccountId, startDate, endDate }
   const historyQuery = useQuery({
-    queryKey: ['portfolio-history', accountId, startDate, endDate],
+    queryKey: ['portfolio-history', selectedAccountId, startDate, endDate],
     queryFn: () => fetchPortfolioHistory(request),
-    enabled: Boolean(accountId && startDate && endDate),
+    enabled: Boolean(selectedAccountId && startDate && endDate),
   })
   const performanceQuery = useQuery({
-    queryKey: ['portfolio-performance', accountId, startDate, endDate],
+    queryKey: ['portfolio-performance', selectedAccountId, startDate, endDate],
     queryFn: () => fetchPortfolioPerformance(request),
-    enabled: Boolean(accountId && startDate && endDate),
+    enabled: Boolean(selectedAccountId && startDate && endDate),
   })
   const reconciliationQuery = useQuery({
     queryKey: [
       'portfolio-history-reconciliation',
-      accountId,
+      selectedAccountId,
       startDate,
       endDate,
     ],
     queryFn: () => fetchHistoryReconciliation(request),
-    enabled: Boolean(accountId && startDate && endDate),
+    enabled: Boolean(selectedAccountId && startDate && endDate),
   })
-  const account = accounts.find((row) => row.id === accountId)
+  const account = accounts.find((row) => row.id === selectedAccountId)
 
   const addEvent = useMutation({
     mutationFn: () => {
       if (
-        !accountId ||
+        !selectedAccountId ||
         !effectiveDate ||
         (!sourceEventId.trim() && eventType === 'other')
       ) {
@@ -156,7 +153,7 @@ export default function HistoryPerformanceWorkspace() {
         throw new Error('Enter a negative withdrawal amount.')
       }
       return createInvestmentEvent({
-        account_id: accountId,
+        account_id: selectedAccountId,
         event_type: eventType,
         effective_date: effectiveDate,
         security_id: needsSecurity || linkedCash ? securityId : null,
@@ -247,7 +244,7 @@ export default function HistoryPerformanceWorkspace() {
             Account
             <select
               className="rounded-lg border border-slate-300 p-2"
-              value={accountId}
+              value={selectedAccountId}
               onChange={(event) => setAccountId(event.target.value)}
             >
               {accounts.map((row) => (
@@ -508,7 +505,7 @@ export default function HistoryPerformanceWorkspace() {
         <button
           className="rounded-lg bg-blue-700 px-4 py-2 font-semibold text-white disabled:opacity-50"
           type="button"
-          disabled={addEvent.isPending || !accountId}
+          disabled={addEvent.isPending || !selectedAccountId}
           onClick={() => addEvent.mutate()}
         >
           {addEvent.isPending ? 'Saving…' : 'Save source-backed event'}

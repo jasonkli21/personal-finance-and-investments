@@ -632,3 +632,95 @@ export async function fetchHistoryReconciliation(input: {
     }),
   )
 }
+
+export async function previewTaxLotImport(input: {
+  accountId: string
+  sourceLabel: string
+  mapping: Record<string, string>
+  file: File
+}) {
+  const response = await fetch('/api/v1/imports/tax-lots/preview', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'text/csv',
+      'X-Account-Id': input.accountId,
+      'X-Source-Label': input.sourceLabel,
+      'X-Column-Mapping': JSON.stringify(input.mapping),
+      'X-File-Name': input.file.name,
+      'Idempotency-Key': crypto.randomUUID(),
+    },
+    body: input.file,
+  })
+  const body = (await response.json()) as
+    components['schemas']['TaxLotImportCreated'] | { detail?: string }
+  if (!response.ok) {
+    throw new ApiError(
+      response.status,
+      'detail' in body
+        ? (body.detail ?? 'Tax-lot import could not be started.')
+        : 'Tax-lot import could not be started.',
+    )
+  }
+  return body as components['schemas']['TaxLotImportCreated']
+}
+
+export async function fetchTaxLotImport(importId: string) {
+  return unwrap(
+    await api.GET('/v1/tax-lot-imports/{import_id}', {
+      params: { path: { import_id: importId } },
+    }),
+  )
+}
+
+export async function correctTaxLotImportRow(
+  importId: string,
+  rowId: string,
+  input: components['schemas']['TaxLotImportCorrection'],
+) {
+  return unwrap(
+    await api.PATCH('/v1/tax-lot-imports/{import_id}/rows/{row_id}', {
+      params: { path: { import_id: importId, row_id: rowId } },
+      body: input,
+    }),
+  )
+}
+
+export async function publishTaxLotImport(
+  importId: string,
+  input: components['schemas']['TaxLotImportPublish'],
+) {
+  return unwrap(
+    await api.POST('/v1/tax-lot-imports/{import_id}/publish', {
+      params: { path: { import_id: importId } },
+      body: input,
+    }),
+  )
+}
+
+export async function fetchTaxLots(
+  accountId: string,
+  qualityStatus?: 'reported' | 'incomplete',
+) {
+  return unwrap(
+    await api.GET('/v1/tax-lots', {
+      params: {
+        query: {
+          account_id: accountId,
+          ...(qualityStatus ? { quality_status: qualityStatus } : {}),
+        },
+      },
+    }),
+  )
+}
+
+export async function createTaxLotAdjustment(
+  lotId: string,
+  input: components['schemas']['TaxLotAdjustmentCreate'],
+) {
+  return unwrap(
+    await api.POST('/v1/tax-lots/{lot_id}/adjustments', {
+      params: { path: { lot_id: lotId } },
+      body: input,
+    }),
+  )
+}
