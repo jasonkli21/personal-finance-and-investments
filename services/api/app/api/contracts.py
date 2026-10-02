@@ -276,6 +276,22 @@ class FinanceSummaryRead(BaseModel):
     exclusions: list[str]
 
 
+class JobRead(BaseModel):
+    id: UUID
+    job_type: str
+    status: Literal["pending", "running", "completed", "failed", "cancelled"]
+    attempts: int
+    max_attempts: int
+    progress_stage: str
+    progress_current: int
+    progress_total: int | None
+    cancel_requested: bool
+    safe_error_code: str | None
+    result: dict[str, Any] | None
+    created_at: datetime
+    updated_at: datetime
+
+
 class SpendingCategoryCreate(BaseModel):
     slug: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{0,79}$")
     display_name: str = Field(min_length=1, max_length=120)

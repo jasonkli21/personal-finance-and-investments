@@ -84,9 +84,11 @@ As verified on 2026-10-01, [AWS DSQL limits](https://docs.aws.amazon.com/aurora-
 
 For **Stage 1**, scheduled CLI refresh commands or single-process APScheduler are enough locally; avoid introducing queues solely to copy cloud architecture. For **Stage 2**, implement a `JobRunner`/`JobStore` interface with `enqueue`, `claim`, `renew`, `complete`, `fail` and an idempotency key. Options:
 
-- **Local:** single-worker polling; a conventional PostgreSQL claim implementation can use `SKIP LOCKED` if desired *behind the interface*.
+- **Local:** single-worker polling. The current PDF preview worker runs inside the API lifespan and claims jobs with conditional updates plus an owner/generation fence; it does not use `SKIP LOCKED`.
 - **Production:** prefer SQS + a small worker or a proven optimistic database lease with conditional `UPDATE ... WHERE status = 'pending' AND lease_until < now()` followed by a check of rows affected. Bound transaction and retry on OCC; design for at-least-once processing and expired leases. Do not assume `SELECT FOR UPDATE SKIP LOCKED` is supported or has identical behavior on DSQL without dedicated integration tests.
 - Whichever implementation: ensure retries cannot duplicate imported transactions, fund snapshots, notifications, or research charges.
+
+The local queue schema and runner are not evidence of DSQL lease correctness. Before using the optimistic lease with Aurora DSQL, run real concurrent-claim, lease-expiry, stale-completion, cancellation and retry tests on a disposable DSQL cluster. The current application uses a local in-process worker only; no SQS or production worker deployment is configured.
 
 SQS, Lambda, schedules, VPC interface endpoints and log ingestion can incur their own charges. They are *not* included in DSQL's database allowance.
 

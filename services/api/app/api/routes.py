@@ -18,7 +18,6 @@ from app.api.contracts import (
     AccountCreate,
     AccountPatch,
     AccountRead,
-    DocumentImportCreated,
     DocumentImportRead,
     ErrorResponse,
     ImportAction,
@@ -29,6 +28,7 @@ from app.api.contracts import (
     IssuerAssignment,
     IssuerCreate,
     IssuerRead,
+    JobRead,
     OwnedPortfolioRead,
     PositionReplace,
     PositionsEnvelope,
@@ -41,8 +41,7 @@ from app.api.contracts import (
 )
 from app.db.models import ImportAttempt, ImportBatch, Issuer, PositionSnapshot, Security
 from app.db.transactions import run_database_unit
-from app.domains import accounts, documents, imports, portfolio, securities
-from app.ingestion.brokerage_pdf import PdfExtractionError
+from app.domains import accounts, documents, imports, jobs, portfolio, securities
 from app.storage.file_store import PrivateFileStore
 
 router = APIRouter(
@@ -254,7 +253,8 @@ async def _read_bounded_request(request: Request, maximum: int) -> bytes:
     async for block in request.stream():
         if len(content) + len(block) > maximum:
             raise HTTPException(
-                status_code=413, detail="Document upload exceeds the configured size limit."
+                status_code=413,
+                detail="Document upload exceeds the configured size limit.",
             )
         content.extend(block)
     return bytes(content)
@@ -262,7 +262,8 @@ async def _read_bounded_request(request: Request, maximum: int) -> bytes:
 
 @router.post(
     "/imports/documents/positions/preview",
-    response_model=DocumentImportCreated,
+    response_model=JobRead,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def post_brokerage_pdf_preview(
     request: Request,
@@ -274,7 +275,9 @@ async def post_brokerage_pdf_preview(
     ],
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
     replace_existing: Annotated[bool, Header(alias="X-Replace-Existing")] = False,
-) -> DocumentImportCreated:
+) -> JobRead:
+    if not request.app.state.job_worker_enabled:
+        raise HTTPException(status_code=503, detail="Document worker is disabled.")
     content_type = request.headers.get("content-type", "").split(";", 1)[0].casefold()
     if content_type != "application/pdf":
         raise HTTPException(status_code=415, detail="Upload the statement as a PDF.")
@@ -282,8 +285,8 @@ async def post_brokerage_pdf_preview(
         request, request.app.state.max_import_file_bytes
     )
     try:
-        document_id, import_id, file_id, row_count, duplicate = await asyncio.to_thread(
-            documents.create_brokerage_pdf_import,
+        job_result = await asyncio.to_thread(
+            jobs.enqueue_pdf_preview,
             request.app.state.session_factory,
             PrivateFileStore(request.app.state.private_file_root),
             content=content,
@@ -293,43 +296,20 @@ async def post_brokerage_pdf_preview(
             source_label=source_label,
             idempotency_key=idempotency_key,
             expected_account_revision=expected_account_revision,
+            replace_existing=replace_existing,
+            max_file_bytes=request.app.state.max_import_file_bytes,
             max_rows=request.app.state.max_import_rows,
             max_pages=request.app.state.max_pdf_pages,
             parser_timeout_seconds=request.app.state.pdf_parser_timeout_seconds,
-            replace_existing=replace_existing,
+            max_attempts=request.app.state.job_max_attempts,
         )
-    except PdfExtractionError as exc:
-        messages = {
-            "parser_timeout": "PDF extraction exceeded its time limit; use a CSV export.",
-            "holdings_table_not_found": "This PDF layout is unsupported; use a CSV export.",
-            "no_position_rows": "No position rows were found in the PDF.",
-            "pdf_invalid": "The PDF could not be read.",
-            "pdf_unreadable": "The PDF could not be read within the parser limits.",
-            "pdf_unsupported": "Encrypted PDFs and PDFs over the page limit are unsupported.",
-            "pdf_page_limit": "A PDF page exceeds the parser text limit.",
-            "pdf_text_limit": "The extracted PDF text exceeds the parser limit.",
-            "row_limit": "The PDF contains more rows than the configured limit.",
-        }
-        raise HTTPException(
-            status_code=422,
-            detail=messages.get(exc.code, "The PDF could not be extracted."),
-        ) from exc
-    except documents.DocumentNotFound as exc:
+    except jobs.JobNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except (documents.DocumentConflict, imports.ImportAccountConflict) as exc:
+    except jobs.JobConflict as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except (documents.DocumentError, imports.ImportErrorBase) as exc:
+    except jobs.JobError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    with request.app.state.session_factory() as session:
-        record = documents.read_document_import(session, document_id)
-    return DocumentImportCreated(
-        id=document_id,
-        file_id=file_id,
-        position_import_id=import_id,
-        status=str(record["position_import_status"]),
-        row_count=row_count,
-        duplicate=duplicate,
-    )
+    return JobRead.model_validate(job_result)
 
 
 @router.get("/documents/{document_id}", response_model=DocumentImportRead)
@@ -341,7 +321,9 @@ def get_document_import(
             documents.read_document_import(session, document_id)
         )
     except documents.DocumentNotFound as exc:
-        raise HTTPException(status_code=404, detail="Document import not found.") from exc
+        raise HTTPException(
+            status_code=404, detail="Document import not found."
+        ) from exc
 
 
 @router.get("/files/{file_id}/preview")
@@ -359,7 +341,9 @@ def get_private_file_preview(
     except documents.DocumentError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     if content_type != "application/pdf":
-        raise HTTPException(status_code=415, detail="This file cannot be previewed inline.")
+        raise HTTPException(
+            status_code=415, detail="This file cannot be previewed inline."
+        )
     safe_name = quote(filename.replace("\r", "").replace("\n", ""), safe="")
     return Response(
         content=content,

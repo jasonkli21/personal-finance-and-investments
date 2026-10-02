@@ -1,12 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   cancelImport,
+  cancelJob,
   correctImportRow,
   createIssuer,
   createManualQuote,
   createSecurity,
   fetchImport,
+  fetchJob,
   fetchIssuers,
   fetchOwnedPortfolio,
   fetchSecurities,
@@ -105,6 +107,12 @@ export default function StageOneWorkspace({
   const [sourceLabel, setSourceLabel] = useState('Broker CSV')
   const [replaceExisting, setReplaceExisting] = useState(false)
   const [importId, setImportId] = useState('')
+  const [pendingJobId, setPendingJobId] = useState(
+    () => localStorage.getItem('stage2-pdf-job-id') ?? '',
+  )
+  const [uploadIdempotencyKey, setUploadIdempotencyKey] = useState(() =>
+    crypto.randomUUID(),
+  )
   const [rowDrafts, setRowDrafts] = useState<
     Record<
       string,
@@ -156,6 +164,15 @@ export default function StageOneWorkspace({
     queryFn: () => fetchImport(importId),
     enabled: Boolean(importId),
   })
+  const jobQuery = useQuery({
+    queryKey: ['job', pendingJobId],
+    queryFn: () => fetchJob(pendingJobId),
+    enabled: Boolean(pendingJobId),
+    refetchInterval: (query) =>
+      ['pending', 'running'].includes(query.state.data?.status ?? '')
+        ? 1000
+        : false,
+  })
   const securities = catalogQuery.data ?? []
   const issuers = issuersQuery.data ?? []
   const review = importQuery.data as ImportReview | undefined
@@ -163,6 +180,51 @@ export default function StageOneWorkspace({
     () => review?.rows.slice(page * 50, page * 50 + 50) ?? [],
     [page, review],
   )
+
+  useEffect(() => {
+    if (pendingJobId) localStorage.setItem('stage2-pdf-job-id', pendingJobId)
+    else localStorage.removeItem('stage2-pdf-job-id')
+  }, [pendingJobId])
+
+  useEffect(() => {
+    setUploadIdempotencyKey(crypto.randomUUID())
+  }, [accountId, effectiveDate, file, replaceExisting, sourceLabel])
+
+  useEffect(() => {
+    const job = jobQuery.data
+    if (!pendingJobId || !job) return
+    if (job.status === 'completed' && job.result) {
+      const positionImportId = job.result.position_import_id
+      if (typeof positionImportId !== 'string') {
+        setError('The document job completed without a review reference.')
+        setPendingJobId('')
+        return
+      }
+      setImportId(positionImportId)
+      setRowDrafts({})
+      setPage(0)
+      setNotice(
+        job.result.duplicate === true
+          ? 'This source was already reviewed; its prior result is shown.'
+          : 'PDF staged privately. Review every row, evidence reference, and discrepancy before publishing.',
+      )
+      setError('')
+      setPendingJobId('')
+      void queryClient.invalidateQueries({
+        queryKey: ['import-review', positionImportId],
+      })
+    } else if (job.status === 'failed') {
+      setError(
+        `Document processing failed (${job.safe_error_code ?? 'unknown_error'}). Use a CSV export or retry the same source.`,
+      )
+      setUploadIdempotencyKey(crypto.randomUUID())
+      setPendingJobId('')
+    } else if (job.status === 'cancelled') {
+      setNotice('Document processing was cancelled before publication.')
+      setUploadIdempotencyKey(crypto.randomUUID())
+      setPendingJobId('')
+    }
+  }, [jobQuery.data, pendingJobId, queryClient])
 
   const previewMutation = useMutation({
     mutationFn: async () => {
@@ -174,13 +236,10 @@ export default function StageOneWorkspace({
           expectedRevision,
           sourceLabel,
           file,
+          idempotencyKey: uploadIdempotencyKey,
           replaceExisting,
         })
-        return {
-          id: result.position_import_id,
-          duplicate: result.duplicate,
-          sourceFormat: 'PDF' as const,
-        }
+        return { kind: 'job' as const, jobId: result.id }
       }
       if (!mapping.quantity || (!mapping.identifier && !mapping.name)) {
         throw new Error('Map quantity and a ticker or security name.')
@@ -197,9 +256,20 @@ export default function StageOneWorkspace({
         file,
         replaceExisting,
       })
-      return { ...result, sourceFormat: 'CSV' as const }
+      return {
+        kind: 'review' as const,
+        id: result.id,
+        duplicate: result.duplicate,
+        sourceFormat: 'CSV' as const,
+      }
     },
     onSuccess: async (result) => {
+      if (result.kind === 'job') {
+        setPendingJobId(result.jobId)
+        setNotice('PDF stored privately. Background extraction is queued.')
+        setError('')
+        return
+      }
       setImportId(result.id)
       setRowDrafts({})
       setPage(0)
@@ -212,6 +282,23 @@ export default function StageOneWorkspace({
       await queryClient.invalidateQueries({
         queryKey: ['import-review', result.id],
       })
+    },
+    onError: (reason) => setError(messageFor(reason)),
+  })
+
+  const cancelJobMutation = useMutation({
+    mutationFn: () => cancelJob(pendingJobId),
+    onSuccess: async (job) => {
+      await queryClient.invalidateQueries({ queryKey: ['job', pendingJobId] })
+      if (job.status === 'cancelled') {
+        setUploadIdempotencyKey(crypto.randomUUID())
+        setPendingJobId('')
+        setNotice('Document processing cancelled.')
+      } else {
+        setNotice(
+          'Cancellation requested. The worker will stop before publication.',
+        )
+      }
     },
     onError: (reason) => setError(messageFor(reason)),
   })
@@ -629,10 +716,10 @@ export default function StageOneWorkspace({
         ) : (
           <>
             <p className="text-sm text-slate-600">
-              Originals stay in private local storage. CSV columns are mapped
-              by you; text PDFs use a deterministic holdings-table adapter.
-              Check page and row evidence, correct discrepancies, and resolve
-              or explicitly exclude every unparsed row before publication.
+              Originals stay in private local storage. CSV columns are mapped by
+              you; text PDFs use a deterministic holdings-table adapter. Check
+              page and row evidence, correct discrepancies, and resolve or
+              explicitly exclude every unparsed row before publication.
             </p>
             <div className="grid gap-3 md:grid-cols-3">
               <label className="text-sm">
@@ -712,13 +799,42 @@ export default function StageOneWorkspace({
             <button
               className="rounded-lg bg-blue-700 px-4 py-2.5 font-semibold text-white disabled:opacity-50"
               type="button"
-              disabled={!file || previewMutation.isPending}
+              disabled={
+                !file || previewMutation.isPending || Boolean(pendingJobId)
+              }
               onClick={() => previewMutation.mutate()}
             >
               {previewMutation.isPending
                 ? 'Extracting and staging…'
                 : 'Stage for review'}
             </button>
+            {pendingJobId && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950">
+                <p role="status">
+                  PDF job {jobQuery.data?.status ?? 'loading'} •{' '}
+                  {jobQuery.data?.progress_stage ?? 'loading status'}
+                  {jobQuery.data?.progress_total
+                    ? ` • ${jobQuery.data.progress_current}/${jobQuery.data.progress_total}`
+                    : ''}
+                </p>
+                <button
+                  className="rounded border border-blue-300 px-3 py-1.5 disabled:opacity-50"
+                  type="button"
+                  disabled={cancelJobMutation.isPending}
+                  onClick={() => cancelJobMutation.mutate()}
+                >
+                  {cancelJobMutation.isPending
+                    ? 'Requesting…'
+                    : 'Cancel processing'}
+                </button>
+              </div>
+            )}
+            {jobQuery.error && pendingJobId && (
+              <p role="alert" className="text-sm text-rose-800">
+                Job status is temporarily unavailable. This job can be resumed
+                after the API is reachable.
+              </p>
+            )}
             {importId && importQuery.isPending && (
               <p role="status" className="text-sm text-slate-600">
                 Loading review rows…

@@ -417,6 +417,40 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/jobs/{job_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Job */
+    get: operations['get_job_v1_jobs__job_id__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/jobs/{job_id}/cancel': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Post Cancel Job */
+    post: operations['post_cancel_job_v1_jobs__job_id__cancel_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/market-data/quotes': {
     parameters: {
       query?: never
@@ -924,30 +958,6 @@ export interface components {
       /** Version */
       version: number
     }
-    /** DocumentImportCreated */
-    DocumentImportCreated: {
-      /** Duplicate */
-      duplicate: boolean
-      /**
-       * File Id
-       * Format: uuid
-       */
-      file_id: string
-      /**
-       * Id
-       * Format: uuid
-       */
-      id: string
-      /**
-       * Position Import Id
-       * Format: uuid
-       */
-      position_import_id: string
-      /** Row Count */
-      row_count: number
-      /** Status */
-      status: string
-    }
     /** DocumentImportRead */
     DocumentImportRead: {
       /**
@@ -1293,6 +1303,49 @@ export interface components {
        * Format: uuid
        */
       id: string
+    }
+    /** JobRead */
+    JobRead: {
+      /** Attempts */
+      attempts: number
+      /** Cancel Requested */
+      cancel_requested: boolean
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Job Type */
+      job_type: string
+      /** Max Attempts */
+      max_attempts: number
+      /** Progress Current */
+      progress_current: number
+      /** Progress Stage */
+      progress_stage: string
+      /** Progress Total */
+      progress_total: number | null
+      /** Result */
+      result: {
+        [key: string]: unknown
+      } | null
+      /** Safe Error Code */
+      safe_error_code: string | null
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string
     }
     /** NetWorthCurrencyTotal */
     NetWorthCurrencyTotal: {
@@ -3104,12 +3157,12 @@ export interface operations {
     requestBody?: never
     responses: {
       /** @description Successful Response */
-      200: {
+      202: {
         headers: {
           [name: string]: unknown
         }
         content: {
-          'application/json': components['schemas']['DocumentImportCreated']
+          'application/json': components['schemas']['JobRead']
         }
       }
       /** @description Requested resource not found */
@@ -3601,6 +3654,122 @@ export interface operations {
         }
       }
       /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  get_job_v1_jobs__job_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        job_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['JobRead']
+        }
+      }
+      /** @description Job not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Job state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  post_cancel_job_v1_jobs__job_id__cancel_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        job_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['JobRead']
+        }
+      }
+      /** @description Job not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Job state conflict */
       409: {
         headers: {
           [name: string]: unknown

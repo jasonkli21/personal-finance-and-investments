@@ -1759,6 +1759,43 @@ TABLE_CONSTRAINTS["account_balance_observations"] = (
         ("unique(idempotency_key)",),
     ),
 )
+TABLE_COLUMNS["jobs"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("job_type", "character varying", "NO", 64, None, None),
+    ("account_id", "uuid", "YES", None, None, None),
+    ("input_file_id", "uuid", "YES", None, None, None),
+    ("idempotency_key", "character varying", "NO", 128, None, None),
+    ("payload", "jsonb", "NO", None, None, None),
+    ("result", "jsonb", "YES", None, None, None),
+    ("status", "character varying", "NO", 24, None, None),
+    ("attempts", "integer", "NO", None, None, None),
+    ("max_attempts", "integer", "NO", None, None, None),
+    ("run_after", "timestamp with time zone", "NO", None, None, None),
+    ("lease_owner", "character varying", "YES", 64, None, None),
+    ("lease_until", "timestamp with time zone", "YES", None, None, None),
+    ("lease_generation", "integer", "NO", None, None, None),
+    ("cancel_requested", "boolean", "NO", None, None, None),
+    ("progress_stage", "character varying", "NO", 80, None, None),
+    ("progress_current", "integer", "NO", None, None, None),
+    ("progress_total", "integer", "YES", None, None, None),
+    ("safe_error_code", "character varying", "YES", 80, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+    ("updated_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["jobs"] = (
+    ("jobs_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    ("uq_job_idempotency", "UNIQUE", ("unique(idempotency_key)",)),
+    (
+        "jobs_account_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(account_id)referencesaccounts(id)ondelete restrict",),
+    ),
+    (
+        "jobs_input_file_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(input_file_id)referencesprivate_files(id)ondelete restrict",),
+    ),
+)
 
 STAGE2_TRANSACTIONS = DsqlMigration(
     "0008_stage2_transactions",
@@ -2127,6 +2164,57 @@ DSQL_MIGRATIONS = (
                 "SELECT true",
                 expected_index_table="account_balance_observations",
                 expected_index_columns=("account_id", "as_of"),
+            ),
+        ),
+    ),
+    DsqlMigration(
+        "0010_stage2_durable_jobs",
+        (
+            DsqlMigrationStep(
+                "create_jobs",
+                "table",
+                """CREATE TABLE jobs (
+                    id uuid NOT NULL,
+                    job_type varchar(64) NOT NULL,
+                    account_id uuid,
+                    input_file_id uuid,
+                    idempotency_key varchar(128) NOT NULL,
+                    payload jsonb NOT NULL,
+                    result jsonb,
+                    status varchar(24) NOT NULL,
+                    attempts integer NOT NULL,
+                    max_attempts integer NOT NULL,
+                    run_after timestamptz NOT NULL,
+                    lease_owner varchar(64),
+                    lease_until timestamptz,
+                    lease_generation integer NOT NULL,
+                    cancel_requested boolean NOT NULL,
+                    progress_stage varchar(80) NOT NULL,
+                    progress_current integer NOT NULL,
+                    progress_total integer,
+                    safe_error_code varchar(80),
+                    created_at timestamptz NOT NULL,
+                    updated_at timestamptz NOT NULL,
+                    CONSTRAINT jobs_pkey PRIMARY KEY (id),
+                    CONSTRAINT uq_job_idempotency UNIQUE (idempotency_key),
+                    CONSTRAINT jobs_account_id_fkey FOREIGN KEY (account_id)
+                        REFERENCES accounts(id) ON DELETE RESTRICT,
+                    CONSTRAINT jobs_input_file_id_fkey FOREIGN KEY (input_file_id)
+                        REFERENCES private_files(id) ON DELETE RESTRICT
+                )""",
+                "jobs",
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = current_schema() AND table_name = :object_name)",
+            ),
+            DsqlMigrationStep(
+                "index_jobs_claim",
+                "index",
+                "CREATE INDEX ASYNC ix_jobs_claim "
+                "ON jobs (status, run_after, created_at)",
+                "ix_jobs_claim",
+                "SELECT true",
+                expected_index_table="jobs",
+                expected_index_columns=("status", "run_after", "created_at"),
             ),
         ),
     ),

@@ -40,6 +40,10 @@ class Settings:
     max_import_rows: int
     max_pdf_pages: int
     pdf_parser_timeout_seconds: int
+    job_worker_enabled: bool
+    job_poll_interval_seconds: int
+    job_lease_seconds: int
+    job_max_attempts: int
     personal_ai_enabled: bool
 
 
@@ -53,6 +57,9 @@ def load_settings() -> Settings:
             "authentication/service authorization and data-handling review "
             "are not implemented"
         )
+    worker_raw = environ.get("JOB_WORKER_ENABLED", "true").casefold()
+    if worker_raw not in {"true", "false"}:
+        raise ValueError("JOB_WORKER_ENABLED must be 'true' or 'false'")
     backend = environ.get("DATABASE_BACKEND", "postgres")
     if backend not in {"postgres", "aurora_dsql"}:
         raise ValueError("DATABASE_BACKEND must be 'postgres' or 'aurora_dsql'")
@@ -110,6 +117,13 @@ def load_settings() -> Settings:
                 "AURORA_DSQL_MIGRATION_DB_USER must differ from the application role"
             )
 
+    pdf_timeout_seconds = _int_setting(
+        "PDF_PARSER_TIMEOUT_SECONDS", 8, minimum=1, maximum=30
+    )
+    job_lease_seconds = _int_setting("JOB_LEASE_SECONDS", 30, minimum=10, maximum=900)
+    if job_lease_seconds <= pdf_timeout_seconds:
+        raise ValueError("JOB_LEASE_SECONDS must exceed PDF_PARSER_TIMEOUT_SECONDS")
+
     return Settings(
         personal_ai_enabled=False,
         database_backend=backend,
@@ -147,7 +161,11 @@ def load_settings() -> Settings:
             "MAX_IMPORT_ROWS", 5000, minimum=1, maximum=20_000
         ),
         max_pdf_pages=_int_setting("MAX_PDF_PAGES", 40, minimum=1, maximum=100),
-        pdf_parser_timeout_seconds=_int_setting(
-            "PDF_PARSER_TIMEOUT_SECONDS", 8, minimum=1, maximum=30
+        pdf_parser_timeout_seconds=pdf_timeout_seconds,
+        job_worker_enabled=worker_raw == "true",
+        job_poll_interval_seconds=_int_setting(
+            "JOB_POLL_INTERVAL_SECONDS", 1, minimum=1, maximum=30
         ),
+        job_lease_seconds=job_lease_seconds,
+        job_max_attempts=_int_setting("JOB_MAX_ATTEMPTS", 3, minimum=1, maximum=8),
     )

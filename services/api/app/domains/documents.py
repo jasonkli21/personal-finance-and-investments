@@ -218,7 +218,7 @@ def create_brokerage_pdf_import(
 
     try:
         document = run_database_unit(session_factory, record_document)
-    except IntegrityError:
+    except IntegrityError as exc:
         with session_factory() as session:
             raced = session.scalar(
                 select(DocumentImport).where(
@@ -227,7 +227,7 @@ def create_brokerage_pdf_import(
                 )
             )
             if raced is None:
-                raise DocumentConflict("Document import identity conflicted.")
+                raise DocumentConflict("Document import identity conflicted.") from exc
             document = raced
     return (
         document.id,

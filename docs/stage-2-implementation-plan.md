@@ -1,6 +1,6 @@
 # Stage 2 implementation plan
 
-**Status:** In progress; S2.1 local text-PDF preview slice, S2.3 local transaction workflow, and S2.4 summary/balance views are partial; S2.2 gated; S2.5 evaluated and deferred; S2.6 pending
+**Status:** In progress; S2.1 local text-PDF preview slice, S2.3 local transaction workflow, S2.4 summary/balance views, and S2.6 PDF job workflow are partial; S2.2 gated; S2.5 evaluated and deferred
 **Updated:** 2026-10-02
 **Roadmap coverage:** Work packages 2.1–2.6
 
@@ -132,7 +132,7 @@ S2.5 is optional; no exit gate for the local document workflow depends on produc
 
 **Out of scope:** automatic trusted imports, OCR, invented trades/cost basis, and one large transaction per statement.
 
-**Implementation status (2026-10-02):** The first local slice accepts synthetic text-layer brokerage PDFs, retains the original privately, records page/line evidence and reconciliation warnings, and stages normalized rows through the existing reviewed position-import workflow. The browser supports PDF selection and correction using the Stage 1 import review. Scanned PDFs, institution-specific broad coverage, correction audit of document diagnostics, background parsing, and end-to-end verification remain outstanding; this does not complete S2.1 or its exit criteria.
+**Implementation status (2026-10-02):** The local slice accepts synthetic text-layer brokerage PDFs, retains originals privately, records page/line evidence and reconciliation warnings, and stages normalized rows through reviewed position import. The browser polls a durable background job and supports cancelling before publication. Scanned PDFs, institution-specific broad coverage, correction audit of document diagnostics, durable parse-stage output reuse, and end-to-end verification remain outstanding; this does not complete S2.1 or its exit criteria.
 
 ### S2.2 — Integrate shared candidate extraction with deterministic/manual fallback
 
@@ -252,6 +252,8 @@ S2.5 is optional; no exit gate for the local document workflow depends on produc
 
 **Out of scope:** general workflow engines, queue microservices, and cloud infrastructure provisioning.
 
+**Implementation status (2026-10-02):** A durable `jobs` table records bounded file references, idempotency, attempts, run-after time, progress, cancellation, lease owner/expiry, and a monotonically increasing lease generation. The in-process local worker claims by conditional update and fences progress/completion by owner and generation; no `SKIP LOCKED` assumption is used. PDF jobs retry transient worker failures with capped exponential backoff. The optimistic lease contract is not verified on a real DSQL cluster and is not approved for production use.
+
 ### S2.6.2 — Integrate safe worker processing and progress UI
 
 **Dependencies:** S2.6.1, S2.1.2.  
@@ -266,6 +268,8 @@ S2.5 is optional; no exit gate for the local document workflow depends on produc
 **Acceptance criteria:** worker crash/restart, duplicate delivery, model failure, lease loss, cancelled parse, cancelled staging, and OCC publish conflict leave one accepted output or none; progress after browser reload is durable; stale workers cannot publish; logs contain no personal content. Real DSQL lease or SQS delivery tests are required before cloud operation.
 
 **Out of scope:** partial publication, cancellation that deletes accepted history, and unbounded cleanup.
+
+**Implementation status (2026-10-02):** Brokerage PDF preview now runs through the local worker. The original file is persisted before enqueueing; after completion the user reviews the existing position import before publication. Job IDs survive browser reload in local storage, progress is polled from the API, and cancellation preserves the original and cancels any newly staged unpublished import. Transaction CSV preview remains synchronous, parsed PDF output is not persisted as a reusable retry artifact, and cleanup/reprocessing controls beyond retrying a failed source are not complete. Browser, restart, lease-race, and live DSQL acceptance remain unverified.
 
 ### S2.6.3 — Evaluate and release the document-finance slice
 

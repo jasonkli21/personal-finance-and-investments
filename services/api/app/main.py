@@ -1,7 +1,8 @@
 """HTTP entry point for the Stage 1 finance API."""
 
+import asyncio
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -30,9 +31,25 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        worker_task: asyncio.Task[None] | None = None
         try:
+            if settings.job_worker_enabled:
+                from app.jobs.runner import run_worker
+
+                worker_task = asyncio.create_task(
+                    run_worker(
+                        session_factory,
+                        settings.private_file_dir,
+                        poll_interval_seconds=settings.job_poll_interval_seconds,
+                        lease_seconds=settings.job_lease_seconds,
+                    )
+                )
             yield
         finally:
+            if worker_task is not None:
+                worker_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await worker_task
             database_engine.dispose()
 
     app = FastAPI(
@@ -45,12 +62,18 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
     app.state.max_import_rows = settings.max_import_rows
     app.state.max_pdf_pages = settings.max_pdf_pages
     app.state.pdf_parser_timeout_seconds = settings.pdf_parser_timeout_seconds
+    app.state.job_worker_enabled = settings.job_worker_enabled
+    app.state.job_poll_interval_seconds = settings.job_poll_interval_seconds
+    app.state.job_lease_seconds = settings.job_lease_seconds
+    app.state.job_max_attempts = settings.job_max_attempts
     app.state.personal_ai_client = DisabledPersonalAIClient()
     app.include_router(api_router)
     app.include_router(transaction_router)
     from app.api.finance_routes import router as finance_router
+    from app.api.job_routes import router as job_router
 
     app.include_router(finance_router)
+    app.include_router(job_router)
     from app.api.fund_routes import router as fund_router
 
     app.include_router(fund_router)

@@ -162,6 +162,7 @@ export async function previewBrokeragePdf(input: {
   expectedRevision: number
   sourceLabel: string
   file: File
+  idempotencyKey: string
   replaceExisting?: boolean
 }) {
   const response = await fetch('/api/v1/imports/documents/positions/preview', {
@@ -174,12 +175,12 @@ export async function previewBrokeragePdf(input: {
       'X-Source-Label': input.sourceLabel,
       'X-File-Name': input.file.name,
       'X-Replace-Existing': String(input.replaceExisting ?? false),
-      'Idempotency-Key': crypto.randomUUID(),
+      'Idempotency-Key': input.idempotencyKey,
     },
     body: input.file,
   })
   const body = (await response.json()) as
-    components['schemas']['DocumentImportCreated'] | { detail?: string }
+    components['schemas']['JobRead'] | { detail?: string }
   if (!response.ok) {
     throw new ApiError(
       response.status,
@@ -188,7 +189,23 @@ export async function previewBrokeragePdf(input: {
         : 'Statement review could not be started.',
     )
   }
-  return body as components['schemas']['DocumentImportCreated']
+  return body as components['schemas']['JobRead']
+}
+
+export async function fetchJob(jobId: string) {
+  return unwrap(
+    await api.GET('/v1/jobs/{job_id}', {
+      params: { path: { job_id: jobId } },
+    }),
+  )
+}
+
+export async function cancelJob(jobId: string) {
+  return unwrap(
+    await api.POST('/v1/jobs/{job_id}/cancel', {
+      params: { path: { job_id: jobId } },
+    }),
+  )
 }
 
 export async function previewTransactionImport(input: {

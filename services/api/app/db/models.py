@@ -290,6 +290,46 @@ class PrivateFile(TimestampMixin, Base):
     byte_size: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
+class Job(TimestampMixin, Base):
+    """Durable bounded work item with an optimistic lease fence."""
+
+    __tablename__ = "jobs"
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_job_idempotency"),
+        Index("ix_jobs_claim", "status", "run_after", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    job_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    account_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("accounts.id", ondelete="RESTRICT")
+    )
+    input_file_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("private_files.id", ondelete="RESTRICT")
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), nullable=False, default=dict
+    )
+    result: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite")
+    )
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    run_after: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    lease_owner: Mapped[str | None] = mapped_column(String(64))
+    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    lease_generation: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    cancel_requested: Mapped[bool] = mapped_column(nullable=False, default=False)
+    progress_stage: Mapped[str] = mapped_column(String(80), nullable=False)
+    progress_current: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    progress_total: Mapped[int | None] = mapped_column(Integer)
+    safe_error_code: Mapped[str | None] = mapped_column(String(80))
+
+
 class ImportAttempt(TimestampMixin, Base):
     """Reviewed position/fund source attempt with immutable source identity."""
 
