@@ -1,4 +1,4 @@
-"""HTTP entry point for the Stage 0 API."""
+"""HTTP entry point for the Stage 1 finance API."""
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.api.routes import router as api_router
 from app.config import load_settings
 from app.db.engine import DatabaseEngineFactory
+from app.integrations.personal_ai import DisabledPersonalAIClient
 
 
 class HealthResponse(BaseModel):
@@ -41,6 +42,7 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
     app.state.private_file_root = settings.private_file_dir
     app.state.max_import_file_bytes = settings.max_import_file_bytes
     app.state.max_import_rows = settings.max_import_rows
+    app.state.personal_ai_client = DisabledPersonalAIClient()
     app.include_router(api_router)
     from app.api.fund_routes import router as fund_router
 

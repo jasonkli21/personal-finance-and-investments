@@ -23,6 +23,8 @@ The smallest vertical slice is **create account → select seeded equity → ent
 
 CSV imports, ETF parsers/decomposition, PDF/OCR, AI, spending, tax lots, workers, authentication for remote hosting, and AWS application infrastructure are outside this stage. DSQL tests are a readiness exercise, not permission to launch production.
 
+Historical delivery notes below reflect the environment at each recorded run; the later Stage 0 PostgreSQL exit evidence and Stage 1 release supersede earlier “unverified locally” statements. The [shared-AI ADR](adr/0001-shared-personal-ai.md) reconciles future integration direction without changing this delivered foundation.
+
 ## Delivery conventions and cross-cutting requirements
 
 - Review existing work before implementing a package. The docs index records 0.1 and 0.2; do not recreate tooling or treat uncommitted schema work as accepted delivery.

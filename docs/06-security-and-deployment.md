@@ -1,6 +1,6 @@
 # Security, privacy, portability and AWS deployment
 
-**Status:** Proposed guardrails | **Updated:** 2026-09-25  
+**Status:** Local Stage 1 controls implemented; cloud/AI launch gates planned | **Updated:** 2026-10-02
 **Deployment strategy:** PostgreSQL 16 runs locally indefinitely. Cloud deployment is optional in timing, but **Aurora DSQL is mandatory for production**. Its recurring database allowance is not a promise of free total cloud hosting. See [`07-aurora-dsql-compatibility.md`](07-aurora-dsql-compatibility.md).
 
 ## 1. Threat model and scope
@@ -24,13 +24,17 @@ The app may hold account identifiers, positions, investments, statements, credit
 
 ## 3. Cloud inference and external accounts
 
-The default config is `REMOTE_AI_ENABLED=false`, `PAID_PROVIDER_FALLBACK=false`, `ACCOUNT_SYNC_ENABLED=false`. Local OCR, deterministic parsing and optional local Ollama can still operate. Any remote provider must have explicit user consent, an allowlist, a documented privacy/data-retention posture, a call/usage budget and an off switch. Do not send real personal statements to Gemini's unpaid API. See `04-ingestion-and-ai.md` and source terms in `03-data-sources.md`.
+The implemented AI setting is `PERSONAL_AI_ENABLED=false`. Startup rejects true: no live adapter or authorized service contract exists. `REMOTE_AI_ENABLED`, model-provider credentials and Ollama configuration are not finance runtime settings. No optional inference failure can enable a remote/paid fallback. Generic model routing and extraction/research/memory runtimes live in `personal-ai-system`; finance independently enforces what data may leave the app.
+
+Before deployed real-data integration, require authenticated finance user identity, scoped service-to-service credentials with verified issuer/audience/expiry (or a reviewed equivalent), server-verified owner propagation and authorization at the upstream boundary. A fixed `local` owner or publicly reachable AI bootstrap is insufficient. Review upstream model data-use/retention, evidence/memory storage, logs, secrets, consent and minimized payloads. Finance owns private originals and canonical records; do not automatically add holdings/statements to shared memory. Keep the integration disabled until these checks have actual evidence. A trusted-local development mode may be designed later with explicit egress/storage rules; loopback configuration alone is not that review. See [ADR 0001](adr/0001-shared-personal-ai.md).
+
+No real sensitive statements go to Gemini's unpaid API. Public research consent never authorizes private portfolio/account context. Tests must cover disabled, unauthorized, wrong-owner and malformed-result paths when a live adapter is added. Current tests cover the disabled boundary, candidate isolation and blocked enablement only.
 
 If enabling Plaid later: use hosted consent/link flows, store only encrypted server-side access tokens, choose Investments/Transactions scopes intentionally, permit disconnect, and keep imports functioning without Plaid. Do not store online-banking passwords.
 
 ## 4. Local configuration and data portability
 
-Proposed `.env.example` keys (illustrative, actual bootstrap may differ):
+Illustrative future production settings (not all are implemented). Actual Stage 1 settings are in the root `.env.example`:
 
 ```dotenv
 APP_ENV=development
@@ -43,13 +47,14 @@ FILE_STORAGE_BACKEND=local
 PRIVATE_FILE_DIR=./.private/uploads
 PRICE_PROVIDER=manual
 ETF_PROVIDER_MODE=manual
-REMOTE_AI_ENABLED=false
-PAID_PROVIDER_FALLBACK=false
-ACCOUNT_SYNC_ENABLED=false
-OLLAMA_BASE_URL=http://127.0.0.1:11434
+PERSONAL_AI_ENABLED=false
+# Account sync and paid-provider policy remain future gates, not live flags.
+# No finance-owned model-provider URL or credentials.
 ```
 
 Do **not** use the literal sample password outside an isolated local dev database. Production DSQL uses scoped IAM token-on-connect, not a static `DATABASE_URL` password. Validate environment combinations: production must fail startup if using dev secrets, open binding without auth, public bucket for private documents, or unsupported provider billing setting.
+
+Finance can stay on AWS while personal-AI runs on another cloud. Future integration uses authenticated HTTPS with explicit egress/cost/retention controls; it requires no shared VPC, datastore or object bucket. This decision does not change PostgreSQL/DSQL, IAM/TLS, private S3 or AWS production gates.
 
 Build portability around a shared logical schema, **distinct verified DSQL migration transactions** and `FileStore(local|s3)`/provider interfaces. App-managed CSV/JSON + original uploaded file export must restore on either backend; generic `pg_dump` is not assumed to work directly between environments. Support encrypted private export/import and **verify restore**. If exported archives contain real account data, encrypt them and warn about retention.
 
@@ -89,7 +94,7 @@ Before using real financial records remotely:
 - [ ] Test DNS/TLS verification and chosen DSQL connectivity path; PrivateLink is optional and must be budgeted if used.
 - [ ] Validate private S3 policies and recoverability; no public statement access or leaked AI-provider data.
 - [ ] Verify current 100,000 DPU / 1 GB-month DSQL allowance and **separately** estimate total monthly AWS cost after trial credits end; set budget alerts and inspect bills.
-- [ ] Confirm paid-model fallback is disabled; audit cloud providers and retention terms before uploading real statements.
+- [ ] Keep personal-AI disabled unless both services authenticate/authorize the user/service, owner propagation is verified, and consent, minimization, provider data-use/retention and redacted logging are reviewed. No silent paid fallback or sensitive unpaid-tier submissions.
 - [ ] Test AWS Backup if enabled **and** export/restore of app records and raw files to local PostgreSQL.
 - [ ] Test deterministic cleanup/teardown and verify billing/resource inventory, including backup vault, snapshots, IPs, CloudWatch log groups and S3 objects.
 - [ ] Demonstrate a fully synthetic user journey in AWS before migrating private data.
@@ -103,4 +108,4 @@ Before using real financial records remotely:
 
 ## 8. Later scaling choices (not MVP requirements)
 
-Consider ECS/Fargate or separated workers only when traffic or operational complexity warrants it. SQS is optional if the job interface cannot support a correct and cheap DSQL lease implementation; research search is decoupled so optional local pgvector does not dictate production DSQL capabilities. Maintain **production DSQL** as the SQL system of record unless the user explicitly changes this requirement.
+Consider ECS/Fargate or separated workers only when traffic or operational complexity warrants it. SQS is optional if the job interface cannot support a correct and cheap DSQL lease implementation; generic research search/indexing is owned by personal-AI and does not dictate finance DSQL capabilities. Maintain **production DSQL** as the SQL system of record unless the user explicitly changes this requirement.

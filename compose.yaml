@@ -38,6 +38,7 @@ services:
       PRIVATE_FILE_DIR: /app/.private
       MAX_IMPORT_FILE_BYTES: ${MAX_IMPORT_FILE_BYTES:-5000000}
       MAX_IMPORT_ROWS: ${MAX_IMPORT_ROWS:-5000}
+      PERSONAL_AI_ENABLED: ${PERSONAL_AI_ENABLED:-false}
     volumes:
       - private_files:/app/.private
     ports:

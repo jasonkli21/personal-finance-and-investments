@@ -9,6 +9,7 @@ def clear_database_env(monkeypatch: pytest.MonkeyPatch) -> None:
     for key in (
         "DATABASE_BACKEND",
         "DEMO_MODE",
+        "PERSONAL_AI_ENABLED",
         "DATABASE_URL",
         "DATABASE_HOST",
         "DATABASE_PORT",

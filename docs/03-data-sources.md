@@ -1,6 +1,6 @@
 # Data sources and free-tier strategy
 
-**Status:** Research shortlist, not integrated | **Official pages checked:** 2026-09-25  
+**Status:** Stage 1 upload-only issuer parsers implemented; other sources remain a research shortlist | **Official pages checked:** 2026-09-25
 **Rule:** Prices, download shapes, terms of use, eligibility and quotas change. Reverify the official page before implementing or deploying a connector. Links here are evidence of published availability, **not** permission to scrape, redistribute, or automate a download.
 
 ## 1. Source-selection policy
@@ -53,15 +53,19 @@ For each provider, implement a separate adapter exposing: `provider_id`, stable 
 
 The SEC provides documents and standardized reported facts, not a fully normalized investment-research narrative. Record accession number, filing date, publication/retrieval time, CIK and original URL. Corrections/re-filings must not be silently merged into old facts.
 
-**Optional web search:** [Tavily pricing](https://www.tavily.com/pricing) or [Brave Search API pricing](https://brave.com/search/api/). Evaluate whichever currently offers a viable no-cost quota. Do not assume either quota is permanent; do not make uncited model knowledge the source of financial news. Record full source URL, retrieval time and publication date when available.
+**Shared research sourcing:** generic SEC/IR document research, search and evidence acquisition belong in `personal-ai-system`; finance-specific deterministic reported-fact adapters may remain here when a bounded need is demonstrated. Retain source dates/rights in finance results and reverify before use. Do not build a duplicate finance search runtime.
+
+**Optional web search (upstream candidates):** [Tavily pricing](https://www.tavily.com/pricing) or [Brave Search API pricing](https://brave.com/search/api/). Evaluate whichever currently offers a viable no-cost quota. Do not assume either quota is permanent; do not make uncited model knowledge the source of financial news. Record full source URL, retrieval time and publication date when available.
 
 **Other possible sources:** official company IR pages, corporate earnings releases, user-supplied reports and publicly licensed datasets; each gets a separate provenance tag and rights review.
 
-## 6. AI model/inference sources — Stage 2 and Stage 5
+## 6. Shared AI service and upstream inference candidates — Stage 2 and Stage 5
+
+Finance integrates reusable AI capabilities through `PersonalAIClient` to `personal-ai-system`. The service owns model SDKs, selection/routing, generic extraction, research/search and memory; do not implement the provider shortlist below as finance adapters. It is historical evaluation context (checked 2026-09-25), not a chosen or newly verified integration. No live service transport is implemented; Stage 1 runs independently. Before later activation, verify the actual upstream contract, provider costs/data-use, user consent, service authorization, verified owner propagation and logging/retention policy. Public upstream bootstrap with a fixed `local` owner is insufficient. See [ADR 0001](adr/0001-shared-personal-ai.md).
 
 | Provider | Role | Free-first and privacy note |
 | --- | --- | --- |
-| **Ollama (local)** | Primary optional model adapter for structured extraction and research prototypes | Zero API fee, consumes local CPU/RAM/GPU. [Schema-constrained JSON](https://docs.ollama.com/capabilities/structured-outputs). Verify local model license and hardware fit. |
+| **Ollama (local)** | Possible upstream local model for extraction and research | Zero API fee, consumes local CPU/RAM/GPU. [Schema-constrained JSON](https://docs.ollama.com/capabilities/structured-outputs). Verify local model license and hardware fit. |
 | **GroqCloud** | Optional fast remote text inference for *non-sensitive* or consented content | [Official free-plan limits](https://console.groq.com/docs/rate-limits) vary **per model** and may change; enforce model allowlist, budgets and backoff. Review [privacy policies](https://groq.com/privacy-policy/). |
 | **Google Gemini API** | Optional document/image experiments on synthetic or thoroughly redacted data | [Official pricing](https://ai.google.dev/gemini-api/docs/pricing) and [terms](https://ai.google.dev/gemini-api/terms). **Unpaid-tier submissions may be used to improve Google products and reviewed by humans; do not send real personal statements.** Paid-service data terms differ, but paid use is not the default. |
 | **OpenRouter / Cloudflare Workers AI** | Optional future model comparison or cloud inference | Verify current free eligible models, rate/compute limits, retention, and third-party routing before use. No essential feature should depend on them. |
@@ -90,7 +94,7 @@ Data display rules:
 
 - Stage 0–1 must succeed with **$0 external service spend** and no mandatory signup; local hardware/electricity excluded.
 - External free tiers are **optional accelerators**, not hard dependencies; track calls/tokens/items in-app if connected.
-- Introduce a hard configuration flag `ALLOW_PAID_PROVIDERS=false` by default; reject unknown or billable model/provider fallbacks.
+- For future finance provider integrations, paid use stays explicitly disabled by default. Personal-AI must enforce its own model/provider budgets and prohibit silent paid fallbacks; finance checks the agreed policy before sending content. `PERSONAL_AI_ENABLED=false` is the current finance gate and true is rejected; no model-budget settings are implemented here yet.
 - Record date of last cost/terms verification in each adapter's documentation; re-check before any cloud deployment, high-volume refresh or subscription activation.
 ## 9. Aurora DSQL as production structured-data store (not an external market-data provider)
 

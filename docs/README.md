@@ -18,7 +18,8 @@ A private tool to track stocks, ETFs, cash, and eventually broader personal fina
 | [`01-product-spec.md`](01-product-spec.md) | Product goals, scope, journeys, requirements, acceptance criteria, non-goals |
 | [`02-architecture.md`](02-architecture.md) | TypeScript/Python stack, local PostgreSQL + production DSQL, conceptual schema, API and repo layout |
 | [`03-data-sources.md`](03-data-sources.md) | Free-first market, ETF, account, regulatory, and research data; provenance and current limits |
-| [`04-ingestion-and-ai.md`](04-ingestion-and-ai.md) | Deterministic parsing, OCR, optional local/cloud LLMs, evaluation and privacy |
+| [`04-ingestion-and-ai.md`](04-ingestion-and-ai.md) | Finance parsing/validation/review, shared personal-AI extraction/research and privacy |
+| [`adr/0001-shared-personal-ai.md`](adr/0001-shared-personal-ai.md) | Accepted AI ownership decision, handoff reconciliation, current seam and activation gaps |
 | [`05-roadmap.md`](05-roadmap.md) | Stages 0–5 with implementable work packages, dependencies, exit gates, and MVP cut line |
 | [`06-security-and-deployment.md`](06-security-and-deployment.md) | Local security, AWS/DSQL deployment, cost gates, backups and migration |
 | [`07-aurora-dsql-compatibility.md`](07-aurora-dsql-compatibility.md) | **Mandatory production compatibility contract:** DSQL features/limits, IAM, migration, batching, research and testing |
@@ -34,7 +35,7 @@ The plans below expand the roadmap into execution backlogs using the phase-plan 
 | [`stage-2-implementation-plan.md`](stage-2-implementation-plan.md) | 2.1–2.6: private statement review, OCR/local fallback, transactions, finance, optional sync and durable jobs |
 | [`stage-3-implementation-plan.md`](stage-3-implementation-plan.md) | 3.1–3.5: history/returns, supplied tax lots, hypothetical sale/exposure and planning comparisons |
 | [`stage-4-implementation-plan.md`](stage-4-implementation-plan.md) | 4.1–4.6: optional authenticated AWS/DSQL deployment, cost gates, real-cluster tests and portable recovery |
-| [`stage-5-implementation-plan.md`](stage-5-implementation-plan.md) | 5.1–5.6: public filings/facts, portfolio/thesis context, portable retrieval, cited research and optional monitoring |
+| [`stage-5-implementation-plan.md`](stage-5-implementation-plan.md) | 5.1–5.6: public filings/facts, portfolio/thesis context, shared personal-AI retrieval and cited research and optional monitoring |
 
 Task IDs follow roadmap packages (`S0.3` corresponds to 0.3); dotted subtask suffixes split a package into smaller slices. `S3.R` is the Stage 3 completion/evaluation task, not a new product stage. Dependency order takes precedence over numeric order. Stage 4 may follow Stage 1; research requires reliable portfolio data and only consumes later history/jobs when those features are available. Local completion never substitutes for the real-DSQL production gate.
 
@@ -49,7 +50,8 @@ Stage 1 was reviewed against Stage 0 commit `81b220e` on 2026-10-02. Its plan no
 5. **Predictable financial math.** Use decimal arithmetic, reconciliation tests, clear currencies, and deterministic calculation paths.
 6. **Privacy before automation.** No personal statements sent to free cloud models by default; cloud use requires affirmative opt-in.
 7. **Stage capabilities.** Prefer small, testable vertical slices to speculative abstractions or early infrastructure complexity.
-8. **One app, two SQL targets.** Use a DSQL-compatible schema and domain logic from the beginning; gate production releases on real DSQL migration and behavior tests.
+8. **Shared AI, finance authority.** Finance owns its data, deterministic math, validation, workflows and UI; reusable AI capabilities integrate through personal-AI. Generic extraction, research, memory and model infrastructure are not duplicated here. Stage 1 has a disabled boundary only.
+9. **One app, two SQL targets.** Use a DSQL-compatible schema and domain logic from the beginning; gate production releases on real DSQL migration and behavior tests.
 
 ## The critical user journey
 
@@ -63,6 +65,7 @@ Stage 1 was reviewed against Stage 0 commit `81b220e` on 2026-10-02. Its plan no
 
 ## Source-of-truth hierarchy
 
+- Delivered behavior: current code/OpenAPI and `stage-1-release.md`; future plans do not imply implemented capability. The integration handoff guides direction, with reconciled decisions in ADR 0001.
 - Product behavior and scope: `01-product-spec.md`.
 - Technical design: `02-architecture.md`; DSQL-specific decisions: `07-aurora-dsql-compatibility.md`.
 - External-source claims and URLs: `03-data-sources.md`; reverify before implementation.
@@ -71,6 +74,8 @@ Stage 1 was reviewed against Stage 0 commit `81b220e` on 2026-10-02. Its plan no
 - `AGENTS.md` gives Codex implementation instructions. In a conflict, flag it and reconcile docs before guessing.
 
 ## Current implementation and next task
+
+Stage 1.1–1.3 is delivered at `f75e101`, `9053d1f`, and `0874f21`: reviewed CSV positions, generic/iShares CSV and SPDR XLSX fund compositions, dated manual/cached quotes, one-level exposure/issuer views and frozen report export. Later-stage document AI, research, memory, jobs and hosted auth are not implemented. The disabled `PersonalAIClient` seam is documented in ADR 0001; no live upstream service calls occur. Select Stage 2 or optional Stage 4 only when requested; do not restart Stage 0/1 prerequisites. Historical checks below remain historical; see the Stage 1 release for the later full-suite evidence.
 
 Stage 0.1–0.6 code is present, including the local stack, SQLAlchemy/Alembic schema, DSQL boundary, manual account/position workflow, and explicit synthetic demo seeding. On 2026-10-02, `pnpm check` passed (8 Vitest, 48 pytest passed, 5 PostgreSQL/DSQL integration tests skipped, and a successful web build). The actual PostgreSQL 16.15 suite also passed (50 pytest passed, including fresh migration and populated `0002 → head` upgrade, replacement/history/rollback; 3 DSQL tests skipped). Those runs exposed and fixed the Alembic version-ledger width for the long 0003 revision ID. Stage 0's local exit gate is complete. The SQLite-backed browser transcript is in [`stage-0-demo-transcript.md`](stage-0-demo-transcript.md); SQLite is not PostgreSQL evidence. Live DSQL remains unverified and production-blocked.
 

@@ -1,6 +1,6 @@
 # Technical architecture and data model
 
-**Status:** Proposed, implementation-independent | **Updated:** 2026-09-25
+**Status:** Stage 1 local implementation plus future design; live DSQL unverified | **Updated:** 2026-10-02
 
 ## 1. Architecture decision
 
@@ -13,41 +13,46 @@ FastAPI application
   |-- accounts / securities / positions
   |-- market_data / etf_holdings / exposure
   |-- imports / spending / taxes / research (as stages unlock)
-  |-- provider interfaces: quotes, fund holdings, account sync, AI, search
-  |-- jobs service: enqueue, run, status, retries
+  |-- finance providers: quotes, fund formats, account sync (later)
+  |-- PersonalAIClient -> personal-ai-system (optional; transport deferred)
+  |-- jobs service: enqueue, run, status, retries (Stage 2 planned)
   +---- DatabaseEngine: local PostgreSQL 16 OR production Aurora DSQL
-  +---- FileStore interface -> local files or private S3
+  +---- PrivateFileStore -> local files; S3 adapter planned in Stage 4
 Python worker/scheduler -> same domain services and interfaces
 ```
+
+Finance remains a single deployable backend. The separately owned `personal-ai-system` supplies reusable AI capabilities through a service API, without shared databases/object stores or importing its internal Python modules. Finance owns all canonical records, private originals, deterministic math/validation, import review and UI. AI responses are candidates or explanations; finance validates, reviews and persists financial changes. App settings and user thesis notes stay here; attributable cross-task AI memory stays in personal-AI, separate from current holdings and external evidence. See [ADR 0001](adr/0001-shared-personal-ai.md).
+
+**Current seam:** `app/integrations/personal_ai.py` contains a narrow async extraction protocol, finance-owned candidate envelopes, disabled client and explicit synthetic fake. Startup always installs the disabled client and rejects `PERSONAL_AI_ENABLED=true`. No network transport, extraction route, model SDK or Stage 1 consumer exists. Endpoint/version/document transport, safe timeout/error mapping and verified user/service identity must be agreed before a live adapter is added. Research/memory/tools are later capabilities, not methods implemented now.
 
 **No** default Redis, Kubernetes, microservices, separate vector DB, or model-hosting infrastructure. For Stage 0–1, CLI-triggered/scheduled refreshes suffice. Introduce a `JobStore`/`JobRunner` interface in Stage 2: local single-worker polling is fine; cloud can use SQS or a tested DSQL-compatible optimistic lease. Do not assume PostgreSQL row-locking queue recipes transfer unchanged.
 
 ## 2. Technology decisions
 
-| Responsibility | Proposed choice | Notes |
+| Responsibility | Current / intended choice | Notes |
 | --- | --- | --- |
 | Web client | React + TypeScript + Vite | Static SPA; no SSR requirement |
-| UI | Tailwind CSS + shadcn/ui | Accessible, composable dashboard |
+| UI | Tailwind CSS; shadcn/ui remains optional | Current accessible forms/tables use React components |
 | Async API state / grids | TanStack Query / TanStack Table | Server-driven caching, sorting, dense holdings grids |
-| Charts | Apache ECharts | Allocation, trend, treemap/overlap; accessible table alternatives |
+| Charts | Apache ECharts when needed | Stage 1 delivers tables; no chart package installed |
 | Routing / forms | React Router; React Hook Form + Zod (optional) | Avoid duplicate canonical backend validation |
 | API | Python 3.12+ + FastAPI + Pydantic v2 | Pin/test exact versions at scaffold time |
 | Persistence | PostgreSQL 16 locally; Aurora DSQL in production; SQLAlchemy 2, psycopg 3, Alembic | Application UUID PKs, portable models, DSQL-specific engine/IAM and migration logic |
 | Finance math | Python `Decimal`; SQL `NUMERIC` on both targets | Never use floats for authoritative money/weights |
 | Data transforms | stdlib/SQL first; pandas/Polars later if useful | SQL should answer core look-through queries |
-| Downloads/parsing | httpx; csv; PyMuPDF subject to license or pypdf; Docling later | Check site Terms/robots for issuer adapters |
-| AI | Ollama local + Pydantic schema; optional Groq provider | **Not part of Stage 1's critical path** |
+| Finance parsing | csv; bounded XML/ZIP XLSX parser; institution templates later | Two upload-only issuer formats implemented; generic AI extraction lives upstream |
+| AI | `PersonalAIClient` service boundary | Disabled Stage 1 seam; upstream owns models, generic extraction, research and memory |
 | Storage | Local private directory -> S3 via `FileStore` | Raw documents never in public SPA asset bucket |
 | Jobs | CLI/cron -> abstract `JobStore` and worker | Local PostgreSQL polling; DSQL-verified lease or SQS in production; at-least-once/idempotent |
 | Tooling | `uv`, `pnpm`, Docker Compose | Use lockfiles and `.env.example` |
 | Tests | pytest + real PG 16, gated real DSQL integration suite, Vitest, Playwright | DSQL tests required for promotion; local suite remains offline |
-| CI/CD | GitHub Actions when scaffolded | Local lint, typecheck, tests before cloud deploy |
+| CI/CD | GitHub Actions quality workflow | Local lint, typecheck, tests before cloud deploy |
 
 **Client API typing:** generate the TypeScript HTTP client from FastAPI's OpenAPI schema using `openapi-typescript` or Orval. Avoid hand-written duplicate request/response interfaces when the backend contract can generate them.
 
 **Dual-engine execution:** configure the database at boot (`DATABASE_BACKEND=postgres|aurora_dsql`) through `DatabaseEngineFactory`; create a separate DSQL SQLAlchemy engine with the official connector, scoped IAM token-on-connect and TLS hostname verification. DSQL rejects `DATABASE_URL`; the migration identity is configured separately from the app role. Never reuse a stale auth token for new pooled connections. PostgreSQL uses Alembic; DSQL uses the versioned runner with separate DDL/DML transactions, one DDL statement per transaction and asynchronous index readiness. Domain methods should not branch on backend in ordinary business code.
 
-## 3. Proposed repository layout
+## 3. Repository layout and future additions
 
 ```text
 /
@@ -67,25 +72,25 @@ Python worker/scheduler -> same domain services and interfaces
 │       │   ├── config.py
 │       │   ├── api/               # Routes and generated OpenAPI contracts
 │       │   ├── db/                # DatabaseEngineFactory, sessions, local/DSQL migration paths
-│       │   ├── domains/
-│       │   │   ├── accounts/
-│       │   │   ├── securities/
-│       │   │   ├── portfolio/
-│       │   │   ├── funds/
-│       │   │   ├── prices/
-│       │   │   ├── ingestion/      # Stage 2
-│       │   │   ├── spending/       # Stage 2
-│       │   │   ├── tax/            # Stage 3
-│       │   │   └── research/       # Stage 5
-│       │   ├── providers/          # External adapters + local fixtures
-│       │   ├── jobs/              # Backend-neutral job interface
+│       │   ├── domains/            # Current flat Python modules:
+│       │   │   ├── accounts.py
+│       │   │   ├── securities.py
+│       │   │   ├── portfolio.py
+│       │   │   ├── imports.py
+│       │   │   ├── funds.py
+│       │   │   ├── exposure.py
+│       │   │   └── reports.py
+│       │   ├── providers/          # Offline quotes and issuer format parsers
+│       │   ├── integrations/
+│       │   │   └── personal_ai.py  # Disabled protocol/candidate boundary
+│       │   ├── jobs/              # Planned Stage 2; not created
 │       │   └── storage/
 │       └── tests/
 ├── fixtures/                      # Synthetic data only
 └── infra/                         # Added in Stage 4
 ```
 
-This is a desired layout rather than a mandate to precreate empty domains. Create directories as each feature is implemented; keep meaningful boundaries between API handlers, domain calculations, ORM mappings, and provider-specific code.
+The current domain modules are files, not per-domain packages. Spending/ingestion, tax and research are future stage additions; jobs and infra are not implemented. This layout is not a mandate to precreate empty domains. Create directories as each feature is implemented; keep meaningful boundaries between API handlers, domain calculations, ORM mappings, and provider-specific code.
 
 ## 4. Conceptual relational schema
 
@@ -110,7 +115,7 @@ The following is a **logical design**; create exact migrations incrementally. In
 | `financial_transactions` | account_id, provider_transaction_id nullable, posted_at, amount, currency, type, category, transfer_group_id, import_id; Stage 2 |
 | `tax_lots` | account_id, security_id, acquired_at nullable, initial/remain_quantity, initial/adjusted_basis, source, verified/status; Stage 3 |
 | `tax_lot_adjustments` | tax_lot_id, adjustment_type, basis_delta, quantity_delta, source; Stage 3 |
-| `research_documents` | security/issuer, title, URL, published_at, retrieved_at, content hash, text/section metadata; Stage 5 |
+| Future research references/results | security/issuer, upstream evidence/run IDs, source URL/dates/hash, validation status and saved finance workflow; Stage 5. Generic evidence/index/memory storage is upstream, not shared SQL. |
 
 **Important distinctions:**
 
@@ -165,7 +170,7 @@ The Stage 0 implementation exposes account create/list/patch, bounded local secu
 
 ## 7. Background work, caching and offline operation
 
-- During Stage 1: `refresh_quotes`, `refresh_fund_holdings`, `recompute_portfolio` CLI commands callable manually and by local scheduler. Keep externally fetched data outside an open DB transaction.
+- Current Stage 1: manual/cached quote observations, reviewed official-download uploads and on-demand frozen reports. Live issuer refresh returns an explicit unavailable reason. Refresh CLIs and scheduling are future work, not existing commands. Keep future external fetches/AI calls outside all DB transactions and retries.
 - During Stage 2: implement a provider-neutral job abstraction with idempotency keys and safe retries; use local PostgreSQL polling and a validated DSQL optimistic lease or AWS SQS for cloud, never an assumed `SKIP LOCKED` cross-target contract. Store diagnostics without leaking source documents.
 - Cache source observations by provider/security/as-of/response hash; retain historical fund snapshots. Recalculate derived exposure on demand initially; memoize by portfolio snapshot + quote revision + fund snapshot IDs if queries get slow.
 - **Offline contract:** a manually entered portfolio and imported/local ETF CSV can be viewed and recalculated without external networking, API keys or an AI model.
@@ -189,5 +194,5 @@ The Stage 0 implementation exposes account create/list/patch, bounded local secu
 
 - No event-sourcing framework: immutable snapshots + append-only import/audit records are sufficient.
 - No trading engine or generalized portfolio optimizer in the MVP.
-- No microservice for AI and no streaming quotes infrastructure. Optional **local-only** pgvector exploration is allowed behind a `ResearchIndex` interface; DSQL production must use a verified separate retrieval implementation if advanced semantic search is needed.
+- No finance-owned AI microservice, generic agent/plugin framework, model routing, research index or memory runtime. Use the independently deployed personal-AI service when a bounded stage feature needs it; no streaming quotes infrastructure. Keep finance SQL/AWS architecture unchanged.
 - No speculative support for every financial instrument. Surface unsupported types honestly and add them when user value justifies it.

@@ -2,6 +2,8 @@
 
 Stage 1 delivers reviewed position/fund imports, dated owned valuation, reconciled one-level ETF exposure, issuer rollups, frozen reports, drill-down and CSV export. It works locally with PostgreSQL 16 and no provider keys. Start with [`docs/stage-1-release.md`](docs/stage-1-release.md) for the workflow, verification and limits; requirements and future work remain in [`docs/README.md`](docs/README.md). Production Aurora DSQL remains unverified.
 
+Reusable AI capabilities will integrate through `personal-ai-system`; finance retains authoritative data, deterministic validation/calculations, workflows and UI. The current `PersonalAIClient` is a disabled extraction boundary with a synthetic fake, not a live integration. Leave `PERSONAL_AI_ENABLED=false`; true fails startup until an upstream contract and security/data-handling gates are implemented. See [ADR 0001](docs/adr/0001-shared-personal-ai.md). No AI service or model credentials are needed to run Stage 1.
+
 ## Requirements
 
 - Docker with Compose for PostgreSQL 16 and the API
@@ -49,7 +51,7 @@ uv run --directory services/api --locked alembic upgrade head
 uv run --directory services/api --locked python -m app.demo_seed
 ```
 
-The seed contains only fictional synthetic accounts, two equities, two ETFs, USD cash, and dated synthetic prices. The web UI labels demo accounts. Repeating the seed adds no duplicates and does not overwrite existing rows. To destructively remove only the labelled demo fixture, run `DEMO_MODE=true uv run --directory services/api --locked python -m app.demo_seed --reset-demo`. Reset refuses when demo securities or accounts have been reused/edited by non-seed data. It does not remove unrelated accounts, securities, quotes, or snapshots. Expected owned totals are $660.00 taxable, $520.00 Roth IRA, and $1,180.00 combined; see [`fixtures/stage-0/expected-values.json`](fixtures/stage-0/expected-values.json). CSVs are examples only; Stage 0 does not parse them.
+The seed contains only fictional synthetic accounts, two equities, two ETFs, USD cash, and dated synthetic prices. The web UI labels demo accounts. Repeating the seed adds no duplicates and does not overwrite existing rows. To destructively remove only the labelled demo fixture, run `DEMO_MODE=true uv run --directory services/api --locked python -m app.demo_seed --reset-demo`. Reset refuses when demo securities or accounts have been reused/edited by non-seed data. It does not remove unrelated accounts, securities, quotes, or snapshots. Expected owned totals are $660.00 taxable, $520.00 Roth IRA, and $1,180.00 combined; see [`fixtures/stage-0/expected-values.json`](fixtures/stage-0/expected-values.json). Those Stage 0 CSVs were originally illustrative; Stage 1 now supports reviewed position/fund imports. Use the Stage 1 templates for the delivered workflow.
 
 The web page checks readiness immediately, then polls every 5 seconds. Each request has a 2-second timeout; failed checks show `unavailable`, and later successful checks restore `ready`. The current interval and timeout are defaults in `apps/web/src/readiness.ts`.
 
@@ -98,7 +100,8 @@ The GitHub Actions workflow in `.github/workflows/quality.yml` installs locked d
 - `apps/web`: React, TypeScript, Vite, Tailwind, generated OpenAPI schema, and account/position workflow.
 - `services/api`: FastAPI routes/domains, selected-backend readiness probe, and tests.
 - `compose.yaml`: local PostgreSQL 16 and API containers.
-- `docs/05-roadmap.md`: staged implementation plan; Stage 1 remains gated by the Stage 0 local exit criteria.
+- `docs/05-roadmap.md`: Stage 0–1 delivered; Stage 2–5 remain scoped future work.
+- `services/api/app/integrations/personal_ai.py`: optional extraction protocol/candidate boundary, disabled runtime and synthetic fake.
 - `fixtures/stage-0/`: synthetic positions/fund-holdings CSV examples and expected Decimal totals.
 
-Aurora DSQL configuration keys in `.env.example` are placeholders and are not needed for local development. The current plan, verification status, checked package versions and AWS references are recorded in [`docs/07-aurora-dsql-compatibility.md`](docs/07-aurora-dsql-compatibility.md). Finish Stage 0 PostgreSQL 16 CI verification before starting Stage 1 CSV import and exposure work; its implementation plan is in [`docs/stage-1-implementation-plan.md`](docs/stage-1-implementation-plan.md).
+Aurora DSQL configuration keys in `.env.example` are placeholders and are not needed for local development. The current plan, verification status, checked package versions and AWS references are recorded in [`docs/07-aurora-dsql-compatibility.md`](docs/07-aurora-dsql-compatibility.md). Stage 1 local MVP is delivered; select a later-stage task only when requested. Its implementation plan and release evidence distinguish historical requirements from current behavior; the plan is in [`docs/stage-1-implementation-plan.md`](docs/stage-1-implementation-plan.md).

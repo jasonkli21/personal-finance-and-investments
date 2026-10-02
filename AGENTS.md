@@ -1,6 +1,6 @@
 # Codex instructions — Personal Finance & Portfolio Intelligence
 
-This repository is a **planned** local-first personal-finance and investment-analysis application. The documents in `docs/` are the current requirements; do not assume any described capability is implemented. Read this file and `docs/README.md` before making changes.
+This repository implements a local-first personal-finance and investment-analysis application through **Stage 1**. Existing code and release evidence describe delivered behavior; future-stage documents remain plans. The documents in `docs/` are the current requirements; do not assume every described capability is implemented. Read this file and `docs/README.md` before making changes.
 
 ## Read in this order
 
@@ -15,11 +15,12 @@ This repository is a **planned** local-first personal-finance and investment-ana
 
 ## Default implementation posture
 
-- Work **only on the requested stage/task**. Start with Stage 0, then Stage 1 unless directed otherwise. Do not build future stages speculatively.
+- Work **only on the requested stage/task**. Stage 0 and Stage 1 are delivered; consult release evidence before starting new work. Do not build future stages speculatively.
 - Stack: React + TypeScript + Vite; Tailwind + shadcn/ui; TanStack Query/Table; ECharts; Python + FastAPI + Pydantic; SQLAlchemy 2 + Alembic + psycopg 3; **PostgreSQL 16 locally, Amazon Aurora DSQL in production**; Docker Compose; `uv` + `pnpm`.
 - Build a modular **single deployable backend**. Background jobs can share the backend codebase; no microservices, Kubernetes, Redis, or separate vector database in the MVP.
 - Local PostgreSQL or production Aurora DSQL is the source of truth for structured financial data in its respective environment. The local filesystem/private S3 holds original files. Local and production are independent unless the user explicitly imports/exports data.
 - **DSQL compatibility is a design constraint from Stage 0:** app-generated UUIDs, portable relational schema, independent DSQL dialect/connection/migration config, short bounded writes, and real DSQL integration tests before production promotion. A local PostgreSQL test alone is not sufficient.
+- Finance owns canonical data, deterministic validation/calculations, workflows and UI. Reusable model access, generic extraction, research/search, evidence retrieval and AI memory belong in `personal-ai-system` behind `PersonalAIClient`; do not recreate that infrastructure here. See `docs/adr/0001-shared-personal-ai.md`. Deployed real-data calls remain blocked pending verified user/service authorization and data-handling review.
 - Keep all external providers behind interfaces/adapters. Local fixtures, manual imports, and offline operation must remain viable.
 - Prefer `Decimal` and portable SQL `NUMERIC` for quantities, money, and weights. Never use binary floats for authoritative financial arithmetic; provide currency and valuation timestamps.
 - Distinguish **actual owned positions** from **derived ETF look-through exposure**. The latter is not a tradable holding or a tax lot.
@@ -46,12 +47,12 @@ This repository is a **planned** local-first personal-finance and investment-ana
 - A report must show whether numbers are imported, estimated, stale, unavailable, or derived.
 - Test reconciliation: `direct assets + indirect look-through decomposition + residual = original portfolio value` within documented rounding tolerances, **without** adding look-through values to actual net worth.
 - Cloud app routes and raw statements must not be publicly exposed without authentication. DSQL uses IAM+TLS; PrivateLink can add fees. Budgets/alerts are not hard spending caps.
-- Avoid a production dependency on `pgvector`, assumed `tsvector`/extension support, PostgreSQL-specific triggers/procedures, or `FOR UPDATE SKIP LOCKED`. Use a portable research retrieval interface and a worker/job interface (SQS or a tested DSQL optimistic lease in cloud).
+- Avoid a production dependency on `pgvector`, assumed `tsvector`/extension support, PostgreSQL-specific triggers/procedures, or `FOR UPDATE SKIP LOCKED`. Use the shared personal-AI service for generic research retrieval and a finance worker/job interface (SQS or a tested DSQL optimistic lease in cloud).
 - Batch large imports with unpublished staging revisions; make publication atomic and retry OCC failures **without re-running external API/AI calls**. See `docs/07-aurora-dsql-compatibility.md`.
 
 ## Commands and repository layout
 
-The target layout and illustrative commands are in `docs/02-architecture.md`. They are a **proposal**, not evidence that scripts or directories already exist. When bootstrapping, favor standard tooling and document the actual commands after implementation.
+The current layout and future additions are distinguished in `docs/02-architecture.md`; actual commands and delivery evidence are in `README.md` and `docs/stage-1-release.md`. Proposed additions are not evidence that scripts or directories already exist. When bootstrapping, favor standard tooling and document the actual commands after implementation.
 
 ## Decisions needing evidence before changing
 

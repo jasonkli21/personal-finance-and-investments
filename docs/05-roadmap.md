@@ -1,7 +1,9 @@
 # Staged implementation plan
 
 **Status:** Stage 0 local exit gate and Stage 1 local MVP complete; live DSQL unverified | **Updated:** 2026-10-02
-**Sequencing:** Stage 0 → Stage 1 deliver the local MVP **with Aurora DSQL compatibility designed in from the start**. Stage 2 and Stage 3 enrich it. Stage 4 (AWS) may be scheduled after Stage 1, but any production deployment **must** use Aurora DSQL, not RDS. Stage 5 (research) builds on reliable portfolio data with portable retrieval. See [`07-aurora-dsql-compatibility.md`](07-aurora-dsql-compatibility.md).
+**Sequencing:** Stage 0 → Stage 1 deliver the local MVP **with Aurora DSQL compatibility designed in from the start**. Stage 2 and Stage 3 enrich it. Stage 4 (AWS) may be scheduled after Stage 1, but any production deployment **must** use Aurora DSQL, not RDS. Stage 5 (research) builds on reliable portfolio data through the shared personal-AI service. See [`07-aurora-dsql-compatibility.md`](07-aurora-dsql-compatibility.md).
+
+The [shared-AI ADR](adr/0001-shared-personal-ai.md) governs later AI work: finance owns deterministic financial state/workflows; personal-AI owns reusable models, generic extraction, research/search, evidence retrieval and memory. The current disabled extraction seam does not implement Stage 2/5 or authorize service calls.
 
 Each work package should produce a small PR or coherent series of PRs, include unit/integration/e2e tests where applicable, and be independently demonstrable. Prioritize a working vertical slice rather than creating empty abstractions for the entire future roadmap.
 
@@ -95,7 +97,7 @@ The reviewed [Stage 1 plan](stage-1-implementation-plan.md#review-decisions-and-
 | Work package | Implementation tasks | Exit evidence |
 | --- | --- | --- |
 | **2.1 File pipeline** | Private FileStore; upload checks/hash; parse-status records; text PDF and CSV adapters; page/row evidence; review/commit through bounded staged batches and final publish | Re-importing same statement does not duplicate positions or transactions; partial batches are never visible |
-| **2.2 Complex documents** | Docling OCR/table extraction and optional **local** Ollama schema-constrained interpretation; parser selection and manual correction | Synthetic scans/screenshots parsed into reviewable data; no silent commits |
+| **2.2 Complex documents** | Shared generic OCR/structured candidate extraction via `PersonalAIClient`; finance evidence/schema/arithmetic review, deterministic templates and manual fallback | Synthetic scans/screenshots parsed into reviewable data; no silent commits |
 | **2.3 Transactions** | Credit-card and bank transaction schemas, merchant/category rules, splits, refunds, transfers and duplicate handling | Credit-card payment and brokerage deposit are not double-counted as spending |
 | **2.4 Finance dashboards** | Monthly income/spending, category trends, manual off-card expenses, balances and unified net worth | Reconcile category subtotals against canonical transaction total |
 | **2.5 Optional account sync** | Evaluate Plaid sandbox, eligibility and institution coverage; read-only consent and encrypted token handling; no dependency on paid tiers | Manual/PDF workflow continues to function with sync disabled/expired |
@@ -130,10 +132,10 @@ The reviewed [Stage 1 plan](stage-1-implementation-plan.md#review-decisions-and-
 
 ## Stage 5 — Portfolio-aware research and AI
 
-- **5.1 Public data:** SEC EDGAR filings, XBRL fundamentals and official IR documents with dates/links; separate data-fetch adapters.
-- **5.2 Research UI:** source-linked company summaries, period-over-period metrics with unit/period reconciliation, public-news search when an approved free provider is available.
+- **5.1 Public data:** SEC/IR research observations via shared evidence capabilities; finance validates issuer/period/unit and retains dated source references. Add only necessary finance-specific deterministic fact adapters.
+- **5.2 Research UI:** shared cited research via `PersonalAIClient`, finance citation/result checks and deterministic period-over-period metrics; generic search/provider orchestration stays upstream.
 - **5.3 Context:** calculate owned issuer exposure, account/fund sources, earnings/report history, user-written thesis and watchlist.
-- **5.4 Retrieval:** Portable company/title/filing metadata search plus an abstract `ResearchIndex`; optional local PostgreSQL full-text/pgvector experiments must not become DSQL production dependencies. Evaluate a separate production search solution only if needed.
+- **5.4 Retrieval:** agree bounded company/filing/date/evidence eligibility through the shared service; finance checks returned provenance and freshness. No duplicate `ResearchIndex`, vector database or DSQL SQL-extension dependency.
 - **5.5 Monitoring:** optional scheduled *public* developments and saved research snapshots; user chooses notifications, no order execution.
 - **5.6 Evaluate:** synthetic and public-company test set for citation fidelity, stale news, irrelevant retrieval, unsupported claims and model/provider outages.
 
@@ -160,4 +162,4 @@ The reviewed [Stage 1 plan](stage-1-implementation-plan.md#review-decisions-and-
 | Document parsing rules and local review | Always-on remote AI, autonomous trading, wholesale agent frameworks |
 | Verifiable source dates and residual exposure | Perfect breadth of ETFs, real-time quote promises, speculative classification |
 
-**Next Codex prompt:** “Read `AGENTS.md` and all docs, especially `docs/07-aurora-dsql-compatibility.md`. Close the Stage 0 local exit gate: run the PostgreSQL 16 CI service through fresh install and a populated `0002 → head` upgrade, verify manual replacement/history and rollback, and confirm generated OpenAPI/TypeScript freshness. Keep DSQL marked unverified unless a real disposable cluster suite is run. Start Stage 1.1 only after the local gate passes; do not add later-stage imports, exposure, providers or AWS infrastructure speculatively.”
+**Next work:** Stage 1 local MVP is delivered; do not restart its prerequisite tasks. Select a scoped Stage 2 package or optional Stage 4 track only when requested. The personal-AI follow-up is one bounded extraction capability after upstream contract/privacy review; keep real deployed data disabled until user/service authorization and owner propagation are verified. DSQL remains unverified until the actual disposable-cluster suite runs.

@@ -1,4 +1,4 @@
-"""Validated database configuration for local PostgreSQL and Aurora DSQL."""
+"""Validated local/DSQL configuration and disabled personal-AI integration."""
 
 from dataclasses import dataclass
 from os import environ
@@ -38,9 +38,19 @@ class Settings:
     private_file_dir: str
     max_import_file_bytes: int
     max_import_rows: int
+    personal_ai_enabled: bool
 
 
 def load_settings() -> Settings:
+    personal_ai_raw = environ.get("PERSONAL_AI_ENABLED", "false").casefold()
+    if personal_ai_raw not in {"true", "false"}:
+        raise ValueError("PERSONAL_AI_ENABLED must be 'true' or 'false'")
+    if personal_ai_raw == "true":
+        raise ValueError(
+            "PERSONAL_AI_ENABLED cannot be enabled: transport contract, "
+            "authentication/service authorization and data-handling review "
+            "are not implemented"
+        )
     backend = environ.get("DATABASE_BACKEND", "postgres")
     if backend not in {"postgres", "aurora_dsql"}:
         raise ValueError("DATABASE_BACKEND must be 'postgres' or 'aurora_dsql'")
@@ -99,6 +109,7 @@ def load_settings() -> Settings:
             )
 
     return Settings(
+        personal_ai_enabled=False,
         database_backend=backend,
         demo_mode=demo_mode,
         database_url=database_url,

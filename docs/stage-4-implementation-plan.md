@@ -1,7 +1,7 @@
 # Stage 4 implementation plan
 
 **Status:** Proposed optional deployment track; no infrastructure provisioned by this plan  
-**Updated:** 2026-10-01  
+**Updated:** 2026-10-02
 **Roadmap coverage:** Work packages 4.1–4.6
 
 This is the execution plan for private AWS production hosting with **Aurora DSQL as the structured-data source of truth**. Read [security and deployment](06-security-and-deployment.md), [the DSQL contract](07-aurora-dsql-compatibility.md), and [the source/cost policy](03-data-sources.md) first. Stage 4 can be scheduled after [Stage 1](stage-1-implementation-plan.md); it does not require Stage 2, 3, or 5 features to be built first.
@@ -13,6 +13,8 @@ Stage 4 adds production configuration, personal authentication/authorization, IA
 The smallest vertical slice is **authenticated HTTPS session → upload synthetic accepted CSV to private S3 → publish/query in real DSQL → inspect reconciled exposure → export and restore into isolated local PostgreSQL**. Modules are configuration, database/storage adapters, authorization, infrastructure, release checks and operator tooling. Domain calculations remain shared.
 
 Production RDS PostgreSQL, automatic local/cloud synchronization, public finance hosting, multiuser SaaS, multi-region replicas, Kubernetes/Redis, speculative new product stages, and guaranteed free cloud hosting are excluded. Local PostgreSQL remains a complete independent personal deployment.
+
+The [shared-AI ADR](adr/0001-shared-personal-ai.md) preserves this SQL/AWS topology. Personal-AI may run on another cloud; do not share databases/buckets or migrate finance hosting for that reason. Keep deployed real-data integration disabled until both sides enforce authenticated users/services, server-verified owner/scope propagation, least-privilege authorization, consent and reviewed provider storage/data-use/logging. Current finance and personal-AI local-owner seams do not satisfy this gate. Ordinary Stage 4 hosting does not require AI enablement.
 
 ## Delivery conventions and release gates
 
@@ -64,6 +66,7 @@ Skipped real-cluster tests are **unverified**, not successful. The applicable su
 | DSQL settings | Supported region/endpoint/non-admin user, IAM role credentials, TLS verification, bounded pools/transactions/retries |
 | FileStore | Local or S3; private statement bucket distinct from static assets; encryption and safe access policy |
 | Auth | Selected provider/session, allowed personal subject(s), issuer/audience/origins, no production bypass |
+| Optional personal-AI | Default off; agreed bounded HTTPS contract, verified user/service/owner authorization and reviewed data handling before private data |
 | Cost/provider gates | Paid fallback off; per-provider work limits, worker pause and refresh kill switches; alert policies |
 | Operations | Explicit environment/apply target; separate migrate/release/rollback/export/restore/teardown commands |
 

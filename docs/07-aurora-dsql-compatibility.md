@@ -50,11 +50,13 @@ DATABASE_URL=postgresql+psycopg://app:local-only@127.0.0.1:5432/portfolio
 | Data manipulation | Idempotent upserts when verified, explicit transaction boundaries | Reliance on triggers, `TRUNCATE`, or temporary tables |
 | Schema changes | Versioned DSQL migration runner with separate transactions | Applying PostgreSQL Alembic migration unchanged |
 | Indexes | DSQL `CREATE INDEX ASYNC` with readiness verification | Treating an index as immediately available after DDL starts |
-| Research search | Source metadata filter plus portable application-level text matching or another independently designed search provider | Requiring `pgvector`, GIN/`tsvector` or any extension in DSQL |
+| Research search | Shared personal-AI retrieval; finance validates and stores only needed source/result references | Requiring `pgvector`, GIN/`tsvector` or any extension in DSQL |
 
 **Feature-state corrections:** AWS's current SQL/type references support foreign keys and their `CASCADE`, `RESTRICT`, and `SET NULL` actions, `CHECK` constraints, UUID, NUMERIC, and JSONB. The core model's `NUMERIC(24,10)` and `NUMERIC(28,10)` fit current limits. Verify [release notes](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/release-notes.html) before treating an older limitations list as current. [Supported SQL](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/working-with-postgresql-compatibility-supported-sql-features.html), [data types](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/working-with-postgresql-compatibility-supported-data-types.html).
 
-Do not assume **PostgreSQL extensions** work: Aurora DSQL is managed and does not expose PostgreSQL extension catalogs as a supported general extension-install mechanism. `pgvector` remains an optional **local PostgreSQL-only experiment** unless the production retrieval design includes a separate portable provider.
+Generic research indexing/retrieval belongs in `personal-ai-system` per [ADR 0001](adr/0001-shared-personal-ai.md). Finance stores canonical financial state and validated source/result references; integration adds no new datastore or SQL-extension dependency. The following restrictions remain for any finance-owned SQL work.
+
+Do not assume **PostgreSQL extensions** work: Aurora DSQL is managed and does not expose PostgreSQL extension catalogs as a supported general extension-install mechanism. Do not create a finance-owned pgvector/research runtime to duplicate the shared AI service.
 
 ## 4. Transaction design and ingestion
 
@@ -93,7 +95,7 @@ SQS, Lambda, schedules, VPC interface endpoints and log ingestion can incur thei
 - Store only active structured data, a small amount of raw provider metadata, and carefully selected historical snapshots in DSQL; originals go to **private S3** (local filesystem offline). Archive old source snapshots as compressed, dated files when appropriate without destroying auditability or historical computations.
 - Monitor *logical database storage*, not just file upload sizes. 1 GB is the DSQL monthly free storage quantity in AWS's current pricing text. Monitor DPU burn from refreshing ETF holdings, full-table aggregate exposure queries, parsing imports and any scheduled research jobs.
 - The DSQL allowance is applied monthly at the account/organization level according to the current [pricing FAQ](https://aws.amazon.com/rds/aurora/dsql/pricing/); **charges apply to excess storage and usage**. Use a single-region cluster. Multi-region replicas multiply storage and replicated-write usage.
-- Vectors and full-text search are **not core Stage 1 requirements**. Stage 5 starts with SEC metadata, title/company/filing filters and simple portable matching. If needed, use a distinct `ResearchIndex` interface: local PostgreSQL pgvector and a separately evaluated production search solution, or just local embeddings with small corpora. Do not build production research dependent on unsupported DSQL extension semantics.
+- Vectors and full-text search are **not finance Stage 1 requirements**. Stage 5 delegates generic passage retrieval/indexing/ranking to personal-AI, while finance validates returned source/issuer/date metadata and retains necessary result references. Do not build duplicate retrieval infrastructure or production research dependent on unsupported DSQL extension semantics.
 - Budget the *entire* AWS topology separately: application compute, S3, CloudFront, TLS/domain, optional SQS/Lambda, CloudWatch, optional PrivateLink, data transfer and AWS Backup. **Free DSQL does not mean free deployment.** Billing alarms notify; they do not forcibly stop overruns.
 
 ## 7. Production security and recovery

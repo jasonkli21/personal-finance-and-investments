@@ -1,6 +1,8 @@
 # Product specification
 
-**Status:** Proposed, not implemented | **Updated:** 2026-09-25 | **MVP:** Stage 1
+**Status:** Stage 1 local MVP delivered; later tiers planned | **Updated:** 2026-10-02 | **MVP:** Stage 1
+
+The finance app owns financial state, deterministic calculations/validation, workflows and UI. Reusable AI extraction, research/search and attributable preference memory integrate through `personal-ai-system`; they do not replace finance records. See [the ownership ADR](adr/0001-shared-personal-ai.md). Stage 1 has no AI feature or live AI transport. [Release evidence](stage-1-release.md) records actual capabilities and limits; this specification also includes future requirements.
 
 ## 1. Problem and product promise
 
@@ -23,7 +25,7 @@ The initial user is a single, technically comfortable investor using the app pri
 | Valuation | Dated quotes; manual price fallback; displayed staleness | Scheduled refreshes | Performance, contributions, dividends | Event-aware commentary |
 | Spending | Not in MVP | Statement import, categories, edits, transfer matching, cash flow | Runway and large-purchase scenarios | Optional research-generated explanations |
 | Tax lots | Not in MVP | Import schema can preserve provided lot fields | Lot view, sale planning, holding period, estimated gains, warnings | Optional event context |
-| AI | Not required | Local document interpretation as fallback; explicit optional free cloud | None required | Cited research, monitoring, searchable notes |
+| AI | Not required | Optional candidate extraction via personal-AI; deterministic/manual fallback | None required | Cited research, monitoring, searchable notes |
 | Deployment | Local PostgreSQL 16 | Local PostgreSQL 16 | Local PostgreSQL 16 | Local PostgreSQL or production Aurora DSQL |
 
 Stage 4 is an **optional deployment track** in timing, but the production database choice is **Aurora DSQL**, not RDS PostgreSQL. Database-compatible modeling and smoke tests begin in Stage 0; the complete product remains available locally with PostgreSQL. See [`07-aurora-dsql-compatibility.md`](07-aurora-dsql-compatibility.md).
@@ -90,7 +92,7 @@ Incomplete USD valuation reports the included valued subtotal and exclusions; to
 ### Ingestion
 
 - Local import of issuer statements and brokerage PDFs, screenshots, account-export webpages where permitted, CSV and image files.
-- Rule/template extraction first; Docling/OCR for complex layout; optional local LLM for ambiguous fields; review before finalization.
+- Finance-owned deterministic rule/template extraction first; generic OCR/structured interpretation through `PersonalAIClient` when an upstream contract is available. Validate and review candidates in finance before finalization; keep manual correction available without the AI service.
 - Show extracted field, original evidence (page/table/line or image region when feasible), confidence/review status, and reconciliation differences.
 - Preserve raw documents and original parsed payload; detect duplicates. No browser extension or credential-based account scraping in initial release.
 - Optional Plaid read-only connection behind an adapter after eligibility, coverage, consent, privacy and pricing checks.
@@ -121,7 +123,7 @@ Incomplete USD valuation reports the included valued subtotal and exclusions; to
 - Company profile with SEC filings, financial metrics, sourced summaries and links to original documents.
 - Portfolio-aware research: holdings and exposure contextualize company news; maintain an investment-thesis journal.
 - User-invoked research with cited excerpts and visible retrieval dates; optional monitored reports/alerts later.
-- Search and retrieval through a `ResearchIndex` adapter: begin with portable metadata and text search; local PostgreSQL pgvector may be an experiment, but Aurora DSQL production must not depend on PostgreSQL extensions or assume full-text feature parity.
+- Generic search, evidence retrieval and synthesis through `PersonalAIClient` to `personal-ai-system`. Finance retains source references, dated results, citation checks, thesis/workflow records and deterministic metric validation; it does not build its own model routing, memory or research index. DSQL remains the finance store without vector/full-text extension dependencies.
 - AI outputs are explicitly research aids, not authoritative data sources, estimates of tax liability, or execution instructions.
 
 ## 7. Explicit non-goals and deferred functionality

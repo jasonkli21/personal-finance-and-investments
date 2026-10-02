@@ -1,16 +1,16 @@
 # Stage 5 implementation plan
 
 **Status:** Proposed execution backlog, not implemented  
-**Updated:** 2026-10-01  
+**Updated:** 2026-10-02
 **Roadmap coverage:** Work packages 5.1–5.6
 
 This is the execution plan for source-grounded, portfolio-aware research. Read [the product specification](01-product-spec.md), [source policy](03-data-sources.md), [research/AI boundaries](04-ingestion-and-ai.md), [security](06-security-and-deployment.md), and [DSQL contract](07-aurora-dsql-compatibility.md) first. Research consumes the reliable [Stage 1 exposure contract](stage-1-implementation-plan.md); optional history/lots come from Stage 3 only if implemented. Hosted execution additionally requires [Stage 4](stage-4-implementation-plan.md).
 
 ## Scope boundary
 
-Stage 5 adds public SEC EDGAR filings/XBRL facts and official IR documents, dated source-linked company views, user thesis/watchlist records, portable retrieval, optional structured cited summaries, and explicitly configured public-development monitoring.
+Stage 5 adds finance-facing SEC/IR source/fact views, user thesis/watchlist records, optional cited research via `PersonalAIClient` and explicitly configured public-development monitoring. Generic document research ingestion, search, retrieval/indexing/ranking, evidence lifecycle, model synthesis and AI memory belong in `personal-ai-system` per [ADR 0001](adr/0001-shared-personal-ai.md). Finance validates issuer/period/unit/citations, retains needed dated result/source snapshots and owns product workflows.
 
-The smallest vertical slice is **select a held company → retrieve permitted dated public filings → select traceable passages → display a dated cited summary alongside frozen actual/derived exposure → save a user-written thesis note**. Modules are `research`, public-data/model/search adapters, the `ResearchIndex` interface, portfolio read services, optional jobs, and web research views.
+The smallest vertical slice is **select a held company → retrieve permitted dated public filings → select traceable passages → display a dated cited summary alongside frozen actual/derived exposure → save a user-written thesis note**. Modules are finance `research` validation/result/context services, `PersonalAIClient`, portfolio reads, optional finance jobs and web views. Do not add generic model/search/index adapters here.
 
 Research never mutates canonical holdings, quotes, prices, lots, or transactions. Autonomous trade recommendations/execution, uncited model news, paid-source dependency, paywall/authentication bypass, general web crawling, automatic thesis rewriting, vector infrastructure as a prerequisite, and speculative multi-agent orchestration are excluded.
 
@@ -19,12 +19,12 @@ Research never mutates canonical holdings, quotes, prices, lots, or transactions
 - Public observations, reported financial facts, selected evidence, model inferences, user thesis notes, and portfolio context are distinct data classes with explicit provenance.
 - Use fixed bounded workflows first. Fetch/parse/model work occurs outside write transactions and database-only OCC retries reuse saved outputs.
 - Research is opt-in and model/search-disabled behavior is useful: source documents, deterministic facts and cached exposure remain available.
-- Remote public-data fetching does not authorize transmission of portfolio values, account/fund details, notes or watchlists to a cloud model/search service. Local model is the default optional inference path; remote requests require explicit provider/data review and minimized context consent.
+- Remote public-data fetching does not authorize transmission of portfolio values, account/fund details, notes or watchlists to a cloud model/search service. The shared service controls allowed local/cloud inference. Any transmitted context requires scoped consent/data-handling review; deployed private context additionally requires verified user/service/owner authorization. The fixed `local` owner is insufficient.
 - Reverify SEC/IR/search access rules, attribution, quotas, formats and provider terms when implementing. Source register check dates remain distinct from test execution dates.
 - All factual citations link to actual selected document/passages; IDs alone or model-generated URLs do not prove support. Distinguish factual support from inference and uncertainty.
 - Preserve filing accession, reported period, units, publication/filing/effective/retrieval dates, raw hashes and amendments. Never collapse restatements into an earlier observation invisibly.
 - Exact financial calculations and portfolio exposure remain Decimal and deterministic. Models describe them but cannot create authoritative amounts or replace source facts.
-- Start metadata/company/title/filing filters and bounded portable text matching behind `ResearchIndex`. No production dependency on pgvector, PostgreSQL extensions or assumed full-text parity.
+- Request bounded issuer/filing/date/source eligibility through the shared research contract and validate returned references/freshness. Do not create a finance `ResearchIndex`, vector store or generic retrieval runtime; finance SQL has no pgvector/full-text dependency.
 - Research results freeze input evidence/context versions. Cached results become visibly stale under source-specific freshness rules; fetching now does not make an old filing current.
 
 ## Required verification matrix
@@ -33,7 +33,7 @@ Research never mutates canonical holdings, quotes, prices, lots, or transactions
 | --- | --- | --- |
 | Public source | Company/CIK mismatch, amendment, quota, no CORS browser path, malformed/oversize response | Offline adapter contracts; opt-in official-source smoke |
 | Metrics | Units/currency, instant versus duration, fiscal period, overlapping/restated facts, missing denominator | Deterministic reconciliation fixtures |
-| Retrieval | Wrong issuer, duplicates/conflicts, stale/missing dates, empty corpus, token/byte budget | Fake and portable-index tests |
+| Retrieval | Wrong issuer, duplicates/conflicts, stale/missing dates, empty corpus, token/byte budget | Fake personal-AI contracts and finance provenance checks |
 | Citations | Invented source ID/URL, unsupported claim, false quotation, truncated passage | Validator tests and labelled evaluation report |
 | Context/privacy | Direct/ETF exposure, account filters, stale baseline, sensitive notes, remote disabled | No canonical writes; blocked unauthorized egress |
 | Model/search | Disabled/outage/invalid JSON/quota, unsafe URL/redirect, prompt injection | Fake-provider and safety bounds |
@@ -49,7 +49,7 @@ Research never mutates canonical holdings, quotes, prices, lots, or transactions
 | --- | --- |
 | Research document | UUID, issuer/security/CIK, accession/type where applicable, title/URL, filing/publication/period dates nullable, retrieval time, content hash/private file key, parser/source version, status |
 | Reported fact | Document/accession/source reference, taxonomy/concept, raw value/unit, Decimal normalized value when valid, currency, period start/end or instant, amendment/context, quality |
-| Passage / evidence | Document/section/page reference, exact extracted text, content hash, offsets where supported, source/date/freshness state, extraction version |
+| Returned evidence reference/snapshot | Upstream evidence/run ID, source URL/date/hash and approved excerpt/offset when needed for finance citation validation; generic evidence store/index remains upstream |
 | Research run | Issuer/user request scope, idempotency key, mode/state, frozen portfolio revision/context reference, query/source/evidence selections, budgets, policy/model versions, timestamps, safe failure |
 | Research result | Run, generated time, structured facts/inferences/unknowns/conflicts, citations to selected passages, validation state, source freshness, portfolio context label |
 | Thesis / watchlist | User-authored text/security/issuer, revisions/timestamps, source attachments if chosen; model text never silently replaces it |
@@ -59,10 +59,9 @@ Research never mutates canonical holdings, quotes, prices, lots, or transactions
 
 | Boundary | Behavior |
 | --- | --- |
-| `PublicDocumentProvider` / fact adapter | Bounded permitted SEC/IR observations with full source metadata |
-| `ResearchIndex` | Ingest/reference, metadata/text query, bounded ranked passage selection and eligibility; portable implementation first |
-| `StructuredModelProvider` | Local/fake/disabled and separately approved remote inference; schema/citation validation |
-| Optional `SearchProvider` | Permitted bounded public search with attributable URLs/date metadata; no portfolio/account details in query |
+| `PersonalAIClient` research capability (later) | Versioned bounded request/result/source evidence; fake/disabled behavior; shared search/retrieval/synthesis stays upstream |
+| Finance result/fact validator | Source/issuer/date/citation checks; deterministic metric normalization and comparison; no generic evidence index |
+| Optional finance-specific fact adapter | Only if necessary for deterministic reported facts; current rights/format checks, no duplicate research crawler |
 | `GET /api/v1/research/companies/{id}` | Documents/facts/thesis/exposure context with independent source dates |
 | `POST /api/v1/research/runs`, `GET /.../runs/{id}` | Explicit idempotent request, state/result/evidence or safe failure |
 | `/api/v1/research/notes` and `/watchlists` | User-controlled create/edit/archive with revisions |
@@ -70,7 +69,7 @@ Research never mutates canonical holdings, quotes, prices, lots, or transactions
 
 Finalize schema/methods/pagination in OpenAPI and refresh the generated TypeScript client. Include stable errors for disabled providers, insufficient evidence, stale context, unavailable source, exceeded budget and invalid citations.
 
-**Configuration:** research/model/search enabled flags default safely off; provider/model allowlists; public fetch URL/rate/timeout/redirect/byte/concurrency limits; source-specific freshness; corpus/query/passage/context/output budgets; prompt/schema version; monitoring disabled until chosen; no automatic paid fallback. Local fixtures work without any model/search credentials.
+**Configuration:** finance personal-AI/research and monitoring gates default off; bounded approved service URL/timeout/redirect/request/response limits, verified identity and scoped consent, source freshness, context/output budgets and schema version. Upstream owns model/search allowlists, generic prompt/index/corpus/runtime limits and provider credentials; finance checks its agreed no-paid-fallback policy. Local fixtures require no live service or model credentials. Current Stage 1 enablement remains rejected.
 
 ## Dependency map
 
@@ -92,7 +91,7 @@ Neither optional tax/performance history nor cloud hosting is required for local
 ### S5.1.1 — Establish research fixtures, contracts and baseline
 
 **Dependencies:** Stage 1 completion and accepted research/privacy boundaries.  
-**Modules:** research schemas, fixtures, fake providers/index/model.
+**Modules:** research schemas, fixtures, fake personal-AI client and finance result validators.
 
 **Goal:** define what a sourced report must prove before adding external calls.
 
@@ -101,35 +100,29 @@ Neither optional tax/performance history nor cloud hosting is required for local
 1. Build synthetic and permission-cleared/public-company examples for filings, metric periods/units, amendments, conflicting/stale facts, unsupported claims, wrong issuer, and missing evidence.
 2. Record a no-model baseline: selected dated source links, deterministic facts, and exact frozen portfolio exposure with no generated narrative.
 3. Define document/fact/passage/run/result/thesis contracts, citation IDs/links, inference labels, freshness rules and idempotency identities.
-4. Specify provider/index/model interfaces, context minimization, disabled modes, request budgets, safe failure states and repository read/write boundaries.
+4. Agree a bounded versioned personal-AI research capability and finance DTOs; specify context minimization, identity/consent, disabled modes, budgets, safe errors and finance read/write boundaries. Do not assume the handoff examples match the current upstream API.
 5. Prepare versioned schema/migrations and fixture schemas only for research records now needed; do not add speculative agent state.
 
 **Requirements:** every generated factual claim has selected supporting evidence; user notes are context, not independently verified facts. Research cannot call canonical portfolio/tax write repositories.
 
-**Acceptance criteria:** fixtures distinguish public fact, calculation, inference, user thesis and portfolio context; all contracts validate offline; baseline includes missing/stale evidence states; a remote disabled test sends no context; plans name concrete schema/API/index/config artifacts before adapter work.
+**Acceptance criteria:** fixtures distinguish public fact, calculation, inference, user thesis and portfolio context; all contracts validate offline; baseline includes missing/stale evidence states; a remote disabled test sends no context; plans name concrete finance schema/API/service/config artifacts before adapter work.
 
 **Out of scope:** multi-agent loops, trade ranking, trained recommendation policies, and assuming model knowledge is fresh evidence.
 
-### S5.1.2 — Implement SEC/IR public-document ingestion
+### S5.1.2 — Integrate dated shared SEC/IR observations
 
-**Dependencies:** S5.1.1; current official access/format/terms verification.  
-**Modules:** public source adapters, research repositories/private content store.
+**Dependencies:** S5.1.1; upstream capability availability and current source/rights/contract review.
+**Modules:** personal-AI adapter, finance source references/result validation, private result storage.
 
-**Goal:** retrieve dated, traceable public observations for the correct issuer.
+**Goal:** obtain traceable public observations for the correct issuer without a second research pipeline.
 
-**Work:**
+**Work:** agree upstream company/CIK/filing/evidence contracts; request bounded dated SEC/IR observations through the service; validate issuer/accession/URL/date/hash/amendment metadata in finance; retain needed immutable reference/result snapshots in bounded SQL/private artifacts. Share databases or object storage with neither project. Generic fetch/cache/extraction/evidence ingestion belongs upstream. Add a finance-specific deterministic XBRL fact adapter only if shared results cannot satisfy a demonstrated finance calculation need; verify official source policy and document that exception.
 
-1. Implement conservative issuer/CIK mapping with reviewed identifiers; wrong/ambiguous matches remain unresolved.
-2. Add backend SEC submissions/company-facts/filing retrieval with identified user-agent, cached responses, permitted access cadence, rate/time/byte bounds and safe failure classification.
-3. Add a small allowlist of official company IR documents via permitted routes; validate URL schemes/host redirects and block local/private targets before any fetch.
-4. Persist accession/filing/publication/period/retrieval dates, document hashes/URLs and exact extracted text/evidence; amendments remain distinct linked records.
-5. Save originals in FileStore and bounded metadata in SQL; stage large evidence/fact batches idempotently, then publish completed document revisions.
+**Requirements:** fetched evidence is not canonical portfolio data. Missing dates stay null, amendments remain distinct and DB retry reuses external outputs. No source/provider cost or live capability claims from synthetic fixtures. Preserve finance source lineage even though generic evidence infrastructure is upstream.
 
-**Requirements:** SEC fetches occur server-side under the documented CORS/access policy. Missing dates remain null, not guessed. A request returning HTML/error/another company's facts cannot publish valid evidence; DB retries reuse the fetched document.
+**Acceptance criteria:** fake service contracts cover duplicate/amended/wrong-company/malformed/oversize/timeout/quota results and disabled fallback; bad references cannot publish a valid finance result. Actual upstream/source smoke is separately opt-in and labelled unverified until run.
 
-**Acceptance criteria:** synthetic adapters cover valid filings, duplicate retrieval, amendment, wrong CIK, malformed payload, `Retry-After`, quota, timeout, unsafe redirects and oversized content; official opt-in smoke records attribution and current policy checks; published evidence retains source hashes/links without requiring live sites in CI.
-
-**Out of scope:** broad crawling, authenticated/paywalled material, arbitrary user URL fetching without controls, and discarding restatement history.
+**Out of scope:** generic research crawler/index/evidence runtime in finance, broad crawling, auth/paywall bypass and shared persistence.
 
 ### S5.2.1 — Normalize reported metrics and build sourced company views
 
@@ -144,7 +137,7 @@ Neither optional tax/performance history nor cloud hosting is required for local
 2. Preserve all source observations; select/compare facts by issuer, taxonomy/concept, unit, instant/duration, fiscal period and amendment policy, exposing conflicts.
 3. Implement Decimal period-over-period calculations only for comparable inputs; label missing/zero denominator, mismatched periods/units and restated values.
 4. Build source-linked filing/metric tables with filing/period/retrieval dates and drill-through to exact source context.
-5. If public-news search is added, verify one permitted provider's access/attribution/budget, isolate its adapter and keep unknown publication dates visible.
+5. If public-news search is used, consume the shared service's attributable observations under reviewed access/budget policy; keep unknown publication dates visible without a finance search-provider adapter.
 
 **Requirements:** retrieval date is not publication date; XBRL concept names alone do not establish comparability. Subjective model interpretation stays outside reported metric records. Search is optional, never a fallback to uncited news.
 
@@ -167,41 +160,35 @@ Neither optional tax/performance history nor cloud hosting is required for local
 
 **Out of scope:** automatic thesis promotion/rewriting, inferred purchase history, and exposing account identifiers in telemetry.
 
-### S5.4 — Implement portable, bounded passage retrieval
+### S5.4 — Agree shared retrieval eligibility and validate evidence
 
-**Dependencies:** S5.1.1, S5.1.2.  
-**Modules:** `ResearchIndex`, evidence selection, repository filters.
+**Dependencies:** S5.1.1, S5.1.2; actual upstream research capability.
+**Modules:** finance service request builders and evidence/result validators.
 
-**Goal:** select attributable evidence without a production SQL-extension dependency.
+**Goal:** obtain attributable, bounded evidence without duplicating indexing/retrieval.
 
-**Work:**
+**Work:** specify company/issuer/filing/date/source scope and count/byte/context limits in the agreed service contract; personal-AI performs chunking, matching/ranking, indexing and evidence lifecycle. Finance checks returned source identity, dates/freshness, traceable excerpts/offsets and scope; preserve conflicts and freeze returned evidence/run references with result snapshots. Source content remains untrusted and cannot grant tool authority. Empty/unavailable/expired evidence is an explicit outcome.
 
-1. Implement issuer/filing/type/date/title/section metadata filters and portable bounded text matching with deterministic relevance/tie-breaking.
-2. Chunk extracted documents with retained section/source offsets; deduplicate exact content while preserving all document/source links and amendments.
-3. Apply source-specific freshness, scope and attribution eligibility; retain material conflicts rather than selecting a single convenient story.
-4. Select passages within configured count/byte/token budgets, recording selected/excluded IDs and reasons for reproducibility.
-5. Measure a small corpus baseline before proposing semantic retrieval. Any local pgvector/full-text experiment stays behind the same interface and has a separately verified production alternative before adoption.
+**Requirements:** no finance-owned `ResearchIndex`, embeddings, vector database or SQL-extension dependency. Finance's retained source references and citation checks complement upstream provenance; they are not a second generic evidence engine.
 
-**Requirements:** bounded application matching cannot silently scan an unlimited corpus; no pgvector/GIN/tsvector production assumption. Source content is untrusted data and cannot issue tool/model instructions. Empty/expired corpus is a distinct insufficient-evidence outcome.
+**Acceptance criteria:** fake/HTTP contract fixtures reject wrong issuer, stale/out-of-scope/unattributed/nontraceable excerpts and oversized results; conflicts and insufficient evidence remain visible. Finance PG/DSQL result persistence is tested independently of upstream index storage. Cached/manual company views work when the service is disabled.
 
-**Acceptance criteria:** correct-issuer passages rank predictably; duplicates retain provenance; unrelated issuer, stale/unattributed evidence and oversized context are excluded with reasons; conflicts survive selection; PG/DSQL portable implementation returns equivalent frozen selections; optional advanced index can be disabled without breaking research.
-
-**Out of scope:** standalone vector database, learned ranking, general knowledge graph and autonomous iterative search.
+**Out of scope:** rebuilding shared chunking/ranking/retrieval, local pgvector experiments in this repo, general knowledge graphs and autonomous search loops.
 
 ### S5.2.2 — Synthesize and render validated cited research
 
 **Dependencies:** S5.2.1, S5.3, S5.4; approved optional inference policy.  
-**Modules:** research orchestration/model adapter/citation validator, run API/UI.
+**Modules:** finance research workflow, personal-AI adapter and citation validator, run API/UI.
 
 **Goal:** provide a dated research aid with inspectable factual support.
 
 **Work:**
 
-1. Create an idempotent run, freeze selected evidence/context and budgets, then call a fake/local structured model or return the deterministic no-model report.
-2. Use versioned prompts/schemas that distinguish reported facts, calculations, inferences, conflicts and unknowns; treat document instructions as quoted data with no tool authority.
+1. Create an idempotent finance run, freeze source/context versions and budgets, then call the shared service through a fake/approved adapter or return the deterministic cached/manual report. Verify identity and consent before any private context leaves finance.
+2. Use versioned finance DTOs that distinguish facts, calculations, inferences, conflicts and unknowns; generic prompts/synthesis run upstream. Treat document instructions as untrusted data with no finance tool authority.
 3. Validate citation IDs against selected evidence and URLs, quotation text against source passages, and factual support using fixture review/explicit claim checks; a resolvable link alone is insufficient.
 4. Reject unsupported/invented claims or mark a safe insufficient result under the declared validation policy; never write model claims into reported facts or portfolio records.
-5. Persist validated result and inference metadata, then render dated source links/excerpts, actual/derived exposure and uncertainty. Support recoverable outage/cancel/budget errors.
+5. Persist validated result and inference metadata, then render dated source links/excerpts, finance-computed actual/derived exposure and uncertainty. Support recoverable outage/cancel/budget errors.
 
 **Requirements:** model costs/content handling are allowed before calls, with no automatic paid/remote fallback. Database retry does not repeat synthesis. Private context stays local unless explicitly approved; model-generated URLs not present in selected evidence cannot become citations.
 
@@ -232,11 +219,11 @@ Neither optional tax/performance history nor cloud hosting is required for local
 
 **Goal:** prove source-grounded usefulness without making research authoritative financial state.
 
-**Work:** run synthetic/public-company evaluation for citation resolution and semantic support, exact quotation traceability, period/unit accuracy, stale/irrelevant/conflicting sources, unsupported claims, prompt injection, privacy and outage; compare no-model baseline to configured local/approved models; execute company → cited report/exposure → user thesis journey; run PG persistence and separately real DSQL migrations/retrieval/idempotency/job cases before hosted promotion; document provider/model/policy/fixture versions and commands.
+**Work:** run synthetic/public-company evaluation for citation resolution and semantic support, exact quotation traceability, period/unit accuracy, stale/irrelevant/conflicting sources, unsupported claims, prompt injection, privacy and outage; compare deterministic finance baseline to shared research results; reuse upstream generic-model evaluation evidence; execute company → cited report/exposure → user thesis journey; run PG finance-result persistence and separately real DSQL migrations/idempotency/job cases before hosted promotion; document provider/model/policy/fixture versions and commands.
 
 **Requirements:** report citation validity separately from claim support; perfect URLs cannot hide hallucinated claims. Distinguish deterministic CI from credentialed provider/cluster tests. Model/search-disabled parity includes existing holdings, imports, finance and simulations, not merely an error screen.
 
-**Acceptance criteria:** dated company report links to accessible supporting sources and labels inferences/unknowns; stale/context gaps are visible; all canonical financial data remains unchanged; every model/search adapter can be disabled while core app and source views remain useful; prohibited egress/invalid citation/critical metric tests block release; actual live/cloud tests are recorded or explicitly unverified.
+**Acceptance criteria:** dated company report links to accessible supporting sources and labels inferences/unknowns; stale/context gaps are visible; all canonical financial data remains unchanged; the shared service can be disabled while core app and source views remain useful; prohibited egress/invalid citation/critical metric tests block release; actual live/cloud tests are recorded or explicitly unverified.
 
 **Out of scope:** universal research accuracy claims, adopting paid advanced retrieval to conceal fixture failures, and promoting conclusions into facts without source review.
 
@@ -247,8 +234,8 @@ Neither optional tax/performance history nor cloud hosting is required for local
 3. Does every factual claim have selected supporting evidence, with traceable quotations and visible conflicts?
 4. Are actual holdings, derived exposure, thesis notes and model inferences distinct and frozen per run?
 5. Does private context stay local unless its transmission is separately approved?
-6. Does portable retrieval work without unverified DSQL SQL extensions?
+6. Does shared retrieval satisfy scope/provenance bounds without finance SQL-extension or duplicate-index dependencies?
 7. Are optional monitors bounded/idempotent and governed by explicit notification preferences?
 8. Does the complete app remain usable with all model/search APIs disabled, with hosted behavior gated on real DSQL/security tests?
 
-**Implementation handoff:** publish routes/generated-client procedure, source/index/model contracts and settings, privacy/terms verification dates, corpus/freshness/context policies, citation/metric evaluation results, notification semantics, reproducible fixture commands, and local/provider/DSQL evidence separately.
+**Implementation handoff:** publish routes/generated-client procedure, source/service/result contracts and settings, privacy/terms verification dates, corpus/freshness/context policies, citation/metric evaluation results, notification semantics, reproducible fixture commands, and local/provider/DSQL evidence separately.

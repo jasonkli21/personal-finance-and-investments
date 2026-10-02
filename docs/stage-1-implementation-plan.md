@@ -14,6 +14,8 @@ The smallest vertical slice is **manual stock + ETF positions → upload dated s
 
 PDF/OCR, AI, bank connections, transaction-based performance, tax lots, recursive fund-of-funds traversal, derivative valuation, trading, AWS application hosting, and general background queues are excluded. Nested funds, shorts, and unsupported instruments stay visible with explicit opaque/residual treatment.
 
+The [shared-AI ADR](adr/0001-shared-personal-ai.md) adds a disabled extraction seam after Stage 1 without changing finance behavior. No PDF/AI/research consumer, HTTP adapter, schema migration or new UI is part of that reconciliation.
+
 ## Delivery conventions and cross-cutting requirements
 
 - Reuse Stage 0 domain services/settings; they currently receive SQLAlchemy sessions directly, with no repository-object layer. Extend schema incrementally rather than precreating later-stage domains.
@@ -33,7 +35,7 @@ These decisions close ambiguities in the original backlog. They are implementati
 
 ### Prerequisite and major commit sequence
 
-Stage 0's latest local gate is still unverified. Before Stage 1 code changes, execute its PostgreSQL 16 fresh-install and populated `0002 → head` upgrade tests, replacement/history/rollback, draft-conflict tests, and generated-contract checks. The upgrade test begins at 0002, while the fresh install exercises 0001 through head; do not describe the populated fixture as starting at 0001. Obtain an isolated PostgreSQL 16 runtime locally or actual CI evidence for this checkout. Docker/psql are absent and `gh` is unauthenticated in the review environment; a configured workflow is not a successful run. Fix only necessary prerequisite defects and record commands/results. DSQL access is a separate production gate and does not block local Stage 1.
+The prerequisite local PostgreSQL 16 gate passed on 2026-10-02; Stage 1 is delivered through `0874f21`. The following commit sequence records the original delivery requirements, not pending tasks. [Release evidence](stage-1-release.md) identifies actual runs and limitations. Fresh install exercises 0001 through head; the populated upgrade fixture begins at 0002. Remote CI success is distinct from local results. DSQL remains a separate unverified production gate.
 
 Implement and commit three major packages, rather than one commit per dotted subtask:
 

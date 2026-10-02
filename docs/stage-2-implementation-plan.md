@@ -1,18 +1,20 @@
 # Stage 2 implementation plan
 
 **Status:** Proposed execution backlog, not implemented  
-**Updated:** 2026-10-01  
+**Updated:** 2026-10-02
 **Roadmap coverage:** Work packages 2.1–2.6
 
 This is the execution plan for reviewed document-assisted holdings and personal finance. It extends [Stage 1](stage-1-implementation-plan.md) without changing snapshot semantics or making AI/account connections mandatory. Read [ingestion and AI](04-ingestion-and-ai.md), [the product specification](01-product-spec.md), [source policy](03-data-sources.md), [security](06-security-and-deployment.md), and [DSQL contract](07-aurora-dsql-compatibility.md) first.
 
 ## Scope boundary
 
-Stage 2 adds private document storage, deterministic text-PDF/CSV extraction, local OCR and optional local structured interpretation, reviewed transaction imports, merchant/category rules, splits/refunds/transfer matching, spending/net-worth views, and same-codebase asynchronous processing. Read-only account sync is optional and independently gated.
+Stage 2 extends Stage 1 private document storage with deterministic institution-specific text-PDF/CSV parsing, optional shared generic OCR/structured candidate extraction through `PersonalAIClient`, reviewed transaction imports, merchant/category rules, splits/refunds/transfer matching, spending/net-worth views, and same-codebase asynchronous processing. Read-only account sync is optional and independently gated.
 
-The smallest vertical slice is **upload synthetic brokerage text PDF and bank/card CSV → inspect row evidence and discrepancies → accept revision → view reconciled holdings/spending**. Modules are `ingestion`, `spending`, `portfolio`, `securities`, storage, model/account-provider adapters, and `jobs`.
+The smallest vertical slice is **upload synthetic brokerage text PDF and bank/card CSV → inspect row evidence and discrepancies → accept revision → view reconciled holdings/spending**. Modules are `ingestion`, `spending`, `portfolio`, `securities`, storage, the personal-AI service boundary, account-provider adapters, and `jobs`.
 
 Tax-lot accounting/performance/sale planning, trading, general agents, mandatory remote inference, password scraping, automatic trusted imports, and new AWS application infrastructure are excluded. Preserve provided lot fields as source evidence for Stage 3; do not infer them.
+
+Per [ADR 0001](adr/0001-shared-personal-ai.md), models, generic extraction/OCR runtime, research, AI memory and evaluation infrastructure belong in personal-AI. Finance owns institution-specific mappings, domain schemas, source evidence, validation, review and publication. Stage 1 supplies only a disabled extraction seam; add one real capability after agreeing upstream transport/versions and reviewing consent, retention and authorization. Do not introduce a second `StructuredModelProvider` or local model stack here.
 
 ## Delivery conventions and cross-cutting requirements
 
@@ -71,7 +73,7 @@ Tax-lot accounting/performance/sale planning, trading, general agents, mandatory
 
 Exact suffixes/methods must be finalized in OpenAPI and the generated client before UI integration. Commands for parsers/workers/benchmarks are implementation deliverables, not existing scripts.
 
-**Configuration:** upload/type/size bounds, private file backend/directory, parser time/memory limits, enabled parsers, `REMOTE_AI_ENABLED=false`, `ACCOUNT_SYNC_ENABLED=false`, paid fallback disabled, local model allowlist/time budget, batch bounds, worker concurrency/lease/retry/cancellation policies, transaction dedup and transfer tolerances. Record actual settings/defaults in the handoff.
+**Configuration:** upload/type/size bounds, private file backend/directory, parser time/memory limits, enabled parsers, `PERSONAL_AI_ENABLED=false` (currently true is rejected), future account-sync/paid-use gates, personal-AI request/response bounds and reviewed service policy, batch bounds, worker concurrency/lease/retry/cancellation policies, transaction dedup and transfer tolerances. Record actual settings/defaults in the handoff.
 
 ## Dependency map
 
@@ -130,26 +132,27 @@ S2.5 is optional; no exit gate for the local document workflow depends on produc
 
 **Out of scope:** automatic trusted imports, OCR, invented trades/cost basis, and one large transaction per statement.
 
-### S2.2 — Add complex-document extraction with local fallback
+### S2.2 — Integrate shared candidate extraction with deterministic/manual fallback
 
-**Dependencies:** S2.1.1, S2.1.2.  
-**Modules:** Docling/OCR adapter, structured model interface, review UI.
+**Dependencies:** S2.1.1, S2.1.2; agreed upstream extraction contract and data-handling policy.
+**Modules:** `PersonalAIClient` adapter, finance candidate/evidence validation, review UI.
 
-**Goal:** support synthetic scans/screenshots while preserving human review and privacy.
+**Goal:** support synthetic scans/screenshots while preserving finance authority, review and privacy.
 
 **Work:**
 
-1. Verify Docling and individual OCR/model licenses, local installation/hardware requirements, and bounded CPU/memory/time behavior.
-2. Implement local OCR/table extraction with evidence references, explicit unreadable regions, orientation/layout diagnostics, and parser selection.
-3. Add a `StructuredModelProvider` interface, disabled/fake implementations, and optional local Ollama schema-constrained interpretation; pin schema/prompt/model identity in each attempt.
-4. Validate all inferred fields against source evidence and deterministic arithmetic; route unresolved/invented/contradictory values to review.
-5. Enforce cloud opt-in/provider/content policy before any transmission; local failure offers manual correction or a different local parser.
+1. Verify upstream generic OCR/structured extraction availability, licenses, local resource bounds, provider data-use/retention and actual versioned transport. The handoff's illustrative extraction endpoint/schema is not a delivered API.
+2. Extend finance-owned capability DTOs with raw fields, actual document evidence references, dates, unknown/unparsed rows and quality. Keep canonical schemas separate.
+3. Add one bounded HTTP adapter behind the existing protocol: timeout/response-size/redirect limits, source/schema compatibility checks, safe disabled/unavailable/timeout/unauthorized/rate-limit/provider/invalid-response errors and deterministic HTTP contract tests. Models/providers/prompt runtime remain upstream.
+4. Validate inferred identifiers, signs, quantities and totals in finance; invented/contradictory/unresolved fields remain review candidates. Persist reusable results privately before DB staging or OCC retries.
+5. Preserve deterministic templates and manual correction when personal-AI/OCR is disabled/unavailable. No silent provider or paid fallback. Generic extraction may run upstream with models disabled when supported.
+6. Gate all data transmission on explicit scoped consent and reviewed content/storage/egress policy; deployed private data also requires authenticated user/service identity, verified owner propagation and upstream authorization. No fixed `local` owner bypass.
 
-**Requirements:** confidence is measurable field quality, not ungrounded model probability. Redacted logs omit statement text/images/prompts. Missing local model and invalid JSON must not activate a remote provider; unpaid Gemini cannot receive sensitive statements.
+**Requirements:** confidence is measurable field quality, not model probability. Redacted diagnostics omit statements/images/prompts. Finance owns original private files, validation/deduplication and reviewed atomic publication. No finance-owned Docling/model service, provider SDK or agent framework.
 
-**Acceptance criteria:** scans/screenshots become evidence-backed previews; deliberately confused decimal/sign/ticker outputs require correction; model-disabled/unavailable paths still allow import; privacy tests prove no unconsented remote calls; benchmark records numeric/identifier/date accuracy, row coverage, reconciliation, review effort, latency, and hardware.
+**Acceptance criteria:** fake/HTTP-stub candidates preserve evidence and require correction for confused numbers/identifiers; malformed output never reaches publication; disabled/outage paths permit manual import; tests block unconsented, unauthorized and wrong-owner calls before transmission. Record finance field/evidence/reconciliation/review benchmarks separately from upstream generic-model evaluations. Live/auth checks are marked unverified until run.
 
-**Out of scope:** choosing a permanent universal model, claiming OCR certainty, and making cloud inference essential.
+**Out of scope:** implementing the upstream extraction runtime, remote private-data activation without authorization, research/memory/tools, and making AI essential.
 
 ### S2.3.1 — Implement transaction identity and canonical publication
 
@@ -246,7 +249,7 @@ S2.5 is optional; no exit gate for the local document workflow depends on produc
 
 **Goal:** recover slow extraction without exposing incomplete financial records.
 
-**Work:** run extraction/normalization/validation as bounded worker stages; persist stage outputs for retry; renew leases and fence writes; resume existing idempotent staging batches; require accepted review revision before commit; expose safe counts/status/errors and cancel/reprocess controls; add dry-run cleanup for orphaned unpublished revisions/files with reference/retention checks. Reuse Stage 1 quote/fund refresh services for explicitly configured, source-appropriate scheduled refreshes with the same cache, budgets and idempotency policies.
+**Work:** run extraction/normalization/validation as bounded worker stages; persist stage outputs for retry; renew leases and fence writes; resume existing idempotent staging batches; require accepted review revision before commit; expose safe counts/status/errors and cancel/reprocess controls; add dry-run cleanup for orphaned unpublished revisions/files with reference/retention checks. Stage 1 has manual/cached quotes and upload-only fund formats, not live refresh services. Add scheduled quote/fund fetching only after the specific provider work and rights review; reuse existing deterministic import/selection code with cache, budgets and idempotency policies.
 
 **Requirements:** database OCC retry never repeats OCR/AI/account fetches; any deliberate external retry is a separately recorded adapter attempt under its own policy. Cancellation before final publish preserves canonical data; after publication return committed state rather than claiming reversal.
 
@@ -261,7 +264,7 @@ S2.5 is optional; no exit gate for the local document workflow depends on produc
 
 **Goal:** prove that automation remains reviewable, accurate, and optional.
 
-**Work:** run the synthetic brokerage + bank/card journey; compare deterministic/no-model extraction with OCR/local-model candidates; record exact numeric/date/identifier matches, row coverage, false matches/duplicates, reconciliation errors, review rate/correction effort, latency/resources; execute local and separately gated real DSQL publication/job checks; document actual worker/parser/benchmark commands and fallback steps.
+**Work:** run the synthetic brokerage + bank/card journey; compare deterministic/no-model extraction with shared extraction candidates; record exact numeric/date/identifier matches, row coverage, false matches/duplicates, reconciliation errors, review rate/correction effort, latency/resources; execute local and separately gated real DSQL publication/job checks; document actual worker/parser/benchmark commands and fallback steps.
 
 **Requirements:** record fixture/parser/schema/model/hardware versions. Critical numerical errors cannot pass through a model-quality average; they must be blocked/reviewed and rechecked outside the model. Unavailable optional binaries/providers are explicit skipped checks, not successful evaluations.
 
