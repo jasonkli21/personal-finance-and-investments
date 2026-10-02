@@ -48,7 +48,7 @@ pnpm check
 
 The API tests cover `/health`, OpenAPI generation, database failure reporting, discrete connection fields, explicit URL overrides, invalid ports, and rejection of the unimplemented Aurora DSQL backend. The web tests cover proxy port configuration and readiness timeouts, recovery, status changes, non-overlapping requests, and cleanup. The Compose services and Vite-to-API readiness proxy were smoke-tested with PostgreSQL 16 on 2026-10-01, including a custom API port and a synthetic password containing URL-reserved characters.
 
-The GitHub Actions workflow in `.github/workflows/quality.yml` installs locked dependencies and runs the same `pnpm check` on pushes and pull requests. It uses Node 24, Python 3.12, pnpm 11.19.0, and uv 0.11.13. The `main` branch publishes to the private GitHub repository `jasonkli21/personal-finance-and-investments`; remote CI execution remains unverified until the first push.
+The GitHub Actions workflow in `.github/workflows/quality.yml` installs locked dependencies and runs the same `pnpm check` on pushes and pull requests. It uses Node 24, Python 3.12, pnpm 11.19.0, and uv 0.11.13. The `main` branch publishes to the private GitHub repository [`jasonkli21/personal-finance-and-investments`](https://github.com/jasonkli21/personal-finance-and-investments); see its [Actions page](https://github.com/jasonkli21/personal-finance-and-investments/actions) for the current CI run status.
 
 ## Layout and next work
 
