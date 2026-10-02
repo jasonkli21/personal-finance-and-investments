@@ -156,6 +156,42 @@ export async function previewPositionImport(input: {
   return body as components['schemas']['ImportCreated']
 }
 
+export async function previewBrokeragePdf(input: {
+  accountId: string
+  effectiveDate: string
+  expectedRevision: number
+  sourceLabel: string
+  file: File
+  replaceExisting?: boolean
+}) {
+  const response = await fetch('/api/v1/imports/documents/positions/preview', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/pdf',
+      'X-Account-Id': input.accountId,
+      'X-Effective-Date': input.effectiveDate,
+      'X-Expected-Account-Revision': String(input.expectedRevision),
+      'X-Source-Label': input.sourceLabel,
+      'X-File-Name': input.file.name,
+      'X-Replace-Existing': String(input.replaceExisting ?? false),
+      'Idempotency-Key': crypto.randomUUID(),
+    },
+    body: input.file,
+  })
+  const body = (await response.json()) as
+    | components['schemas']['DocumentImportCreated']
+    | { detail?: string }
+  if (!response.ok) {
+    throw new ApiError(
+      response.status,
+      'detail' in body
+        ? (body.detail ?? 'Statement review could not be started.')
+        : 'Statement review could not be started.',
+    )
+  }
+  return body as components['schemas']['DocumentImportCreated']
+}
+
 export async function correctImportRow(
   importId: string,
   rowId: string,

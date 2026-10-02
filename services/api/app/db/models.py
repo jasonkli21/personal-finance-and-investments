@@ -325,6 +325,40 @@ class ImportAttempt(TimestampMixin, Base):
     )
 
 
+class DocumentImport(TimestampMixin, Base):
+    """Original statement and its deterministic position-import projection."""
+
+    __tablename__ = "document_imports"
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_document_import_idempotency"),
+        UniqueConstraint("file_id", "position_import_id", name="uq_document_import_link"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    file_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("private_files.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    position_import_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("imports.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    account_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False
+    )
+    effective_date: Mapped[date] = mapped_column(Date, nullable=False)
+    source_label: Mapped[str] = mapped_column(String(100), nullable=False)
+    parser_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    diagnostics: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), nullable=False, default=dict
+    )
+
+
 class ImportBatch(TimestampMixin, Base):
     """Idempotency marker for one bounded review or publication batch."""
 

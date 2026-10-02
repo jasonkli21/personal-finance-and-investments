@@ -1,6 +1,6 @@
 # Stage 2 implementation plan
 
-**Status:** Proposed execution backlog, not implemented  
+**Status:** In progress; S2.1 local text-PDF preview slice implemented; S2.2 and S2.5 gated; S2.3, S2.4 and S2.6 pending
 **Updated:** 2026-10-02
 **Roadmap coverage:** Work packages 2.1–2.6
 
@@ -132,6 +132,8 @@ S2.5 is optional; no exit gate for the local document workflow depends on produc
 
 **Out of scope:** automatic trusted imports, OCR, invented trades/cost basis, and one large transaction per statement.
 
+**Implementation status (2026-10-02):** The first local slice accepts synthetic text-layer brokerage PDFs, retains the original privately, records page/line evidence and reconciliation warnings, and stages normalized rows through the existing reviewed position-import workflow. The browser supports PDF selection and correction using the Stage 1 import review. Scanned PDFs, institution-specific broad coverage, correction audit of document diagnostics, background parsing, and end-to-end verification remain outstanding; this does not complete S2.1 or its exit criteria.
+
 ### S2.2 — Integrate shared candidate extraction with deterministic/manual fallback
 
 **Dependencies:** S2.1.1, S2.1.2; agreed upstream extraction contract and data-handling policy.
@@ -153,6 +155,8 @@ S2.5 is optional; no exit gate for the local document workflow depends on produc
 **Acceptance criteria:** fake/HTTP-stub candidates preserve evidence and require correction for confused numbers/identifiers; malformed output never reaches publication; disabled/outage paths permit manual import; tests block unconsented, unauthorized and wrong-owner calls before transmission. Record finance field/evidence/reconciliation/review benchmarks separately from upstream generic-model evaluations. Live/auth checks are marked unverified until run.
 
 **Out of scope:** implementing the upstream extraction runtime, remote private-data activation without authorization, research/memory/tools, and making AI essential.
+
+**Implementation status (2026-10-02):** Deferred at its stated dependency gate. The adjacent `personal-ai-system` currently has no agreed extraction transport, verified authenticated owner propagation, or reviewed real-data authorization/handling policy. Finance remains `PERSONAL_AI_ENABLED=false`; no statement bytes are transmitted. Revisit after those prerequisites are established.
 
 ### S2.3.1 — Implement transaction identity and canonical publication
 
@@ -227,6 +231,8 @@ S2.5 is optional; no exit gate for the local document workflow depends on produc
 
 **Out of scope:** required production subscription, paid fallback, credential scraping, and reliable lots inferred from aggregate basis.
 
+**Implementation status (2026-10-02):** Sandbox-only evaluation; production connection work remains optional and gated. Plaid's official documentation describes account holdings/transactions products, but pricing is subscription-based and exact eligibility/fees depend on an approved account. No credentials, hosted Link flow, token storage, refresh adapter, or production sync has been added. Manual imports remain the supported path.
+
 ### S2.6.1 — Define durable job claiming and retry contracts
 
 **Dependencies:** S2.1.1.  
@@ -271,6 +277,8 @@ S2.5 is optional; no exit gate for the local document workflow depends on produc
 **Acceptance criteria:** clean local setup reviews and commits both statement types with models/sync disabled; reimport leaves totals unchanged; spending/holdings reconcile; failure/cancel/retry are safe; OCR benchmark and privacy results are recorded; every persistent/job change has real DSQL evidence before cloud promotion.
 
 **Out of scope:** introducing Stage 3 calculations to compensate for missing statement data, and treating benchmark success as permission to remove review.
+
+**Implementation status (2026-10-02):** Pending. The parser fixture is synthetic and its expected extraction JSON is checked in, but no benchmark, browser journey, database migration run, or DSQL verification is claimed for this Stage 2 work.
 
 ## Stage 2 completion review
 

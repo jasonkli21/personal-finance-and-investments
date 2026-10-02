@@ -91,6 +91,40 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/documents/{document_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Document Import */
+    get: operations['get_document_import_v1_documents__document_id__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/files/{file_id}/preview': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Private File Preview */
+    get: operations['get_private_file_preview_v1_files__file_id__preview_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/fund-imports/{import_id}/publish': {
     parameters: {
       query?: never
@@ -170,6 +204,23 @@ export interface paths {
     put?: never
     /** Upload */
     post: operations['upload_v1_funds__fund_id__upload_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/imports/documents/positions/preview': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Post Brokerage Pdf Preview */
+    post: operations['post_brokerage_pdf_preview_v1_imports_documents_positions_preview_post']
     delete?: never
     options?: never
     head?: never
@@ -491,6 +542,74 @@ export interface components {
       name: string
       /** Source Type */
       source_type: string
+    }
+    /** DocumentImportCreated */
+    DocumentImportCreated: {
+      /** Duplicate */
+      duplicate: boolean
+      /**
+       * File Id
+       * Format: uuid
+       */
+      file_id: string
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /**
+       * Position Import Id
+       * Format: uuid
+       */
+      position_import_id: string
+      /** Row Count */
+      row_count: number
+      /** Status */
+      status: string
+    }
+    /** DocumentImportRead */
+    DocumentImportRead: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Diagnostics */
+      diagnostics: {
+        [key: string]: unknown
+      }
+      /**
+       * Effective Date
+       * Format: date
+       */
+      effective_date: string
+      /**
+       * File Id
+       * Format: uuid
+       */
+      file_id: string
+      /** Filename */
+      filename: string
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Parser Version */
+      parser_version: string
+      /**
+       * Position Import Id
+       * Format: uuid
+       */
+      position_import_id: string
+      /** Position Import Status */
+      position_import_status: string
+      /** Row Count */
+      row_count: number
+      /** Source Label */
+      source_label: string
+      /** Status */
+      status: string
     }
     /** ErrorResponse */
     ErrorResponse: {
@@ -1525,6 +1644,122 @@ export interface operations {
       }
     }
   }
+  get_document_import_v1_documents__document_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        document_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DocumentImportRead']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  get_private_file_preview_v1_files__file_id__preview_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        file_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': unknown
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
   publish_v1_fund_imports__import_id__publish_post: {
     parameters: {
       query?: never
@@ -1692,6 +1927,69 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  post_brokerage_pdf_preview_v1_imports_documents_positions_preview_post: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Account-Id': string
+        'X-Effective-Date': string
+        'X-Source-Label': string
+        'X-Expected-Account-Revision': number
+        'Idempotency-Key': string
+        'X-Replace-Existing'?: boolean
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DocumentImportCreated']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
         }
       }
     }

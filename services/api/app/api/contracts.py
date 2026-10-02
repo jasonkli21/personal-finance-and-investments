@@ -1,7 +1,7 @@
 """Public API contracts for accounts, local security lookup and positions."""
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -165,6 +165,30 @@ class ImportCreated(BaseModel):
     row_count: int
     batch_count: int
     duplicate: bool
+
+
+class DocumentImportCreated(BaseModel):
+    id: UUID
+    file_id: UUID
+    position_import_id: UUID
+    status: str
+    row_count: int
+    duplicate: bool
+
+
+class DocumentImportRead(BaseModel):
+    id: UUID
+    file_id: UUID
+    position_import_id: UUID
+    account_id: UUID
+    effective_date: date
+    source_label: str
+    parser_version: str
+    status: str
+    row_count: int
+    diagnostics: dict[str, Any]
+    position_import_status: str
+    filename: str
 
 
 class ImportRowRead(BaseModel):

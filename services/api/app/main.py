@@ -42,6 +42,8 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
     app.state.private_file_root = settings.private_file_dir
     app.state.max_import_file_bytes = settings.max_import_file_bytes
     app.state.max_import_rows = settings.max_import_rows
+    app.state.max_pdf_pages = settings.max_pdf_pages
+    app.state.pdf_parser_timeout_seconds = settings.pdf_parser_timeout_seconds
     app.state.personal_ai_client = DisabledPersonalAIClient()
     app.include_router(api_router)
     from app.api.fund_routes import router as fund_router

@@ -1,8 +1,8 @@
 # Portfolio Intelligence
 
-Stage 1 delivers reviewed position/fund imports, dated owned valuation, reconciled one-level ETF exposure, issuer rollups, frozen reports, drill-down and CSV export. It works locally with PostgreSQL 16 and no provider keys. Start with [`docs/stage-1-release.md`](docs/stage-1-release.md) for the workflow, verification and limits; requirements and future work remain in [`docs/README.md`](docs/README.md). Production Aurora DSQL remains unverified.
+Stage 1 delivers reviewed position/fund imports, dated owned valuation, reconciled one-level ETF exposure, issuer rollups, frozen reports, drill-down and CSV export. The first Stage 2 slice adds local text-layer brokerage PDF preview through the existing reviewed position-import flow; scanned PDFs, bank/card transactions, dashboards and background jobs remain pending. See [`docs/stage-2-release.md`](docs/stage-2-release.md) for its exact limits. The app works locally with PostgreSQL 16 and no provider keys. Production Aurora DSQL remains unverified.
 
-Reusable AI capabilities will integrate through `personal-ai-system`; finance retains authoritative data, deterministic validation/calculations, workflows and UI. The current `PersonalAIClient` is a disabled extraction boundary with a synthetic fake, not a live integration. Leave `PERSONAL_AI_ENABLED=false`; true fails startup until an upstream contract and security/data-handling gates are implemented. See [ADR 0001](docs/adr/0001-shared-personal-ai.md). No AI service or model credentials are needed to run Stage 1.
+Reusable AI capabilities will integrate through `personal-ai-system`; finance retains authoritative data, deterministic validation/calculations, workflows and UI. The current `PersonalAIClient` is a disabled extraction boundary with a synthetic fake, not a live integration. Leave `PERSONAL_AI_ENABLED=false`; true fails startup until an upstream contract and security/data-handling gates are implemented. See [ADR 0001](docs/adr/0001-shared-personal-ai.md). No AI service or model credentials are needed for local imports.
 
 ## Requirements
 

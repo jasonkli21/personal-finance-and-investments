@@ -11,6 +11,7 @@ import {
   fetchOwnedPortfolio,
   fetchSecurities,
   previewPositionImport,
+  previewBrokeragePdf,
   publishImport,
 } from './api/client'
 import type { components } from './api/schema'
@@ -164,15 +165,30 @@ export default function StageOneWorkspace({
   )
 
   const previewMutation = useMutation({
-    mutationFn: () => {
-      if (!file) throw new Error('Choose a CSV file.')
+    mutationFn: async () => {
+      if (!file) throw new Error('Choose a CSV or supported brokerage PDF.')
+      if (file.name.toLowerCase().endsWith('.pdf')) {
+        const result = await previewBrokeragePdf({
+          accountId,
+          effectiveDate,
+          expectedRevision,
+          sourceLabel,
+          file,
+          replaceExisting,
+        })
+        return {
+          id: result.position_import_id,
+          duplicate: result.duplicate,
+          sourceFormat: 'PDF' as const,
+        }
+      }
       if (!mapping.quantity || (!mapping.identifier && !mapping.name)) {
         throw new Error('Map quantity and a ticker or security name.')
       }
       const selected = Object.fromEntries(
         Object.entries(mapping).filter(([, header]) => Boolean(header)),
       )
-      return previewPositionImport({
+      const result = await previewPositionImport({
         accountId,
         effectiveDate,
         expectedRevision,
@@ -181,6 +197,7 @@ export default function StageOneWorkspace({
         file,
         replaceExisting,
       })
+      return { ...result, sourceFormat: 'CSV' as const }
     },
     onSuccess: async (result) => {
       setImportId(result.id)
@@ -189,7 +206,7 @@ export default function StageOneWorkspace({
       setNotice(
         result.duplicate
           ? 'This source was already reviewed; its prior result is shown.'
-          : 'CSV staged privately. Review each unmatched or unusual row before publishing.',
+          : `${result.sourceFormat} staged privately. Review every row, evidence reference, and discrepancy before publishing.`,
       )
       setError('')
       await queryClient.invalidateQueries({
@@ -351,6 +368,12 @@ export default function StageOneWorkspace({
     setNotice('')
     setError('')
     if (!nextFile) return
+    if (nextFile.name.toLowerCase().endsWith('.pdf')) {
+      setNotice(
+        'The local text PDF adapter supports a holdings table with symbol, security, quantity, price, and market value columns. Scanned PDFs remain manual review only.',
+      )
+      return
+    }
     try {
       setHeaders(parseCsvHeader(await nextFile.slice(0, 64_000).text()))
     } catch (reason) {
@@ -598,7 +621,7 @@ export default function StageOneWorkspace({
         </p>
       </Section>
 
-      <Section title="Reviewed CSV position import">
+      <Section title="Reviewed CSV or brokerage statement import">
         {!accountId ? (
           <p className="text-sm text-slate-600">
             Choose or create an account to stage positions.
@@ -606,17 +629,18 @@ export default function StageOneWorkspace({
         ) : (
           <>
             <p className="text-sm text-slate-600">
-              The source stays in a private local file store. Select every
-              column mapping yourself; unknown rows block publication until
-              corrected or explicitly excluded.
+              Originals stay in private local storage. CSV columns are mapped
+              by you; text PDFs use a deterministic holdings-table adapter.
+              Check page and row evidence, correct discrepancies, and resolve
+              or explicitly exclude every unparsed row before publication.
             </p>
             <div className="grid gap-3 md:grid-cols-3">
               <label className="text-sm">
-                CSV file
+                CSV or supported text PDF
                 <input
                   className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2"
                   type="file"
-                  accept=".csv,text/csv"
+                  accept=".csv,text/csv,.pdf,application/pdf"
                   onChange={(event) =>
                     void chooseFile(event.target.files?.[0] ?? null)
                   }
@@ -691,7 +715,9 @@ export default function StageOneWorkspace({
               disabled={!file || previewMutation.isPending}
               onClick={() => previewMutation.mutate()}
             >
-              {previewMutation.isPending ? 'Staging CSV…' : 'Stage for review'}
+              {previewMutation.isPending
+                ? 'Extracting and staging…'
+                : 'Stage for review'}
             </button>
             {importId && importQuery.isPending && (
               <p role="status" className="text-sm text-slate-600">

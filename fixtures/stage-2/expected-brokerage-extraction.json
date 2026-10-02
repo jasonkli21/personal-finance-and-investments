@@ -1,0 +1,32 @@
+{
+  "fixture": "synthetic-brokerage-statement.pdf",
+  "synthetic_only": true,
+  "expected_parser": "brokerage-text-pdf/1",
+  "expected_rows": [
+    {
+      "identifier": "NVDA",
+      "name": "NVIDIA Corporation",
+      "quantity": "2",
+      "price": "100.00",
+      "reported_value": "200.00",
+      "review_status": "unmatched until the local security is selected"
+    },
+    {
+      "identifier": "SYNB",
+      "name": "Synthetic Bond Fund",
+      "quantity": "1.5",
+      "price": "40.00",
+      "reported_value": "60.00",
+      "review_status": "unmatched until the local security is selected"
+    },
+    {
+      "identifier": "ODD",
+      "name": "Synthetic Mismatch Corp",
+      "quantity": "1",
+      "price": "100.00",
+      "reported_value": "105.00",
+      "review_status": "needs review because reported value does not reconcile"
+    }
+  ],
+  "privacy": "No personal account data, identifiers, or real issuer statement content."
+}

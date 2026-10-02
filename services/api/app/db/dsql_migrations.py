@@ -1364,6 +1364,86 @@ STAGE1_REPORTS = DsqlMigration(
     ),
 )
 
+TABLE_COLUMNS["document_imports"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("file_id", "uuid", "NO", None, None, None),
+    ("position_import_id", "uuid", "NO", None, None, None),
+    ("account_id", "uuid", "NO", None, None, None),
+    ("effective_date", "date", "NO", None, None, None),
+    ("source_label", "character varying", "NO", 100, None, None),
+    ("parser_version", "character varying", "NO", 80, None, None),
+    ("idempotency_key", "character varying", "NO", 128, None, None),
+    ("row_count", "integer", "NO", None, None, None),
+    ("status", "character varying", "NO", 24, None, None),
+    ("diagnostics", "jsonb", "NO", None, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+    ("updated_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["document_imports"] = (
+    ("document_imports_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    (
+        "document_imports_file_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(file_id)referencesprivate_files(id)ondeleterestrict",),
+    ),
+    (
+        "document_imports_position_import_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(position_import_id)referencesimports(id)ondeleterestrict",),
+    ),
+    (
+        "document_imports_account_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(account_id)referencesaccounts(id)ondeleterestrict",),
+    ),
+    (
+        "uq_document_import_link",
+        "UNIQUE",
+        ("unique(file_id,position_import_id)",),
+    ),
+    (
+        "uq_document_import_idempotency",
+        "UNIQUE",
+        ("unique(idempotency_key)",),
+    ),
+)
+STAGE2_DOCUMENT_INGESTION = DsqlMigration(
+    "0007_stage2_document_ingestion",
+    (
+        DsqlMigrationStep(
+            "create_document_imports",
+            "table",
+            """CREATE TABLE document_imports (
+        id uuid NOT NULL,
+        file_id uuid NOT NULL,
+        position_import_id uuid NOT NULL,
+        account_id uuid NOT NULL,
+        effective_date date NOT NULL,
+        source_label varchar(100) NOT NULL,
+        parser_version varchar(80) NOT NULL,
+        idempotency_key varchar(128) NOT NULL,
+        row_count integer NOT NULL,
+        status varchar(24) NOT NULL,
+        diagnostics jsonb NOT NULL,
+        created_at timestamptz NOT NULL,
+        updated_at timestamptz NOT NULL,
+        CONSTRAINT document_imports_pkey PRIMARY KEY (id),
+        CONSTRAINT document_imports_file_id_fkey FOREIGN KEY (file_id)
+            REFERENCES private_files(id) ON DELETE RESTRICT,
+        CONSTRAINT document_imports_position_import_id_fkey
+            FOREIGN KEY (position_import_id) REFERENCES imports(id) ON DELETE RESTRICT,
+        CONSTRAINT document_imports_account_id_fkey FOREIGN KEY (account_id)
+            REFERENCES accounts(id) ON DELETE RESTRICT,
+        CONSTRAINT uq_document_import_link UNIQUE (file_id, position_import_id),
+        CONSTRAINT uq_document_import_idempotency UNIQUE (idempotency_key)
+    )""",
+            "document_imports",
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :object_name)",
+        ),
+    ),
+)
+
 DSQL_MIGRATIONS = (
     CORE_SCHEMA,
     POSITION_SNAPSHOT_REVISION,
@@ -1371,6 +1451,7 @@ DSQL_MIGRATIONS = (
     STAGE1_POSITION_IMPORTS,
     STAGE1_FUND_COMPOSITIONS,
     STAGE1_REPORTS,
+    STAGE2_DOCUMENT_INGESTION,
 )
 LEDGER_DDL = """CREATE TABLE IF NOT EXISTS dsql_schema_migration_steps (
     revision varchar(128) NOT NULL,

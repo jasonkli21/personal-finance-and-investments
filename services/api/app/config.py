@@ -38,6 +38,8 @@ class Settings:
     private_file_dir: str
     max_import_file_bytes: int
     max_import_rows: int
+    max_pdf_pages: int
+    pdf_parser_timeout_seconds: int
     personal_ai_enabled: bool
 
 
@@ -143,5 +145,9 @@ def load_settings() -> Settings:
         ),
         max_import_rows=_int_setting(
             "MAX_IMPORT_ROWS", 5000, minimum=1, maximum=20_000
+        ),
+        max_pdf_pages=_int_setting("MAX_PDF_PAGES", 40, minimum=1, maximum=100),
+        pdf_parser_timeout_seconds=_int_setting(
+            "PDF_PARSER_TIMEOUT_SECONDS", 8, minimum=1, maximum=30
         ),
     )

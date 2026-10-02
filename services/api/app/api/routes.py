@@ -1,12 +1,15 @@
 """Versioned HTTP routes for the manual portfolio workflow."""
 
+import asyncio
 import json
 from collections.abc import Iterator
 from datetime import date
 from typing import Annotated
+from urllib.parse import quote
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
+from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
@@ -15,6 +18,8 @@ from app.api.contracts import (
     AccountCreate,
     AccountPatch,
     AccountRead,
+    DocumentImportCreated,
+    DocumentImportRead,
     ErrorResponse,
     ImportAction,
     ImportCreated,
@@ -36,7 +41,8 @@ from app.api.contracts import (
 )
 from app.db.models import ImportAttempt, ImportBatch, Issuer, PositionSnapshot, Security
 from app.db.transactions import run_database_unit
-from app.domains import accounts, imports, portfolio, securities
+from app.domains import accounts, documents, imports, portfolio, securities
+from app.ingestion.brokerage_pdf import PdfExtractionError
 from app.storage.file_store import PrivateFileStore
 
 router = APIRouter(
@@ -242,16 +248,128 @@ async def _read_bounded_request(request: Request, maximum: int) -> bytes:
     declared = request.headers.get("content-length")
     if declared and declared.isdecimal() and int(declared) > maximum:
         raise HTTPException(
-            status_code=413, detail="CSV upload exceeds the configured size limit."
+            status_code=413, detail="Document upload exceeds the configured size limit."
         )
     content = bytearray()
     async for block in request.stream():
         if len(content) + len(block) > maximum:
             raise HTTPException(
-                status_code=413, detail="CSV upload exceeds the configured size limit."
+                status_code=413, detail="Document upload exceeds the configured size limit."
             )
         content.extend(block)
     return bytes(content)
+
+
+@router.post(
+    "/imports/documents/positions/preview",
+    response_model=DocumentImportCreated,
+)
+async def post_brokerage_pdf_preview(
+    request: Request,
+    account_id: Annotated[UUID, Header(alias="X-Account-Id")],
+    effective_date: Annotated[date, Header(alias="X-Effective-Date")],
+    source_label: Annotated[str, Header(alias="X-Source-Label")],
+    expected_account_revision: Annotated[
+        int, Header(alias="X-Expected-Account-Revision")
+    ],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key")],
+    replace_existing: Annotated[bool, Header(alias="X-Replace-Existing")] = False,
+) -> DocumentImportCreated:
+    content_type = request.headers.get("content-type", "").split(";", 1)[0].casefold()
+    if content_type != "application/pdf":
+        raise HTTPException(status_code=415, detail="Upload the statement as a PDF.")
+    content = await _read_bounded_request(
+        request, request.app.state.max_import_file_bytes
+    )
+    try:
+        document_id, import_id, file_id, row_count, duplicate = await asyncio.to_thread(
+            documents.create_brokerage_pdf_import,
+            request.app.state.session_factory,
+            PrivateFileStore(request.app.state.private_file_root),
+            content=content,
+            filename=request.headers.get("x-file-name", "statement.pdf"),
+            account_id=account_id,
+            effective_date=effective_date,
+            source_label=source_label,
+            idempotency_key=idempotency_key,
+            expected_account_revision=expected_account_revision,
+            max_rows=request.app.state.max_import_rows,
+            max_pages=request.app.state.max_pdf_pages,
+            parser_timeout_seconds=request.app.state.pdf_parser_timeout_seconds,
+            replace_existing=replace_existing,
+        )
+    except PdfExtractionError as exc:
+        messages = {
+            "parser_timeout": "PDF extraction exceeded its time limit; use a CSV export.",
+            "holdings_table_not_found": "This PDF layout is unsupported; use a CSV export.",
+            "no_position_rows": "No position rows were found in the PDF.",
+            "pdf_invalid": "The PDF could not be read.",
+            "pdf_unreadable": "The PDF could not be read within the parser limits.",
+            "pdf_unsupported": "Encrypted PDFs and PDFs over the page limit are unsupported.",
+            "pdf_page_limit": "A PDF page exceeds the parser text limit.",
+            "pdf_text_limit": "The extracted PDF text exceeds the parser limit.",
+            "row_limit": "The PDF contains more rows than the configured limit.",
+        }
+        raise HTTPException(
+            status_code=422,
+            detail=messages.get(exc.code, "The PDF could not be extracted."),
+        ) from exc
+    except documents.DocumentNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (documents.DocumentConflict, imports.ImportAccountConflict) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except (documents.DocumentError, imports.ImportErrorBase) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    with request.app.state.session_factory() as session:
+        record = documents.read_document_import(session, document_id)
+    return DocumentImportCreated(
+        id=document_id,
+        file_id=file_id,
+        position_import_id=import_id,
+        status=str(record["position_import_status"]),
+        row_count=row_count,
+        duplicate=duplicate,
+    )
+
+
+@router.get("/documents/{document_id}", response_model=DocumentImportRead)
+def get_document_import(
+    document_id: UUID, session: SessionDependency
+) -> DocumentImportRead:
+    try:
+        return DocumentImportRead.model_validate(
+            documents.read_document_import(session, document_id)
+        )
+    except documents.DocumentNotFound as exc:
+        raise HTTPException(status_code=404, detail="Document import not found.") from exc
+
+
+@router.get("/files/{file_id}/preview")
+def get_private_file_preview(
+    request: Request, file_id: UUID, session: SessionDependency
+) -> Response:
+    try:
+        content, content_type, filename = documents.read_document_file(
+            session,
+            file_id,
+            PrivateFileStore(request.app.state.private_file_root),
+        )
+    except documents.DocumentNotFound as exc:
+        raise HTTPException(status_code=404, detail="Private file not found.") from exc
+    except documents.DocumentError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if content_type != "application/pdf":
+        raise HTTPException(status_code=415, detail="This file cannot be previewed inline.")
+    safe_name = quote(filename.replace("\r", "").replace("\n", ""), safe="")
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={
+            "Content-Disposition": f"inline; filename*=UTF-8''{safe_name}",
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.post("/imports/positions/preview", response_model=ImportCreated)
