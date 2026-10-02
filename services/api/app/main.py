@@ -11,6 +11,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.api.routes import router as api_router
+from app.api.transaction_routes import router as transaction_router
 from app.config import load_settings
 from app.db.engine import DatabaseEngineFactory
 from app.integrations.personal_ai import DisabledPersonalAIClient
@@ -46,6 +47,7 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
     app.state.pdf_parser_timeout_seconds = settings.pdf_parser_timeout_seconds
     app.state.personal_ai_client = DisabledPersonalAIClient()
     app.include_router(api_router)
+    app.include_router(transaction_router)
     from app.api.fund_routes import router as fund_router
 
     app.include_router(fund_router)

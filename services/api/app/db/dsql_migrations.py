@@ -1444,6 +1444,602 @@ STAGE2_DOCUMENT_INGESTION = DsqlMigration(
     ),
 )
 
+TABLE_COLUMNS["spending_categories"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("slug", "character varying", "NO", 80, None, None),
+    ("display_name", "character varying", "NO", 120, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+    ("updated_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["spending_categories"] = (
+    ("spending_categories_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    ("uq_spending_category_slug", "UNIQUE", ("unique(slug)",)),
+)
+TABLE_COLUMNS["transaction_imports"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("file_id", "uuid", "NO", None, None, None),
+    ("account_id", "uuid", "NO", None, None, None),
+    ("source_label", "character varying", "NO", 100, None, None),
+    ("parser_version", "character varying", "NO", 80, None, None),
+    ("file_sha256", "character varying", "NO", 64, None, None),
+    ("idempotency_key", "character varying", "NO", 128, None, None),
+    ("statement_start", "date", "YES", None, None, None),
+    ("statement_end", "date", "YES", None, None, None),
+    ("review_revision", "integer", "NO", None, None, None),
+    ("row_count", "integer", "NO", None, None, None),
+    ("status", "character varying", "NO", 24, None, None),
+    ("diagnostics", "jsonb", "NO", None, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+    ("updated_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["transaction_imports"] = (
+    ("transaction_imports_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    ("uq_transaction_import_idempotency", "UNIQUE", ("unique(idempotency_key)",)),
+    (
+        "transaction_imports_file_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(file_id)referencesprivate_files(id)ondelete restrict",),
+    ),
+    (
+        "transaction_imports_account_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(account_id)referencesaccounts(id)ondelete restrict",),
+    ),
+)
+TABLE_COLUMNS["financial_transactions"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("account_id", "uuid", "NO", None, None, None),
+    ("import_id", "uuid", "YES", None, None, None),
+    ("row_number", "integer", "YES", None, None, None),
+    ("source_label", "character varying", "NO", 100, None, None),
+    ("provider_transaction_id", "character varying", "YES", 200, None, None),
+    ("raw_posted_date", "character varying", "YES", 100, None, None),
+    ("posted_date", "date", "YES", None, None, None),
+    ("raw_transaction_date", "character varying", "YES", 100, None, None),
+    ("transaction_date", "date", "YES", None, None, None),
+    ("raw_amount", "character varying", "YES", 100, None, None),
+    ("amount", "numeric", "YES", None, 24, 10),
+    ("raw_currency", "character varying", "YES", 40, None, None),
+    ("currency", "character varying", "YES", 3, None, None),
+    ("raw_description", "text", "NO", None, None, None),
+    ("description", "text", "NO", None, None, None),
+    ("normalized_merchant", "character varying", "NO", 200, None, None),
+    ("raw_type", "character varying", "YES", 120, None, None),
+    ("raw_payload", "jsonb", "NO", None, None, None),
+    ("fingerprint", "character varying", "NO", 64, None, None),
+    ("status", "character varying", "NO", 24, None, None),
+    ("identity_resolution", "character varying", "YES", 24, None, None),
+    ("duplicate_of_transaction_id", "uuid", "YES", None, None, None),
+    ("classification", "character varying", "NO", 24, None, None),
+    ("category_id", "uuid", "YES", None, None, None),
+    ("category_source", "character varying", "NO", 24, None, None),
+    ("revision", "integer", "NO", None, None, None),
+    ("idempotency_key", "character varying", "YES", 128, None, None),
+    ("diagnostics", "jsonb", "NO", None, None, None),
+    ("published_at", "timestamp with time zone", "YES", None, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+    ("updated_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["financial_transactions"] = (
+    ("financial_transactions_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    (
+        "uq_transaction_import_row",
+        "UNIQUE",
+        ("unique(import_id,row_number)",),
+    ),
+    (
+        "financial_transactions_idempotency_key_key",
+        "UNIQUE",
+        ("unique(idempotency_key)",),
+    ),
+    (
+        "financial_transactions_account_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(account_id)referencesaccounts(id)ondelete restrict",),
+    ),
+    (
+        "financial_transactions_import_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(import_id)referencestransaction_imports(id)ondelete restrict",),
+    ),
+    (
+        "financial_transactions_category_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(category_id)referencesspending_categories(id)ondelete set null",),
+    ),
+    (
+        "financial_transactions_duplicate_of_transaction_id_fkey",
+        "FOREIGN KEY",
+        (
+            "foreignkey(duplicate_of_transaction_id)"
+            "referencesfinancial_transactions(id)ondelete set null",
+        ),
+    ),
+)
+TABLE_COLUMNS["transaction_provider_identities"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("account_id", "uuid", "NO", None, None, None),
+    ("source_label", "character varying", "NO", 100, None, None),
+    ("provider_transaction_id", "character varying", "NO", 200, None, None),
+    ("transaction_id", "uuid", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["transaction_provider_identities"] = (
+    ("transaction_provider_identities_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    (
+        "uq_transaction_provider_identity",
+        "UNIQUE",
+        ("unique(account_id,source_label,provider_transaction_id)",),
+    ),
+    (
+        "uq_transaction_provider_transaction",
+        "UNIQUE",
+        ("unique(transaction_id)",),
+    ),
+    (
+        "transaction_provider_identities_account_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(account_id)referencesaccounts(id)ondelete restrict",),
+    ),
+    (
+        "transaction_provider_identities_transaction_id_fkey",
+        "FOREIGN KEY",
+        (
+            "foreignkey(transaction_id)"
+            "referencesfinancial_transactions(id)ondelete cascade",
+        ),
+    ),
+)
+TABLE_COLUMNS["merchant_category_rules"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("normalized_merchant", "character varying", "NO", 200, None, None),
+    ("category_id", "uuid", "NO", None, None, None),
+    ("priority", "integer", "NO", None, None, None),
+    ("version", "integer", "NO", None, None, None),
+    ("active", "boolean", "NO", None, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+    ("updated_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["merchant_category_rules"] = (
+    ("merchant_category_rules_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    (
+        "uq_merchant_category_rule_version",
+        "UNIQUE",
+        ("unique(normalized_merchant,version)",),
+    ),
+    (
+        "merchant_category_rules_category_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(category_id)referencesspending_categories(id)ondelete restrict",),
+    ),
+)
+TABLE_COLUMNS["transaction_review_events"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("transaction_id", "uuid", "NO", None, None, None),
+    ("import_id", "uuid", "YES", None, None, None),
+    ("review_revision", "integer", "NO", None, None, None),
+    ("action", "character varying", "NO", 32, None, None),
+    ("reason", "character varying", "NO", 500, None, None),
+    ("change_payload", "jsonb", "NO", None, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["transaction_review_events"] = (
+    ("transaction_review_events_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    (
+        "transaction_review_events_transaction_id_fkey",
+        "FOREIGN KEY",
+        (
+            "foreignkey(transaction_id)"
+            "referencesfinancial_transactions(id)ondelete cascade",
+        ),
+    ),
+    (
+        "transaction_review_events_import_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(import_id)referencestransaction_imports(id)ondelete cascade",),
+    ),
+)
+TABLE_COLUMNS["transaction_splits"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("transaction_id", "uuid", "NO", None, None, None),
+    ("split_index", "integer", "NO", None, None, None),
+    ("amount", "numeric", "NO", None, 24, 10),
+    ("category_id", "uuid", "YES", None, None, None),
+    ("note", "character varying", "YES", 500, None, None),
+    ("revision", "integer", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["transaction_splits"] = (
+    ("transaction_splits_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    (
+        "uq_transaction_split_index",
+        "UNIQUE",
+        ("unique(transaction_id,split_index)",),
+    ),
+    (
+        "transaction_splits_transaction_id_fkey",
+        "FOREIGN KEY",
+        (
+            "foreignkey(transaction_id)"
+            "referencesfinancial_transactions(id)ondelete cascade",
+        ),
+    ),
+    (
+        "transaction_splits_category_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(category_id)referencesspending_categories(id)ondelete set null",),
+    ),
+)
+TABLE_COLUMNS["transfer_matches"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("first_transaction_id", "uuid", "NO", None, None, None),
+    ("second_transaction_id", "uuid", "NO", None, None, None),
+    ("status", "character varying", "NO", 24, None, None),
+    ("match_method", "character varying", "NO", 32, None, None),
+    ("reason", "character varying", "NO", 500, None, None),
+    ("confirmed_at", "timestamp with time zone", "YES", None, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+    ("updated_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["transfer_matches"] = (
+    ("transfer_matches_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    (
+        "transfer_matches_first_transaction_id_fkey",
+        "FOREIGN KEY",
+        (
+            "foreignkey(first_transaction_id)"
+            "referencesfinancial_transactions(id)ondelete restrict",
+        ),
+    ),
+    (
+        "transfer_matches_second_transaction_id_fkey",
+        "FOREIGN KEY",
+        (
+            "foreignkey(second_transaction_id)"
+            "referencesfinancial_transactions(id)ondelete restrict",
+        ),
+    ),
+)
+TABLE_COLUMNS["active_transfer_transactions"] = (
+    ("transaction_id", "uuid", "NO", None, None, None),
+    ("transfer_id", "uuid", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["active_transfer_transactions"] = (
+    (
+        "active_transfer_transactions_pkey",
+        "PRIMARY KEY",
+        ("primarykey(transaction_id)",),
+    ),
+    (
+        "active_transfer_transactions_transaction_id_fkey",
+        "FOREIGN KEY",
+        (
+            "foreignkey(transaction_id)"
+            "referencesfinancial_transactions(id)ondelete restrict",
+        ),
+    ),
+    (
+        "active_transfer_transactions_transfer_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(transfer_id)referencestransfer_matches(id)ondelete cascade",),
+    ),
+)
+
+STAGE2_TRANSACTIONS = DsqlMigration(
+    "0008_stage2_transactions",
+    (
+        DsqlMigrationStep(
+            "create_spending_categories",
+            "table",
+            """CREATE TABLE spending_categories (
+                id uuid NOT NULL,
+                slug varchar(80) NOT NULL,
+                display_name varchar(120) NOT NULL,
+                created_at timestamptz NOT NULL,
+                updated_at timestamptz NOT NULL,
+                CONSTRAINT spending_categories_pkey PRIMARY KEY (id),
+                CONSTRAINT uq_spending_category_slug UNIQUE (slug)
+            )""",
+            "spending_categories",
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :object_name)",
+        ),
+        DsqlMigrationStep(
+            "create_transaction_imports",
+            "table",
+            """CREATE TABLE transaction_imports (
+                id uuid NOT NULL,
+                file_id uuid NOT NULL,
+                account_id uuid NOT NULL,
+                source_label varchar(100) NOT NULL,
+                parser_version varchar(80) NOT NULL,
+                file_sha256 varchar(64) NOT NULL,
+                idempotency_key varchar(128) NOT NULL,
+                statement_start date,
+                statement_end date,
+                review_revision integer NOT NULL,
+                row_count integer NOT NULL,
+                status varchar(24) NOT NULL,
+                diagnostics jsonb NOT NULL,
+                created_at timestamptz NOT NULL,
+                updated_at timestamptz NOT NULL,
+                CONSTRAINT transaction_imports_pkey PRIMARY KEY (id),
+                CONSTRAINT uq_transaction_import_idempotency UNIQUE (idempotency_key),
+                CONSTRAINT transaction_imports_file_id_fkey FOREIGN KEY (file_id)
+                    REFERENCES private_files(id) ON DELETE RESTRICT,
+                CONSTRAINT transaction_imports_account_id_fkey FOREIGN KEY (account_id)
+                    REFERENCES accounts(id) ON DELETE RESTRICT
+            )""",
+            "transaction_imports",
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :object_name)",
+        ),
+        DsqlMigrationStep(
+            "create_financial_transactions",
+            "table",
+            """CREATE TABLE financial_transactions (
+                id uuid NOT NULL,
+                account_id uuid NOT NULL,
+                import_id uuid,
+                row_number integer,
+                source_label varchar(100) NOT NULL,
+                provider_transaction_id varchar(200),
+                raw_posted_date varchar(100),
+                posted_date date,
+                raw_transaction_date varchar(100),
+                transaction_date date,
+                raw_amount varchar(100),
+                amount numeric(24, 10),
+                raw_currency varchar(40),
+                currency varchar(3),
+                raw_description text NOT NULL,
+                description text NOT NULL,
+                normalized_merchant varchar(200) NOT NULL,
+                raw_type varchar(120),
+                raw_payload jsonb NOT NULL,
+                fingerprint varchar(64) NOT NULL,
+                status varchar(24) NOT NULL,
+                identity_resolution varchar(24),
+                duplicate_of_transaction_id uuid,
+                classification varchar(24) NOT NULL,
+                category_id uuid,
+                category_source varchar(24) NOT NULL,
+                revision integer NOT NULL,
+                idempotency_key varchar(128),
+                diagnostics jsonb NOT NULL,
+                published_at timestamptz,
+                created_at timestamptz NOT NULL,
+                updated_at timestamptz NOT NULL,
+                CONSTRAINT financial_transactions_pkey PRIMARY KEY (id),
+                CONSTRAINT uq_transaction_import_row UNIQUE (import_id, row_number),
+                CONSTRAINT financial_transactions_idempotency_key_key
+                    UNIQUE (idempotency_key),
+                CONSTRAINT financial_transactions_account_id_fkey
+                    FOREIGN KEY (account_id)
+                    REFERENCES accounts(id) ON DELETE RESTRICT,
+                CONSTRAINT financial_transactions_import_id_fkey FOREIGN KEY (import_id)
+                    REFERENCES transaction_imports(id) ON DELETE RESTRICT,
+                CONSTRAINT financial_transactions_category_id_fkey
+                    FOREIGN KEY (category_id)
+                    REFERENCES spending_categories(id) ON DELETE SET NULL,
+                CONSTRAINT financial_transactions_duplicate_of_transaction_id_fkey
+                    FOREIGN KEY (duplicate_of_transaction_id)
+                    REFERENCES financial_transactions(id) ON DELETE SET NULL
+            )""",
+            "financial_transactions",
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :object_name)",
+        ),
+        DsqlMigrationStep(
+            "create_transaction_provider_identities",
+            "table",
+            """CREATE TABLE transaction_provider_identities (
+                id uuid NOT NULL,
+                account_id uuid NOT NULL,
+                source_label varchar(100) NOT NULL,
+                provider_transaction_id varchar(200) NOT NULL,
+                transaction_id uuid NOT NULL,
+                CONSTRAINT transaction_provider_identities_pkey PRIMARY KEY (id),
+                CONSTRAINT uq_transaction_provider_identity UNIQUE
+                    (account_id, source_label, provider_transaction_id),
+                CONSTRAINT uq_transaction_provider_transaction UNIQUE (transaction_id),
+                CONSTRAINT transaction_provider_identities_account_id_fkey
+                    FOREIGN KEY (account_id)
+                    REFERENCES accounts(id) ON DELETE RESTRICT,
+                CONSTRAINT transaction_provider_identities_transaction_id_fkey
+                    FOREIGN KEY (transaction_id)
+                    REFERENCES financial_transactions(id) ON DELETE CASCADE
+            )""",
+            "transaction_provider_identities",
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :object_name)",
+        ),
+        DsqlMigrationStep(
+            "create_merchant_category_rules",
+            "table",
+            """CREATE TABLE merchant_category_rules (
+                id uuid NOT NULL,
+                normalized_merchant varchar(200) NOT NULL,
+                category_id uuid NOT NULL,
+                priority integer NOT NULL,
+                version integer NOT NULL,
+                active boolean NOT NULL,
+                created_at timestamptz NOT NULL,
+                updated_at timestamptz NOT NULL,
+                CONSTRAINT merchant_category_rules_pkey PRIMARY KEY (id),
+                CONSTRAINT uq_merchant_category_rule_version
+                    UNIQUE (normalized_merchant, version),
+                CONSTRAINT merchant_category_rules_category_id_fkey
+                    FOREIGN KEY (category_id)
+                    REFERENCES spending_categories(id) ON DELETE RESTRICT
+            )""",
+            "merchant_category_rules",
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :object_name)",
+        ),
+        DsqlMigrationStep(
+            "create_transaction_review_events",
+            "table",
+            """CREATE TABLE transaction_review_events (
+                id uuid NOT NULL,
+                transaction_id uuid NOT NULL,
+                import_id uuid,
+                review_revision integer NOT NULL,
+                action varchar(32) NOT NULL,
+                reason varchar(500) NOT NULL,
+                change_payload jsonb NOT NULL,
+                created_at timestamptz NOT NULL,
+                CONSTRAINT transaction_review_events_pkey PRIMARY KEY (id),
+                CONSTRAINT transaction_review_events_transaction_id_fkey
+                    FOREIGN KEY (transaction_id)
+                    REFERENCES financial_transactions(id) ON DELETE CASCADE,
+                CONSTRAINT transaction_review_events_import_id_fkey
+                    FOREIGN KEY (import_id)
+                    REFERENCES transaction_imports(id) ON DELETE CASCADE
+            )""",
+            "transaction_review_events",
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :object_name)",
+        ),
+        DsqlMigrationStep(
+            "create_transaction_splits",
+            "table",
+            """CREATE TABLE transaction_splits (
+                id uuid NOT NULL,
+                transaction_id uuid NOT NULL,
+                split_index integer NOT NULL,
+                amount numeric(24, 10) NOT NULL,
+                category_id uuid,
+                note varchar(500),
+                revision integer NOT NULL,
+                CONSTRAINT transaction_splits_pkey PRIMARY KEY (id),
+                CONSTRAINT uq_transaction_split_index
+                    UNIQUE (transaction_id, split_index),
+                CONSTRAINT transaction_splits_transaction_id_fkey
+                    FOREIGN KEY (transaction_id)
+                    REFERENCES financial_transactions(id) ON DELETE CASCADE,
+                CONSTRAINT transaction_splits_category_id_fkey FOREIGN KEY (category_id)
+                    REFERENCES spending_categories(id) ON DELETE SET NULL
+            )""",
+            "transaction_splits",
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :object_name)",
+        ),
+        DsqlMigrationStep(
+            "create_transfer_matches",
+            "table",
+            """CREATE TABLE transfer_matches (
+                id uuid NOT NULL,
+                first_transaction_id uuid NOT NULL,
+                second_transaction_id uuid NOT NULL,
+                status varchar(24) NOT NULL,
+                match_method varchar(32) NOT NULL,
+                reason varchar(500) NOT NULL,
+                confirmed_at timestamptz,
+                created_at timestamptz NOT NULL,
+                updated_at timestamptz NOT NULL,
+                CONSTRAINT transfer_matches_pkey PRIMARY KEY (id),
+                CONSTRAINT transfer_matches_first_transaction_id_fkey
+                    FOREIGN KEY (first_transaction_id)
+                    REFERENCES financial_transactions(id) ON DELETE RESTRICT,
+                CONSTRAINT transfer_matches_second_transaction_id_fkey
+                    FOREIGN KEY (second_transaction_id)
+                    REFERENCES financial_transactions(id) ON DELETE RESTRICT
+            )""",
+            "transfer_matches",
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :object_name)",
+        ),
+        DsqlMigrationStep(
+            "create_active_transfer_transactions",
+            "table",
+            """CREATE TABLE active_transfer_transactions (
+                transaction_id uuid NOT NULL,
+                transfer_id uuid NOT NULL,
+                CONSTRAINT active_transfer_transactions_pkey
+                    PRIMARY KEY (transaction_id),
+                CONSTRAINT active_transfer_transactions_transaction_id_fkey
+                    FOREIGN KEY (transaction_id)
+                    REFERENCES financial_transactions(id) ON DELETE RESTRICT,
+                CONSTRAINT active_transfer_transactions_transfer_id_fkey
+                    FOREIGN KEY (transfer_id)
+                    REFERENCES transfer_matches(id) ON DELETE CASCADE
+            )""",
+            "active_transfer_transactions",
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = current_schema() AND table_name = :object_name)",
+        ),
+        DsqlMigrationStep(
+            "index_transaction_imports_account",
+            "index",
+            "CREATE INDEX ASYNC ix_transaction_imports_account "
+            "ON transaction_imports (account_id, created_at)",
+            "ix_transaction_imports_account",
+            "SELECT true",
+            expected_index_table="transaction_imports",
+            expected_index_columns=("account_id", "created_at"),
+        ),
+        DsqlMigrationStep(
+            "index_transactions_account_posted",
+            "index",
+            "CREATE INDEX ASYNC ix_transactions_account_posted "
+            "ON financial_transactions (account_id, posted_date)",
+            "ix_transactions_account_posted",
+            "SELECT true",
+            expected_index_table="financial_transactions",
+            expected_index_columns=("account_id", "posted_date"),
+        ),
+        DsqlMigrationStep(
+            "index_transactions_import_status",
+            "index",
+            "CREATE INDEX ASYNC ix_transactions_import_status "
+            "ON financial_transactions (import_id, status)",
+            "ix_transactions_import_status",
+            "SELECT true",
+            expected_index_table="financial_transactions",
+            expected_index_columns=("import_id", "status"),
+        ),
+        DsqlMigrationStep(
+            "index_merchant_category_rule_lookup",
+            "index",
+            "CREATE INDEX ASYNC ix_merchant_category_rule_lookup "
+            "ON merchant_category_rules (normalized_merchant, active)",
+            "ix_merchant_category_rule_lookup",
+            "SELECT true",
+            expected_index_table="merchant_category_rules",
+            expected_index_columns=("normalized_merchant", "active"),
+        ),
+        DsqlMigrationStep(
+            "index_transaction_events_transaction",
+            "index",
+            "CREATE INDEX ASYNC ix_transaction_events_transaction "
+            "ON transaction_review_events (transaction_id, created_at)",
+            "ix_transaction_events_transaction",
+            "SELECT true",
+            expected_index_table="transaction_review_events",
+            expected_index_columns=("transaction_id", "created_at"),
+        ),
+        DsqlMigrationStep(
+            "index_transaction_splits_transaction",
+            "index",
+            "CREATE INDEX ASYNC ix_transaction_splits_transaction "
+            "ON transaction_splits (transaction_id)",
+            "ix_transaction_splits_transaction",
+            "SELECT true",
+            expected_index_table="transaction_splits",
+            expected_index_columns=("transaction_id",),
+        ),
+        DsqlMigrationStep(
+            "index_active_transfer_transactions_transfer",
+            "index",
+            "CREATE INDEX ASYNC ix_active_transfer_transactions_transfer "
+            "ON active_transfer_transactions (transfer_id)",
+            "ix_active_transfer_transactions_transfer",
+            "SELECT true",
+            expected_index_table="active_transfer_transactions",
+            expected_index_columns=("transfer_id",),
+        ),
+    ),
+)
+
 DSQL_MIGRATIONS = (
     CORE_SCHEMA,
     POSITION_SNAPSHOT_REVISION,
@@ -1452,6 +2048,7 @@ DSQL_MIGRATIONS = (
     STAGE1_FUND_COMPOSITIONS,
     STAGE1_REPORTS,
     STAGE2_DOCUMENT_INGESTION,
+    STAGE2_TRANSACTIONS,
 )
 LEDGER_DDL = """CREATE TABLE IF NOT EXISTS dsql_schema_migration_steps (
     revision varchar(128) NOT NULL,

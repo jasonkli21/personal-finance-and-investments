@@ -1,6 +1,6 @@
 # Stage 2 implementation plan
 
-**Status:** In progress; S2.1 local text-PDF preview slice implemented; S2.2 and S2.5 gated; S2.3, S2.4 and S2.6 pending
+**Status:** In progress; S2.1 local text-PDF preview slice and S2.3 local transaction workflow are partial; S2.2 gated; S2.5 evaluated and deferred; S2.4 and S2.6 pending
 **Updated:** 2026-10-02
 **Roadmap coverage:** Work packages 2.1–2.6
 
@@ -199,6 +199,8 @@ S2.5 is optional; no exit gate for the local document workflow depends on produc
 **Acceptance criteria:** a card purchase plus payment counts spending once; an owned-account transfer is not both income and expense; split totals reconcile; refunds reduce spending under the documented convention; ambiguous/partial/cross-currency transfer candidates stay reviewable; manual overrides are not lost after reruns.
 
 **Out of scope:** AI-required categorization, tax deductibility, and automatic inferred transactions.
+
+**Implementation status (2026-10-02):** A local CSV review workflow now preserves source rows, stages signed amounts, resolves native-ID and fingerprint ambiguity, and publishes with idempotent identity handling. Manual transactions, deterministic exact-merchant rules, audited classification corrections, exact signed splits, and explicit exact-match transfer confirmation/unlink are available through the API and spending workspace. This is a partial implementation: live PostgreSQL/browser journeys, collision/retry behavior under concurrent writes, and real DSQL integration remain unverified; refunds rely on the imported sign and user's classification.
 
 ### S2.4 — Deliver reconciled finance and net-worth views
 

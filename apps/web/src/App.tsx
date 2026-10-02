@@ -15,6 +15,7 @@ import { startReadinessPolling, type ApiStatus } from './readiness'
 import StageOneWorkspace from './StageOneWorkspace'
 import FundWorkspace from './FundWorkspace'
 import ReportWorkspace from './ReportWorkspace'
+import SpendingWorkspace from './SpendingWorkspace'
 
 type Security = components['schemas']['SecurityRead']
 type PositionLine = components['schemas']['PositionLineRead']
@@ -930,6 +931,7 @@ export default function App() {
           }
         }}
       />
+      <SpendingWorkspace />
     </main>
   )
 }

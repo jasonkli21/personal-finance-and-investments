@@ -1,0 +1,43 @@
+{
+  "currency_default": null,
+  "parser_version": "bank-card-csv/1",
+  "signed_amounts_are_preserved": true,
+  "rows": [
+    {
+      "posted_date": "2026-09-01",
+      "transaction_date": "2026-08-31",
+      "description": "Neighborhood Grocery",
+      "amount": "-12.34",
+      "currency": "USD",
+      "provider_transaction_id": "synthetic-card-001",
+      "classification": "unclassified"
+    },
+    {
+      "posted_date": "2026-09-02",
+      "transaction_date": "2026-09-02",
+      "description": "Corner Coffee",
+      "amount": "-4.50",
+      "currency": "USD",
+      "provider_transaction_id": "synthetic-card-002",
+      "classification": "unclassified"
+    },
+    {
+      "posted_date": "2026-09-02",
+      "transaction_date": "2026-09-02",
+      "description": "Corner Coffee",
+      "amount": "-4.50",
+      "currency": "USD",
+      "provider_transaction_id": "synthetic-card-003",
+      "classification": "unclassified"
+    },
+    {
+      "posted_date": "2026-09-04",
+      "transaction_date": "2026-09-03",
+      "description": "Store Refund",
+      "amount": "3.20",
+      "currency": "USD",
+      "provider_transaction_id": "synthetic-card-004",
+      "classification": "unclassified"
+    }
+  ]
+}

@@ -91,6 +91,42 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/categories': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Categories */
+    get: operations['get_categories_v1_categories_get']
+    put?: never
+    /** Post Category */
+    post: operations['post_category_v1_categories_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/category-rules': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Category Rules */
+    get: operations['get_category_rules_v1_category_rules_get']
+    put?: never
+    /** Post Category Rule */
+    post: operations['post_category_rule_v1_category_rules_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/documents/{document_id}': {
     parameters: {
       query?: never
@@ -238,6 +274,23 @@ export interface paths {
     put?: never
     /** Post Position Import Preview */
     post: operations['post_position_import_preview_v1_imports_positions_preview_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/imports/transactions/preview': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Post Transaction Import Preview */
+    post: operations['post_transaction_import_preview_v1_imports_transactions_preview_post']
     delete?: never
     options?: never
     head?: never
@@ -501,6 +554,194 @@ export interface paths {
     patch: operations['patch_security_issuer_v1_securities__security_id__issuer_patch']
     trace?: never
   }
+  '/v1/transaction-imports/{import_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Transaction Import */
+    get: operations['get_transaction_import_v1_transaction_imports__import_id__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/transaction-imports/{import_id}/cancel': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Post Cancel Transaction Import */
+    post: operations['post_cancel_transaction_import_v1_transaction_imports__import_id__cancel_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/transaction-imports/{import_id}/publish': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Post Publish Transaction Import */
+    post: operations['post_publish_transaction_import_v1_transaction_imports__import_id__publish_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/transaction-imports/{import_id}/rows/{row_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /** Patch Transaction Import Row */
+    patch: operations['patch_transaction_import_row_v1_transaction_imports__import_id__rows__row_id__patch']
+    trace?: never
+  }
+  '/v1/transactions': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Transactions */
+    get: operations['get_transactions_v1_transactions_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/transactions/manual': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Post Manual Transaction */
+    post: operations['post_manual_transaction_v1_transactions_manual_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/transactions/{transaction_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /** Patch Transaction */
+    patch: operations['patch_transaction_v1_transactions__transaction_id__patch']
+    trace?: never
+  }
+  '/v1/transactions/{transaction_id}/splits': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Transaction Splits */
+    get: operations['get_transaction_splits_v1_transactions__transaction_id__splits_get']
+    /** Put Transaction Splits */
+    put: operations['put_transaction_splits_v1_transactions__transaction_id__splits_put']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/transfers': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Post Transfer */
+    post: operations['post_transfer_v1_transfers_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/transfers/candidates': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Transfer Candidates */
+    get: operations['get_transfer_candidates_v1_transfers_candidates_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/transfers/{transfer_id}/unlink': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Post Unlink Transfer */
+    post: operations['post_unlink_transfer_v1_transfers__transfer_id__unlink_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export interface components {
@@ -542,6 +783,44 @@ export interface components {
       name: string
       /** Source Type */
       source_type: string
+    }
+    /** CategoryRuleCreate */
+    CategoryRuleCreate: {
+      /**
+       * Category Id
+       * Format: uuid
+       */
+      category_id: string
+      /** Merchant */
+      merchant: string
+      /**
+       * Priority
+       * @default 100
+       */
+      priority: number
+    }
+    /** CategoryRuleRead */
+    CategoryRuleRead: {
+      /** Active */
+      active: boolean
+      /**
+       * Category Id
+       * Format: uuid
+       */
+      category_id: string
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Merchant */
+      merchant: string
+      /** Normalized Merchant */
+      normalized_merchant: string
+      /** Priority */
+      priority: number
+      /** Version */
+      version: number
     }
     /** DocumentImportCreated */
     DocumentImportCreated: {
@@ -1291,6 +1570,351 @@ export interface components {
        */
       status: 'resolved' | 'ambiguous' | 'unknown'
     }
+    /** SpendingCategoryCreate */
+    SpendingCategoryCreate: {
+      /** Display Name */
+      display_name: string
+      /** Slug */
+      slug: string
+    }
+    /** SpendingCategoryRead */
+    SpendingCategoryRead: {
+      /** Display Name */
+      display_name: string
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Slug */
+      slug: string
+    }
+    /** TransactionImportAction */
+    TransactionImportAction: {
+      /** Expected Review Revision */
+      expected_review_revision: number
+      /** Reason */
+      reason: string
+    }
+    /** TransactionImportCreated */
+    TransactionImportCreated: {
+      /** Duplicate */
+      duplicate: boolean
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Review Revision */
+      review_revision: number
+      /** Row Count */
+      row_count: number
+      /** Status */
+      status: string
+    }
+    /** TransactionImportReviewRead */
+    TransactionImportReviewRead: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Diagnostics */
+      diagnostics: {
+        [key: string]: unknown
+      }
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Parser Version */
+      parser_version: string
+      /** Review Revision */
+      review_revision: number
+      /** Row Count */
+      row_count: number
+      /** Rows */
+      rows: components['schemas']['TransactionRowRead'][]
+      /** Source Label */
+      source_label: string
+      /** Statement End */
+      statement_end: string | null
+      /** Statement Start */
+      statement_start: string | null
+      /** Status */
+      status: string
+    }
+    /** TransactionManualCreate */
+    TransactionManualCreate: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Amount */
+      amount: string
+      /** Category Id */
+      category_id?: string | null
+      /**
+       * Classification
+       * @default unclassified
+       * @enum {string}
+       */
+      classification:
+        | 'unclassified'
+        | 'income'
+        | 'expense'
+        | 'refund'
+        | 'transfer'
+        | 'card_payment'
+        | 'fee'
+        | 'other'
+      /** Currency */
+      currency: string
+      /** Description */
+      description: string
+      /** Idempotency Key */
+      idempotency_key: string
+      /**
+       * Posted Date
+       * Format: date
+       */
+      posted_date: string
+      /** Transaction Date */
+      transaction_date?: string | null
+    }
+    /** TransactionPatch */
+    TransactionPatch: {
+      /** Category Id */
+      category_id?: string | null
+      /** Classification */
+      classification?:
+        | (
+            | 'unclassified'
+            | 'income'
+            | 'expense'
+            | 'refund'
+            | 'transfer'
+            | 'card_payment'
+            | 'fee'
+            | 'other'
+          )
+        | null
+      /** Expected Revision */
+      expected_revision: number
+      /** Reason */
+      reason: string
+    }
+    /** TransactionRead */
+    TransactionRead: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Amount */
+      amount: string
+      /** Category Id */
+      category_id: string | null
+      /** Category Name */
+      category_name: string | null
+      /** Category Slug */
+      category_slug: string | null
+      /** Category Source */
+      category_source: string
+      /** Classification */
+      classification: string
+      /** Currency */
+      currency: string
+      /** Description */
+      description: string
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /**
+       * Posted Date
+       * Format: date
+       */
+      posted_date: string
+      /** Provider Transaction Id */
+      provider_transaction_id: string | null
+      /** Raw Description */
+      raw_description: string
+      /** Raw Type */
+      raw_type: string | null
+      /** Revision */
+      revision: number
+      /** Source Label */
+      source_label: string
+      /** Split Count */
+      split_count: number
+      /** Transaction Date */
+      transaction_date: string | null
+      /** Transfer Match Id */
+      transfer_match_id: string | null
+    }
+    /** TransactionRowCorrection */
+    TransactionRowCorrection: {
+      /** Amount */
+      amount?: string | null
+      /** Currency */
+      currency?: string | null
+      /** Description */
+      description?: string | null
+      /** Duplicate Of Transaction Id */
+      duplicate_of_transaction_id?: string | null
+      /** Expected Review Revision */
+      expected_review_revision: number
+      /** Identity Resolution */
+      identity_resolution?: ('keep' | 'duplicate' | 'update') | null
+      /** Posted Date */
+      posted_date?: string | null
+      /** Provider Transaction Id */
+      provider_transaction_id?: string | null
+      /** Raw Type */
+      raw_type?: string | null
+      /** Reason */
+      reason: string
+      /** Transaction Date */
+      transaction_date?: string | null
+    }
+    /** TransactionRowRead */
+    TransactionRowRead: {
+      /** Amount */
+      amount: string | null
+      /** Currency */
+      currency: string | null
+      /** Description */
+      description: string
+      /** Diagnostics */
+      diagnostics: {
+        [key: string]: unknown
+      }
+      /** Duplicate Candidates */
+      duplicate_candidates: string[]
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Posted Date */
+      posted_date: string | null
+      /** Provider Transaction Id */
+      provider_transaction_id: string | null
+      /** Raw Amount */
+      raw_amount: string | null
+      /** Raw Currency */
+      raw_currency: string | null
+      /** Raw Description */
+      raw_description: string
+      /** Raw Payload */
+      raw_payload: {
+        [key: string]: unknown
+      }
+      /** Raw Posted Date */
+      raw_posted_date: string | null
+      /** Raw Transaction Date */
+      raw_transaction_date: string | null
+      /** Raw Type */
+      raw_type: string | null
+      /** Row Number */
+      row_number: number | null
+      /** Status */
+      status: string
+      /** Transaction Date */
+      transaction_date: string | null
+    }
+    /** TransactionSplitInput */
+    TransactionSplitInput: {
+      /** Amount */
+      amount: string
+      /** Category Id */
+      category_id?: string | null
+      /** Note */
+      note?: string | null
+    }
+    /** TransactionSplitRead */
+    TransactionSplitRead: {
+      /** Amount */
+      amount: string
+      /** Category Id */
+      category_id: string | null
+      /** Category Name */
+      category_name: string | null
+      /** Category Slug */
+      category_slug: string | null
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Note */
+      note: string | null
+      /** Split Index */
+      split_index: number
+    }
+    /** TransactionSplitsReplace */
+    TransactionSplitsReplace: {
+      /** Expected Revision */
+      expected_revision: number
+      /** Reason */
+      reason: string
+      /** Splits */
+      splits: components['schemas']['TransactionSplitInput'][]
+    }
+    /** TransferCandidateRead */
+    TransferCandidateRead: {
+      /** Date Gap Days */
+      date_gap_days: number
+      first_transaction: components['schemas']['TransactionRead']
+      /** Reason */
+      reason: string
+      second_transaction: components['schemas']['TransactionRead']
+    }
+    /** TransferCreate */
+    TransferCreate: {
+      /**
+       * First Transaction Id
+       * Format: uuid
+       */
+      first_transaction_id: string
+      /** Reason */
+      reason: string
+      /**
+       * Second Transaction Id
+       * Format: uuid
+       */
+      second_transaction_id: string
+    }
+    /** TransferRead */
+    TransferRead: {
+      /** Confirmed At */
+      confirmed_at: string | null
+      /**
+       * First Transaction Id
+       * Format: uuid
+       */
+      first_transaction_id: string
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Match Method */
+      match_method: string
+      /** Reason */
+      reason: string
+      /**
+       * Second Transaction Id
+       * Format: uuid
+       */
+      second_transaction_id: string
+      /** Status */
+      status: string
+    }
     /** ValidationError */
     ValidationError: {
       /** Context */
@@ -1616,6 +2240,220 @@ export interface operations {
         }
       }
       /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  get_categories_v1_categories_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SpendingCategoryRead'][]
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or identity conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  post_category_v1_categories_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SpendingCategoryCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SpendingCategoryRead']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or identity conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  get_category_rules_v1_category_rules_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CategoryRuleRead'][]
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or identity conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  post_category_rule_v1_category_rules_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CategoryRuleCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['CategoryRuleRead']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or identity conflict */
       409: {
         headers: {
           [name: string]: unknown
@@ -2030,6 +2868,69 @@ export interface operations {
         }
       }
       /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  post_transaction_import_preview_v1_imports_transactions_preview_post: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Account-Id': string
+        'X-Source-Label': string
+        'Idempotency-Key': string
+        'X-Column-Mapping': string
+        'X-Statement-Start'?: string | null
+        'X-Statement-End'?: string | null
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TransactionImportCreated']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or identity conflict */
       409: {
         headers: {
           [name: string]: unknown
@@ -2914,6 +3815,732 @@ export interface operations {
         }
       }
       /** @description Revision or state conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  get_transaction_import_v1_transaction_imports__import_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        import_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TransactionImportReviewRead']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or identity conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  post_cancel_transaction_import_v1_transaction_imports__import_id__cancel_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        import_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TransactionImportAction']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TransactionImportCreated']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or identity conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  post_publish_transaction_import_v1_transaction_imports__import_id__publish_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        import_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TransactionImportAction']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TransactionImportCreated']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or identity conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  patch_transaction_import_row_v1_transaction_imports__import_id__rows__row_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        import_id: string
+        row_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TransactionRowCorrection']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TransactionRowRead']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or identity conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  get_transactions_v1_transactions_get: {
+    parameters: {
+      query?: {
+        account_id?: string | null
+        start_date?: string | null
+        end_date?: string | null
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TransactionRead'][]
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or identity conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  post_manual_transaction_v1_transactions_manual_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TransactionManualCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TransactionRead']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or identity conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  patch_transaction_v1_transactions__transaction_id__patch: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        transaction_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TransactionPatch']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TransactionRead']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or identity conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  get_transaction_splits_v1_transactions__transaction_id__splits_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        transaction_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TransactionSplitRead'][]
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or identity conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  put_transaction_splits_v1_transactions__transaction_id__splits_put: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        transaction_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TransactionSplitsReplace']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TransactionSplitRead'][]
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or identity conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  post_transfer_v1_transfers_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TransferCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TransferRead']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or identity conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  get_transfer_candidates_v1_transfers_candidates_get: {
+    parameters: {
+      query?: {
+        limit?: number
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TransferCandidateRead'][]
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or identity conflict */
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+      /** @description Database unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  post_unlink_transfer_v1_transfers__transfer_id__unlink_post: {
+    parameters: {
+      query?: never
+      header: {
+        'X-Reason': string
+      }
+      path: {
+        transfer_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['TransferRead']
+        }
+      }
+      /** @description Requested resource not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Revision or identity conflict */
       409: {
         headers: {
           [name: string]: unknown

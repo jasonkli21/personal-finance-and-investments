@@ -179,8 +179,7 @@ export async function previewBrokeragePdf(input: {
     body: input.file,
   })
   const body = (await response.json()) as
-    | components['schemas']['DocumentImportCreated']
-    | { detail?: string }
+    components['schemas']['DocumentImportCreated'] | { detail?: string }
   if (!response.ok) {
     throw new ApiError(
       response.status,
@@ -190,6 +189,184 @@ export async function previewBrokeragePdf(input: {
     )
   }
   return body as components['schemas']['DocumentImportCreated']
+}
+
+export async function previewTransactionImport(input: {
+  accountId: string
+  sourceLabel: string
+  mapping: Record<string, string>
+  file: File
+}) {
+  const response = await fetch('/api/v1/imports/transactions/preview', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'text/csv',
+      'X-Account-Id': input.accountId,
+      'X-Source-Label': input.sourceLabel,
+      'X-Column-Mapping': JSON.stringify(input.mapping),
+      'X-File-Name': input.file.name,
+      'Idempotency-Key': crypto.randomUUID(),
+    },
+    body: input.file,
+  })
+  const body = (await response.json()) as
+    components['schemas']['TransactionImportCreated'] | { detail?: string }
+  if (!response.ok) {
+    throw new ApiError(
+      response.status,
+      'detail' in body
+        ? (body.detail ?? 'Transaction review could not be started.')
+        : 'Transaction review could not be started.',
+    )
+  }
+  return body as components['schemas']['TransactionImportCreated']
+}
+
+export async function fetchTransactionImport(importId: string) {
+  return unwrap(
+    await api.GET('/v1/transaction-imports/{import_id}', {
+      params: { path: { import_id: importId } },
+    }),
+  )
+}
+
+export async function correctTransactionRow(
+  importId: string,
+  rowId: string,
+  input: components['schemas']['TransactionRowCorrection'],
+) {
+  return unwrap(
+    await api.PATCH('/v1/transaction-imports/{import_id}/rows/{row_id}', {
+      params: { path: { import_id: importId, row_id: rowId } },
+      body: input,
+    }),
+  )
+}
+
+export async function publishTransactionImport(
+  importId: string,
+  expectedReviewRevision: number,
+) {
+  return unwrap(
+    await api.POST('/v1/transaction-imports/{import_id}/publish', {
+      params: { path: { import_id: importId } },
+      body: {
+        expected_review_revision: expectedReviewRevision,
+        reason: 'Accepted in transaction review',
+      },
+    }),
+  )
+}
+
+export async function cancelTransactionImport(
+  importId: string,
+  expectedReviewRevision: number,
+) {
+  return unwrap(
+    await api.POST('/v1/transaction-imports/{import_id}/cancel', {
+      params: { path: { import_id: importId } },
+      body: {
+        expected_review_revision: expectedReviewRevision,
+        reason: 'Cancelled in transaction review',
+      },
+    }),
+  )
+}
+
+export async function fetchTransactions(accountId: string) {
+  return unwrap(
+    await api.GET('/v1/transactions', {
+      params: { query: { account_id: accountId, limit: 200 } },
+    }),
+  )
+}
+
+export async function createManualTransaction(
+  input: components['schemas']['TransactionManualCreate'],
+) {
+  return unwrap(await api.POST('/v1/transactions/manual', { body: input }))
+}
+
+export async function updateTransaction(
+  id: string,
+  input: components['schemas']['TransactionPatch'],
+) {
+  return unwrap(
+    await api.PATCH('/v1/transactions/{transaction_id}', {
+      params: { path: { transaction_id: id } },
+      body: input,
+    }),
+  )
+}
+
+export async function fetchTransactionSplits(transactionId: string) {
+  return unwrap(
+    await api.GET('/v1/transactions/{transaction_id}/splits', {
+      params: { path: { transaction_id: transactionId } },
+    }),
+  )
+}
+
+export async function replaceTransactionSplits(
+  transactionId: string,
+  input: components['schemas']['TransactionSplitsReplace'],
+) {
+  return unwrap(
+    await api.PUT('/v1/transactions/{transaction_id}/splits', {
+      params: { path: { transaction_id: transactionId } },
+      body: input,
+    }),
+  )
+}
+
+export async function fetchCategories() {
+  return unwrap(await api.GET('/v1/categories'))
+}
+
+export async function createCategory(
+  input: components['schemas']['SpendingCategoryCreate'],
+) {
+  return unwrap(await api.POST('/v1/categories', { body: input }))
+}
+
+export async function fetchCategoryRules() {
+  return unwrap(await api.GET('/v1/category-rules'))
+}
+
+export async function createCategoryRule(
+  input: components['schemas']['CategoryRuleCreate'],
+) {
+  return unwrap(await api.POST('/v1/category-rules', { body: input }))
+}
+
+export async function fetchTransferCandidates() {
+  return unwrap(await api.GET('/v1/transfers/candidates'))
+}
+
+export async function confirmTransfer(
+  firstTransactionId: string,
+  secondTransactionId: string,
+) {
+  return unwrap(
+    await api.POST('/v1/transfers', {
+      body: {
+        first_transaction_id: firstTransactionId,
+        second_transaction_id: secondTransactionId,
+        reason: 'Confirmed from transfer review',
+      },
+    }),
+  )
+}
+
+export async function unlinkTransfer(transferId: string) {
+  return unwrap(
+    await api.POST('/v1/transfers/{transfer_id}/unlink', {
+      params: {
+        path: { transfer_id: transferId },
+        header: { 'X-Reason': 'Unlinked from spending review' },
+      },
+    }),
+  )
 }
 
 export async function correctImportRow(

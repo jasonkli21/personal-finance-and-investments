@@ -1,0 +1,5 @@
+Posted Date,Transaction Date,Description,Amount,Currency,FitID,Type
+2026-09-01,2026-08-31,Neighborhood Grocery,-12.34,USD,synthetic-card-001,Debit
+2026-09-02,2026-09-02,Corner Coffee,-4.50,USD,synthetic-card-002,Debit
+2026-09-02,2026-09-02,Corner Coffee,-4.50,USD,synthetic-card-003,Debit
+2026-09-04,2026-09-03,Store Refund,3.20,USD,synthetic-card-004,Credit

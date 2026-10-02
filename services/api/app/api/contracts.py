@@ -191,6 +191,242 @@ class DocumentImportRead(BaseModel):
     filename: str
 
 
+class SpendingCategoryCreate(BaseModel):
+    slug: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{0,79}$")
+    display_name: str = Field(min_length=1, max_length=120)
+
+    @field_validator("display_name")
+    @classmethod
+    def trim_display_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Category name cannot be blank")
+        return normalized
+
+
+class SpendingCategoryRead(BaseModel):
+    id: UUID
+    slug: str
+    display_name: str
+
+
+class TransactionImportCreated(BaseModel):
+    id: UUID
+    status: str
+    row_count: int
+    review_revision: int
+    duplicate: bool
+
+
+class TransactionRowRead(BaseModel):
+    id: UUID
+    row_number: int | None
+    raw_payload: dict[str, Any]
+    raw_posted_date: str | None
+    posted_date: date | None
+    raw_transaction_date: str | None
+    transaction_date: date | None
+    raw_amount: str | None
+    amount: str | None
+    raw_currency: str | None
+    currency: str | None
+    raw_description: str
+    description: str
+    raw_type: str | None
+    provider_transaction_id: str | None
+    status: str
+    diagnostics: dict[str, Any]
+    duplicate_candidates: list[UUID]
+
+
+class TransactionImportReviewRead(BaseModel):
+    id: UUID
+    account_id: UUID
+    source_label: str
+    statement_start: date | None
+    statement_end: date | None
+    parser_version: str
+    status: str
+    review_revision: int
+    row_count: int
+    diagnostics: dict[str, Any]
+    rows: list[TransactionRowRead]
+
+
+class TransactionRowCorrection(BaseModel):
+    expected_review_revision: int = Field(ge=1)
+    reason: str = Field(min_length=1, max_length=500)
+    posted_date: date | None = None
+    transaction_date: date | None = None
+    amount: str | None = Field(
+        default=None, max_length=40, pattern=r"^-?\d+(?:\.\d{1,10})?$"
+    )
+    currency: str | None = Field(default=None, pattern=r"^[A-Z]{3}$")
+    description: str | None = Field(default=None, min_length=1, max_length=2000)
+    provider_transaction_id: str | None = Field(default=None, max_length=200)
+    raw_type: str | None = Field(default=None, max_length=120)
+    identity_resolution: Literal["keep", "duplicate", "update"] | None = None
+    duplicate_of_transaction_id: UUID | None = None
+
+    @field_validator("amount")
+    @classmethod
+    def transaction_amount_precision(cls, value: str | None) -> str | None:
+        if value is not None and len(value.lstrip("-").split(".")[0]) > 14:
+            raise ValueError("Amount exceeds NUMERIC(24, 10) precision")
+        return value
+
+
+class TransactionImportAction(BaseModel):
+    expected_review_revision: int = Field(ge=1)
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class TransactionRead(BaseModel):
+    id: UUID
+    account_id: UUID
+    posted_date: date
+    transaction_date: date | None
+    amount: str
+    currency: str
+    raw_description: str
+    description: str
+    raw_type: str | None
+    provider_transaction_id: str | None
+    source_label: str
+    classification: str
+    category_id: UUID | None
+    category_slug: str | None
+    category_name: str | None
+    category_source: str
+    revision: int
+    split_count: int
+    transfer_match_id: UUID | None
+
+
+class TransactionManualCreate(BaseModel):
+    account_id: UUID
+    posted_date: date
+    transaction_date: date | None = None
+    amount: str = Field(max_length=40, pattern=r"^-?\d+(?:\.\d{1,10})?$")
+    currency: str = Field(pattern=r"^[A-Z]{3}$")
+    description: str = Field(min_length=1, max_length=2000)
+    classification: Literal[
+        "unclassified",
+        "income",
+        "expense",
+        "refund",
+        "transfer",
+        "card_payment",
+        "fee",
+        "other",
+    ] = "unclassified"
+    category_id: UUID | None = None
+    idempotency_key: str = Field(min_length=1, max_length=128)
+
+    @field_validator("amount")
+    @classmethod
+    def manual_amount_precision(cls, value: str) -> str:
+        if len(value.lstrip("-").split(".")[0]) > 14:
+            raise ValueError("Amount exceeds NUMERIC(24, 10) precision")
+        return value
+
+
+class TransactionPatch(BaseModel):
+    expected_revision: int = Field(ge=1)
+    reason: str = Field(min_length=1, max_length=500)
+    classification: (
+        Literal[
+            "unclassified",
+            "income",
+            "expense",
+            "refund",
+            "transfer",
+            "card_payment",
+            "fee",
+            "other",
+        ]
+        | None
+    ) = None
+    category_id: UUID | None = None
+
+    @model_validator(mode="after")
+    def require_a_change(self) -> "TransactionPatch":
+        if (
+            "classification" not in self.model_fields_set
+            and "category_id" not in self.model_fields_set
+        ):
+            raise ValueError("At least one transaction field must be provided")
+        return self
+
+
+class CategoryRuleCreate(BaseModel):
+    merchant: str = Field(min_length=1, max_length=200)
+    category_id: UUID
+    priority: int = Field(default=100, ge=0, le=10000)
+
+
+class CategoryRuleRead(BaseModel):
+    id: UUID
+    merchant: str
+    normalized_merchant: str
+    category_id: UUID
+    priority: int
+    version: int
+    active: bool
+
+
+class TransactionSplitInput(BaseModel):
+    amount: str = Field(max_length=40, pattern=r"^-?\d+(?:\.\d{1,10})?$")
+    category_id: UUID | None = None
+    note: str | None = Field(default=None, max_length=500)
+
+    @field_validator("amount")
+    @classmethod
+    def split_amount_precision(cls, value: str) -> str:
+        if len(value.lstrip("-").split(".")[0]) > 14:
+            raise ValueError("Split exceeds NUMERIC(24, 10) precision")
+        return value
+
+
+class TransactionSplitsReplace(BaseModel):
+    expected_revision: int = Field(ge=1)
+    reason: str = Field(min_length=1, max_length=500)
+    splits: list[TransactionSplitInput] = Field(max_length=100)
+
+
+class TransactionSplitRead(BaseModel):
+    id: UUID
+    split_index: int
+    amount: str
+    category_id: UUID | None
+    category_slug: str | None
+    category_name: str | None
+    note: str | None
+
+
+class TransferCreate(BaseModel):
+    first_transaction_id: UUID
+    second_transaction_id: UUID
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class TransferRead(BaseModel):
+    id: UUID
+    first_transaction_id: UUID
+    second_transaction_id: UUID
+    status: str
+    match_method: str
+    reason: str
+    confirmed_at: datetime | None
+
+
+class TransferCandidateRead(BaseModel):
+    first_transaction: TransactionRead
+    second_transaction: TransactionRead
+    date_gap_days: int
+    reason: str
+
+
 class ImportRowRead(BaseModel):
     id: UUID
     row_number: int

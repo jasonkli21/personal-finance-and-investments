@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import io
 import json
 import os
@@ -30,12 +31,12 @@ def _apply_process_limits() -> None:
 
 def main() -> None:
     _apply_process_limits()
+    result: dict[str, object]
     try:
         content = sys.stdin.buffer.read(MAX_PDF_BYTES + 1)
         if not content.startswith(b"%PDF-") or len(content) > MAX_PDF_BYTES:
             raise ValueError("pdf_invalid")
-        from pypdf import PdfReader
-
+        PdfReader = importlib.import_module("pypdf").PdfReader
         reader = PdfReader(io.BytesIO(content), strict=True)
         if reader.is_encrypted or not 1 <= len(reader.pages) <= MAX_PAGES:
             raise ValueError("pdf_unsupported")

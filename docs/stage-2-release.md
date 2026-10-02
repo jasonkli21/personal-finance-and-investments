@@ -16,13 +16,13 @@ The checked-in example is wholly synthetic: [`fixtures/stage-2/synthetic-brokera
 | --- | --- | --- |
 | S2.1 files and deterministic preview | Partial | PDF preview uses existing reviewed position publication. Upload size, parser time/page/row/text bounds are configured. Correction history for PDF-specific diagnostics, document CSV adapters, worker execution, and full acceptance evidence remain. |
 | S2.2 shared candidate extraction | Deferred at dependency gate | Upstream extraction transport, verified identity/owner propagation, and reviewed real-data handling are not available. [`S2.2 gate evidence`](stage-2-ai-gate.md). `PERSONAL_AI_ENABLED=false`; no statement transmission. |
-| S2.3 transactions/categories/transfers | Pending | No canonical transaction schema or workflow has shipped yet. |
+| S2.3 transactions/categories/transfers | Partial | Reviewed CSV/manual transactions, identity decisions, exact merchant rules, auditable categories, signed splits, and confirmed exact-match transfer link/unlink are implemented. Database/browser acceptance and live DSQL verification remain. |
 | S2.4 finance/net-worth views | Pending | No spending summary or unified balance view has shipped yet. |
 | S2.5 read-only account sync | Optional; evaluation only | Current official Plaid documentation requires production product access and production billing depends on product/agreement. No production tokens or connections are present. See [source evaluation](03-data-sources.md#plaid). |
 | S2.6 jobs and release evaluation | Pending | PDF parse is synchronous from the user's perspective; no durable job/lease/worker contract exists. |
 
 ## Verification state
 
-The generated OpenAPI JSON and TypeScript schema include the S2.1 routes and contracts. The Stage 2 parser, migration, preview/review, duplicate-upload, and browser journey have not been run against a database or browser for this delivery. The live DSQL path is unverified. Do not treat the synthetic expected JSON as a benchmark result.
+The generated OpenAPI JSON and TypeScript schema include the S2.1 and S2.3 routes and contracts. Static Python checks, mypy, the web TypeScript checker, and the DSQL plan structural validator passed. The Stage 2 parser, migration, CSV review/publication, split reconciliation, transfer unlink, duplicate-upload, and browser journeys have not been run against a database or browser for this delivery. The live DSQL path is unverified. Do not treat the synthetic expected JSON as a benchmark result.
 
 Continue with the repo commands in [`README.md`](../README.md). After dependencies are installed, regenerate contracts with `pnpm api:generate`. Apply local schema changes through the usual Alembic migration command. Before hosted use, add authentication and authorization for document metadata and private previews, and complete the real DSQL gate.

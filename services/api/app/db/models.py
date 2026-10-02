@@ -331,7 +331,9 @@ class DocumentImport(TimestampMixin, Base):
     __tablename__ = "document_imports"
     __table_args__ = (
         UniqueConstraint("idempotency_key", name="uq_document_import_idempotency"),
-        UniqueConstraint("file_id", "position_import_id", name="uq_document_import_link"),
+        UniqueConstraint(
+            "file_id", "position_import_id", name="uq_document_import_link"
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
@@ -346,7 +348,9 @@ class DocumentImport(TimestampMixin, Base):
         nullable=False,
     )
     account_id: Mapped[UUID] = mapped_column(
-        Uuid(as_uuid=True), ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False
+        Uuid(as_uuid=True),
+        ForeignKey("accounts.id", ondelete="RESTRICT"),
+        nullable=False,
     )
     effective_date: Mapped[date] = mapped_column(Date, nullable=False)
     source_label: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -559,4 +563,255 @@ class Calculation(Base):
     calculation_version: Mapped[str] = mapped_column(String(80), nullable=False)
     generated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
+    )
+
+
+class TransactionImport(TimestampMixin, Base):
+    """Reviewed bank/card CSV import attempt; source rows remain immutable."""
+
+    __tablename__ = "transaction_imports"
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_transaction_import_idempotency"),
+        Index("ix_transaction_imports_account", "account_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    file_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("private_files.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    account_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("accounts.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    source_label: Mapped[str] = mapped_column(String(100), nullable=False)
+    parser_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    file_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    statement_start: Mapped[date | None] = mapped_column(Date)
+    statement_end: Mapped[date | None] = mapped_column(Date)
+    review_revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    diagnostics: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), nullable=False, default=dict
+    )
+
+
+class SpendingCategory(TimestampMixin, Base):
+    """User-defined stable spending category."""
+
+    __tablename__ = "spending_categories"
+    __table_args__ = (UniqueConstraint("slug", name="uq_spending_category_slug"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    slug: Mapped[str] = mapped_column(String(80), nullable=False)
+    display_name: Mapped[str] = mapped_column(String(120), nullable=False)
+
+
+class FinancialTransaction(TimestampMixin, Base):
+    """Canonical signed transaction or private, unpublished import observation."""
+
+    __tablename__ = "financial_transactions"
+    __table_args__ = (
+        UniqueConstraint("import_id", "row_number", name="uq_transaction_import_row"),
+        Index("ix_transactions_account_posted", "account_id", "posted_date"),
+        Index("ix_transactions_import_status", "import_id", "status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    account_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("accounts.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    import_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("transaction_imports.id", ondelete="RESTRICT")
+    )
+    row_number: Mapped[int | None] = mapped_column(Integer)
+    source_label: Mapped[str] = mapped_column(String(100), nullable=False)
+    provider_transaction_id: Mapped[str | None] = mapped_column(String(200))
+    raw_posted_date: Mapped[str | None] = mapped_column(String(100))
+    posted_date: Mapped[date | None] = mapped_column(Date)
+    raw_transaction_date: Mapped[str | None] = mapped_column(String(100))
+    transaction_date: Mapped[date | None] = mapped_column(Date)
+    raw_amount: Mapped[str | None] = mapped_column(String(100))
+    amount: Mapped[Decimal | None] = mapped_column(Numeric(24, 10))
+    raw_currency: Mapped[str | None] = mapped_column(String(40))
+    currency: Mapped[str | None] = mapped_column(String(3))
+    raw_description: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    normalized_merchant: Mapped[str] = mapped_column(String(200), nullable=False)
+    raw_type: Mapped[str | None] = mapped_column(String(120))
+    raw_payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), nullable=False, default=dict
+    )
+    fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    identity_resolution: Mapped[str | None] = mapped_column(String(24))
+    duplicate_of_transaction_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("financial_transactions.id", ondelete="SET NULL")
+    )
+    classification: Mapped[str] = mapped_column(
+        String(24), nullable=False, default="unclassified"
+    )
+    category_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("spending_categories.id", ondelete="SET NULL")
+    )
+    category_source: Mapped[str] = mapped_column(
+        String(24), nullable=False, default="unclassified"
+    )
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    idempotency_key: Mapped[str | None] = mapped_column(String(128), unique=True)
+    diagnostics: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), nullable=False, default=dict
+    )
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class MerchantCategoryRule(TimestampMixin, Base):
+    """Versioned exact merchant-to-category rule; user changes are append-only."""
+
+    __tablename__ = "merchant_category_rules"
+    __table_args__ = (
+        UniqueConstraint(
+            "normalized_merchant", "version", name="uq_merchant_category_rule_version"
+        ),
+        Index("ix_merchant_category_rule_lookup", "normalized_merchant", "active"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    normalized_merchant: Mapped[str] = mapped_column(String(200), nullable=False)
+    category_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("spending_categories.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    active: Mapped[bool] = mapped_column(nullable=False, default=True)
+
+
+class TransactionProviderIdentity(Base):
+    """Unique selected native provider ID; staged rows never reserve identities."""
+
+    __tablename__ = "transaction_provider_identities"
+    __table_args__ = (
+        UniqueConstraint(
+            "account_id",
+            "source_label",
+            "provider_transaction_id",
+            name="uq_transaction_provider_identity",
+        ),
+        UniqueConstraint("transaction_id", name="uq_transaction_provider_transaction"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    account_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("accounts.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    source_label: Mapped[str] = mapped_column(String(100), nullable=False)
+    provider_transaction_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    transaction_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("financial_transactions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+
+class TransactionReviewEvent(Base):
+    """Append-only audit of import corrections and canonical edits."""
+
+    __tablename__ = "transaction_review_events"
+    __table_args__ = (
+        Index("ix_transaction_events_transaction", "transaction_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    transaction_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("financial_transactions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    import_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("transaction_imports.id", ondelete="CASCADE")
+    )
+    review_revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    action: Mapped[str] = mapped_column(String(32), nullable=False)
+    reason: Mapped[str] = mapped_column(String(500), nullable=False)
+    change_payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB().with_variant(JSON(), "sqlite"), nullable=False, default=dict
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class TransactionSplit(Base):
+    """Signed category allocations whose amounts must equal the parent."""
+
+    __tablename__ = "transaction_splits"
+    __table_args__ = (
+        UniqueConstraint(
+            "transaction_id", "split_index", name="uq_transaction_split_index"
+        ),
+        Index("ix_transaction_splits_transaction", "transaction_id"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    transaction_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("financial_transactions.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    split_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(24, 10), nullable=False)
+    category_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True), ForeignKey("spending_categories.id", ondelete="SET NULL")
+    )
+    note: Mapped[str | None] = mapped_column(String(500))
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class TransferMatch(TimestampMixin, Base):
+    """Explicit user-confirmed link between opposite-side account events."""
+
+    __tablename__ = "transfer_matches"
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    first_transaction_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("financial_transactions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    second_transaction_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("financial_transactions.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(String(24), nullable=False)
+    match_method: Mapped[str] = mapped_column(String(32), nullable=False)
+    reason: Mapped[str] = mapped_column(String(500), nullable=False)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ActiveTransferTransaction(Base):
+    """Unique claim for each transaction in a currently confirmed transfer."""
+
+    __tablename__ = "active_transfer_transactions"
+    __table_args__ = (Index("ix_active_transfer_transactions_transfer", "transfer_id"),)
+
+    transaction_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("financial_transactions.id", ondelete="RESTRICT"),
+        primary_key=True,
+    )
+    transfer_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("transfer_matches.id", ondelete="CASCADE"),
+        nullable=False,
     )
