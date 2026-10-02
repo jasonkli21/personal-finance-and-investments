@@ -15,7 +15,7 @@ The checked-in example is wholly synthetic: [`fixtures/stage-2/synthetic-brokera
 | Package | Status | Notes |
 | --- | --- | --- |
 | S2.1 files and deterministic preview | Partial | PDF preview uses existing reviewed position publication. Upload size, parser time/page/row/text bounds are configured. Correction history for PDF-specific diagnostics, document CSV adapters, worker execution, and full acceptance evidence remain. |
-| S2.2 shared candidate extraction | Deferred at dependency gate | Upstream extraction transport, verified identity/owner propagation, and reviewed real-data handling are not available. `PERSONAL_AI_ENABLED=false`; no statement transmission. |
+| S2.2 shared candidate extraction | Deferred at dependency gate | Upstream extraction transport, verified identity/owner propagation, and reviewed real-data handling are not available. [`S2.2 gate evidence`](stage-2-ai-gate.md). `PERSONAL_AI_ENABLED=false`; no statement transmission. |
 | S2.3 transactions/categories/transfers | Pending | No canonical transaction schema or workflow has shipped yet. |
 | S2.4 finance/net-worth views | Pending | No spending summary or unified balance view has shipped yet. |
 | S2.5 read-only account sync | Optional; evaluation only | Current official Plaid documentation requires production product access and production billing depends on product/agreement. No production tokens or connections are present. See [source evaluation](03-data-sources.md#plaid). |
