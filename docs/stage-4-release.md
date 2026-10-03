@@ -44,7 +44,7 @@ The synthetic auth tests cover RSA-signed ID-token acceptance, invalid-signature
 | --- | --- | --- |
 | S4.1 | Production configuration, auth, private storage adapter, and `0015` migration plan | Real DSQL migration/reconnect, scoped IAM and S3 policies, HTTPS synthetic journey |
 | S4.2 | Terraform lockfile, provider schema validation, static policy guardrails, and fake-input no-network plans prepared | Explicit account/region/domain/certificate/image/identity/budget inputs, target-specific reviewed plan, runtime smoke/benchmark, and approved apply |
-| S4.3 | Pending real-cluster execution | Full current-schema DSQL suite with dated, secret-free evidence |
+| S4.3 | Nine-case real-DSQL suite and fail-closed evidence runner prepared; all nine cases skip without explicit opt-in | Execute against an approved isolated DSQL cluster and pass with zero skipped tests; separately close the populated-upgrade, interrupted-migration, token-expiry, and real DSQL OCC-gap evidence |
 | S4.4 | Official allowance/pricing source rechecked 2026-10-02 | Account-specific whole-stack forecast, approved spend exposure, budget routing test |
 | S4.5 | Pending | Encrypted portable export and isolated restore with tamper/interruption negatives |
 | S4.6 | Pending | Approved gated release, synthetic launch, rollback/pause/teardown rehearsal and retained-resource inventory |
@@ -109,3 +109,57 @@ Local guardrails are executable with:
 python3 scripts/stage4/test_infra_contract.py
 bash -n scripts/stage4/set-apprunner-log-retention.sh
 ```
+
+## S4.3 — Real Aurora DSQL suite and evidence gate
+
+The gated suite covers the complete versioned migration plan and representative
+synthetic schema/UUID/`NUMERIC`/JSONB round trips, current tax/event/auth
+tables, auth/session constraints, fresh app-role IAM/TLS reconnect, a real
+competing-write retry, snapshot replacement/history, the 502-row fund import,
+hidden interrupted staging, concurrent publication, and golden report values.
+The application role and migration role are supplied separately. The new auth
+checks exercise the deployed migration-0015 tables using only synthetic IDs.
+Every feature case has scoped cleanup and does not target local or user data.
+
+`app.release.dsql_evidence` is the promotion runner. It requires the exact
+`RUN_DSQL_INTEGRATION=1`, `DSQL_TEST_CLUSTER=disposable`,
+`DATABASE_BACKEND=aurora_dsql` opt-in, a DSQL endpoint, AWS region, and distinct
+non-admin application/migration roles. It captures pytest/JUnit only in a
+temporary directory, never prints or saves raw output, and emits a mode-0600
+summary bound to source commit, application build, Alembic/DSQL schema plan,
+sanitized configuration, fixture, immutable OCI image digest, and hashed cluster
+identity. The `check` command requires the same runtime configuration and image
+digest to still be selected. Missing required cases, a nonzero test result, or
+any skip writes failed/blocked evidence; `check` rejects skips, failures,
+incomplete suites and stale fingerprints. The current report also carries explicit blockers for populated
+previous-schema upgrade, induced migration interruption/resume, 15-minute IAM
+token-expiry reconnection, and a configured safe-batch-limit failure; even a
+clean run of the available nine cases cannot pass the promotion check until
+those matrix rows are implemented and evidenced.
+
+Run only after supplying credentials to an explicitly approved isolated,
+disposable test cluster and confirming its spend envelope:
+
+```sh
+export RUN_DSQL_INTEGRATION=1
+export DSQL_TEST_CLUSTER=disposable
+export DATABASE_BACKEND=aurora_dsql
+# Also set AWS_REGION, the DSQL endpoint and distinct scoped roles, and
+# RELEASE_IMAGE_DIGEST to the reviewed source-matched sha256 OCI image digest.
+uv run --directory services/api --locked python -m app.release.dsql_evidence \
+  run --evidence /secure/operator/path/dsql-evidence.json
+uv run --directory services/api --locked python -m app.release.dsql_evidence \
+  check /secure/operator/path/dsql-evidence.json
+```
+
+The test harness can verify a newly opened IAM/TLS connection after disposing
+the old pool, but does not wait 15 minutes to demonstrate token-expiry
+reconnection. It also does not yet provide a safe real-cluster populated
+previous-version upgrade, induced mid-migration interruption/resume, or a
+reliably induced native DSQL OCC conflict on demand. Those remain explicit
+launch evidence gaps; the existing OCC case coordinates competing transactions
+and passes only if DSQL itself reports the retryable conflict. No DSQL cluster
+was configured here: a direct default invocation reported all nine gated cases
+skipped, and no evidence record was issued. Local evidence-gate tests prove
+that skip/failure/stale-schema records cannot be promoted. Live DSQL therefore
+remains **unverified**.

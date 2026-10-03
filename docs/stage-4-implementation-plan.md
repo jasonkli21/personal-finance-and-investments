@@ -1,6 +1,6 @@
 # Stage 4 implementation plan
 
-**Status:** S4.1–S4.2 locally prepared; no infrastructure provisioned or live DSQL verified
+**Status:** S4.1–S4.3 locally prepared; no infrastructure provisioned or live DSQL verified
 **Updated:** 2026-10-02
 **Roadmap coverage:** Work packages 4.1–4.6
 

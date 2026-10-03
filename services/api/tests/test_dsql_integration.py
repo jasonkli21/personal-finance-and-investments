@@ -631,3 +631,160 @@ def test_real_dsql_manual_replacement_history_and_scoped_identity() -> None:
                 {"first": issuer_a, "second": issuer_b},
             )
         app_engine.dispose()
+
+
+def test_real_dsql_auth_schema_and_session_round_trip() -> None:
+    """Use the scoped app role against the new auth/audit schema and constraints."""
+    migration_engine, app_engine = _open_engines()
+    run_dsql_migrations(migration_engine)
+    migration_engine.dispose()
+    principal_id, session_id, audit_id = [uuid4() for _ in range(3)]
+    now = datetime.now(UTC)
+    issuer = "https://synthetic.example.invalid/"
+    subject = f"synthetic-{principal_id}"
+    scope_id = f"synthetic-{principal_id.hex}"
+    token_hash = f"{session_id.hex:0<64}"[:64]
+    try:
+        with app_engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO auth_principals "
+                    "(id, issuer, subject, scope_id, active, created_at) "
+                    "VALUES (:id, :issuer, :subject, :scope, true, :now)"
+                ),
+                {
+                    "id": principal_id,
+                    "issuer": issuer,
+                    "subject": subject,
+                    "scope": scope_id,
+                    "now": now,
+                },
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO auth_sessions "
+                    "(id, principal_id, token_hash, created_at, expires_at) "
+                    "VALUES (:id, :principal, :hash, :now, :expires)"
+                ),
+                {
+                    "id": session_id,
+                    "principal": principal_id,
+                    "hash": token_hash,
+                    "now": now,
+                    "expires": now.replace(year=now.year + 1),
+                },
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO security_audit_events "
+                    "(id, actor_subject, scope_id, action, target_type, target_id, "
+                    "result, correlation_id, created_at) VALUES (:id, :subject, "
+                    ":scope, 'login', 'session', :target, 'success', :correlation, "
+                    ":now)"
+                ),
+                {
+                    "id": audit_id,
+                    "subject": subject,
+                    "scope": scope_id,
+                    "target": str(session_id),
+                    "correlation": str(uuid4()),
+                    "now": now,
+                },
+            )
+        with app_engine.connect() as connection:
+            row = connection.execute(
+                text(
+                    "SELECT p.issuer, p.subject, p.scope_id, s.token_hash, "
+                    "s.revoked_at, a.action, a.result FROM auth_principals p "
+                    "JOIN auth_sessions s ON s.principal_id = p.id "
+                    "JOIN security_audit_events a ON a.scope_id = p.scope_id "
+                    "WHERE p.id = :id AND s.id = :session AND a.id = :audit"
+                ),
+                {"id": principal_id, "session": session_id, "audit": audit_id},
+            ).one()
+            assert row.issuer == issuer
+            assert row.subject == subject
+            assert row.scope_id == scope_id
+            assert row.token_hash == token_hash
+            assert row.revoked_at is None
+            assert row.action == "login"
+            assert row.result == "success"
+
+        # Unique principal and session identities must be enforced by the
+        # deployed schema, with each expected violation isolated to its own txn.
+        with pytest.raises(SQLAlchemyError) as duplicate_principal:
+            with app_engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "INSERT INTO auth_principals "
+                        "(id, issuer, subject, scope_id, active, created_at) "
+                        "VALUES (:id, :issuer, :subject, :scope, true, :now)"
+                    ),
+                    {
+                        "id": uuid4(),
+                        "issuer": issuer,
+                        "subject": subject,
+                        "scope": f"duplicate-{principal_id.hex}",
+                        "now": now,
+                    },
+                )
+        assert getattr(duplicate_principal.value.orig, "sqlstate", None) == "23505"
+        with pytest.raises(SQLAlchemyError) as duplicate_session:
+            with app_engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "INSERT INTO auth_sessions "
+                        "(id, principal_id, token_hash, created_at, expires_at) "
+                        "VALUES (:id, :principal, :hash, :now, :expires)"
+                    ),
+                    {
+                        "id": uuid4(),
+                        "principal": principal_id,
+                        "hash": token_hash,
+                        "now": now,
+                        "expires": now.replace(year=now.year + 1),
+                    },
+                )
+        assert getattr(duplicate_session.value.orig, "sqlstate", None) == "23505"
+    finally:
+        with app_engine.begin() as connection:
+            connection.execute(
+                text("DELETE FROM security_audit_events WHERE id = :id"),
+                {"id": audit_id},
+            )
+            connection.execute(
+                text("DELETE FROM auth_sessions WHERE id = :id"),
+                {"id": session_id},
+            )
+            connection.execute(
+                text("DELETE FROM auth_principals WHERE id = :id"),
+                {"id": principal_id},
+            )
+        app_engine.dispose()
+
+
+def test_real_dsql_application_role_reconnects_with_verified_tls() -> None:
+    """Dispose the pool and prove the scoped role can open a fresh IAM connection."""
+    migration_engine, app_engine = _open_engines()
+    run_dsql_migrations(migration_engine)
+    migration_engine.dispose()
+    try:
+        with app_engine.connect() as connection:
+            current_user: str = connection.execute(
+                text("SELECT current_user")
+            ).scalar_one()
+            assert current_user == load_settings().aurora_dsql_db_user
+        app_engine.dispose()
+
+        reconnect_migration_engine, reconnected_engine = _open_engines()
+        reconnect_migration_engine.dispose()
+        try:
+            with reconnected_engine.connect() as connection:
+                reconnected_user: str = connection.execute(
+                    text("SELECT current_user")
+                ).scalar_one()
+            assert reconnected_user == load_settings().aurora_dsql_db_user
+        finally:
+            reconnected_engine.dispose()
+    finally:
+        app_engine.dispose()
