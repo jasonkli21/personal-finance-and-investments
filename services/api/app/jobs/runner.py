@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 from datetime import date, timedelta
 from uuid import uuid4
 
@@ -14,6 +15,8 @@ from app.db.models import Job, PrivateFile, utc_now
 from app.domains import documents, jobs
 from app.ingestion.brokerage_pdf import PdfExtractionError
 from app.storage.file_store import FileStore
+
+logger = logging.getLogger(__name__)
 
 
 class _LeaseLost(RuntimeError):
@@ -108,6 +111,7 @@ def _process_one(
                     Job.status == "running",
                     Job.lease_owner == claim.owner,
                     Job.lease_generation == claim.generation,
+                    Job.lease_until > now,
                     Job.cancel_requested.is_(False),
                 )
                 .values(
@@ -159,7 +163,13 @@ def _process_one(
             retryable=False,
         )
         return True
-    except Exception:
+    except Exception as exc:
+        # Exception messages/tracebacks can contain private parser or DB data.
+        logger.error(
+            "Document job failed: job_id=%s error_type=%s",
+            claim.id,
+            type(exc).__name__,
+        )
         jobs.fail_job(
             session_factory,
             claim,
@@ -219,7 +229,8 @@ async def run_worker(
         except asyncio.CancelledError:
             await operation
             raise
-        except Exception:
+        except Exception as exc:
+            logger.error("Job polling failed: error_type=%s", type(exc).__name__)
             processed = False
         if not processed:
             await asyncio.sleep(poll_interval_seconds)

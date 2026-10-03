@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
 from uuid import UUID, uuid4
@@ -205,3 +205,46 @@ def test_scope_and_retrieval_dates_require_timezone_and_same_issuer() -> None:
         raise AssertionError("naive retrieval timestamps must fail")
     except ValueError as exc:
         assert "timezone" in str(exc)
+
+
+def test_freshness_uses_elapsed_time_and_empty_sources_are_insufficient() -> None:
+    document, scope = _document()
+    policy = _eligibility(document, scope)
+    exact_boundary = _candidate(
+        document, scope, retrieved_at=policy.as_of - timedelta(days=45)
+    )
+    just_stale = _candidate(
+        document,
+        scope,
+        retrieved_at=policy.as_of - timedelta(days=45, seconds=1),
+    )
+    result = validate_research_evidence(policy, [exact_boundary, just_stale])
+    assert result.eligible == [exact_boundary]
+    assert result.rejected[0].reason == "stale"
+    assert (
+        validate_research_evidence(
+            _eligibility(document, scope, minimum_evidence=0), []
+        ).state
+        == "insufficient"
+    )
+
+    blank = validate_research_evidence(
+        policy, [_candidate(document, scope, excerpt=" ")]
+    )
+    assert blank.state == "insufficient"
+    assert blank.rejected[0].reason == "excerpt_unavailable"
+
+
+def test_scoped_future_filing_is_ineligible_for_historical_research() -> None:
+    document, scope = _document()
+    as_of = datetime(2026, 10, 3, tzinfo=UTC)
+    future_date = (as_of + timedelta(days=1)).date()
+    future_scope = scope.model_copy(update={"filing_date": future_date})
+    future_candidate = _candidate(document, scope).model_copy(
+        update={"published_at": future_date}
+    )
+    result = validate_research_evidence(
+        _eligibility(document, future_scope), [future_candidate]
+    )
+    assert result.state == "insufficient"
+    assert result.rejected[0].reason == "publication_date_in_future"

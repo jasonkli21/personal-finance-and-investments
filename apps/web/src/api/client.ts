@@ -1,42 +1,9 @@
 import createClient from 'openapi-fetch'
 import type { components, paths } from './schema'
+import { readJsonResponse, unwrap } from './response'
+export { ApiError } from './response'
 
 export const api = createClient<paths>({ baseUrl: '/api' })
-
-export class ApiError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-  ) {
-    super(message)
-    this.name = 'ApiError'
-  }
-}
-
-function noteAuthenticationFailure(response: Response) {
-  if (response.status === 401 && typeof window !== 'undefined') {
-    window.dispatchEvent(new Event('finance:unauthorized'))
-  }
-}
-
-async function unwrap<T>(result: {
-  data?: T
-  error?: unknown
-  response: Response
-}): Promise<T> {
-  if (!result.response.ok) {
-    noteAuthenticationFailure(result.response)
-    const body = result.error as { detail?: string } | undefined
-    throw new ApiError(
-      result.response.status,
-      body?.detail ?? 'The request could not be completed.',
-    )
-  }
-  if (result.data === undefined) {
-    throw new ApiError(result.response.status, 'The server returned no data.')
-  }
-  return result.data
-}
 
 export async function fetchAccounts() {
   return unwrap(await api.GET('/v1/accounts'))
@@ -224,18 +191,10 @@ export async function previewPositionImport(input: {
     },
     body: input.file,
   })
-  const body = (await response.json()) as
-    components['schemas']['ImportCreated'] | { detail?: string }
-  if (!response.ok) {
-    noteAuthenticationFailure(response)
-    throw new ApiError(
-      response.status,
-      'detail' in body
-        ? (body.detail ?? 'CSV review could not be started.')
-        : 'CSV review could not be started.',
-    )
-  }
-  return body as components['schemas']['ImportCreated']
+  return readJsonResponse<components['schemas']['ImportCreated']>(
+    response,
+    'CSV review could not be started.',
+  )
 }
 
 export async function previewBrokeragePdf(input: {
@@ -261,18 +220,10 @@ export async function previewBrokeragePdf(input: {
     },
     body: input.file,
   })
-  const body = (await response.json()) as
-    components['schemas']['JobRead'] | { detail?: string }
-  if (!response.ok) {
-    noteAuthenticationFailure(response)
-    throw new ApiError(
-      response.status,
-      'detail' in body
-        ? (body.detail ?? 'Statement review could not be started.')
-        : 'Statement review could not be started.',
-    )
-  }
-  return body as components['schemas']['JobRead']
+  return readJsonResponse<components['schemas']['JobRead']>(
+    response,
+    'Statement review could not be started.',
+  )
 }
 
 export async function fetchJob(jobId: string) {
@@ -309,18 +260,10 @@ export async function previewTransactionImport(input: {
     },
     body: input.file,
   })
-  const body = (await response.json()) as
-    components['schemas']['TransactionImportCreated'] | { detail?: string }
-  if (!response.ok) {
-    noteAuthenticationFailure(response)
-    throw new ApiError(
-      response.status,
-      'detail' in body
-        ? (body.detail ?? 'Transaction review could not be started.')
-        : 'Transaction review could not be started.',
-    )
-  }
-  return body as components['schemas']['TransactionImportCreated']
+  return readJsonResponse<components['schemas']['TransactionImportCreated']>(
+    response,
+    'Transaction review could not be started.',
+  )
 }
 
 export async function fetchTransactionImport(importId: string) {
@@ -374,10 +317,14 @@ export async function cancelTransactionImport(
   )
 }
 
-export async function fetchTransactions(accountId: string) {
+export async function fetchTransactions(
+  accountId: string,
+  offset = 0,
+  limit = 200,
+) {
   return unwrap(
     await api.GET('/v1/transactions', {
-      params: { query: { account_id: accountId, limit: 200 } },
+      params: { query: { account_id: accountId, offset, limit } },
     }),
   )
 }
@@ -572,15 +519,12 @@ export async function previewFundImport(input: {
     },
     body: input.file,
   })
-  const body =
-    (await response.json()) as components['schemas']['ImportCreated'] & {
-      detail?: string
-    }
-  if (!response.ok) noteAuthenticationFailure(response)
-  if (!response.ok)
-    throw new ApiError(response.status, body.detail ?? 'Fund review failed')
-  return body
+  return readJsonResponse<components['schemas']['ImportCreated']>(
+    response,
+    'Fund review could not be started.',
+  )
 }
+
 export async function fetchFundSnapshots(fundId: string) {
   return unwrap(
     await api.GET('/v1/funds/{fund_id}/snapshots', {
@@ -736,18 +680,10 @@ export async function previewTaxLotImport(input: {
     },
     body: input.file,
   })
-  const body = (await response.json()) as
-    components['schemas']['TaxLotImportCreated'] | { detail?: string }
-  if (!response.ok) {
-    noteAuthenticationFailure(response)
-    throw new ApiError(
-      response.status,
-      'detail' in body
-        ? (body.detail ?? 'Tax-lot import could not be started.')
-        : 'Tax-lot import could not be started.',
-    )
-  }
-  return body as components['schemas']['TaxLotImportCreated']
+  return readJsonResponse<components['schemas']['TaxLotImportCreated']>(
+    response,
+    'Tax-lot import could not be started.',
+  )
 }
 
 export async function fetchTaxLotImport(importId: string) {

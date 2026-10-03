@@ -11,6 +11,7 @@ import re
 from collections import defaultdict
 from datetime import UTC, date
 from decimal import Decimal, InvalidOperation, localcontext
+from itertools import islice
 from pathlib import Path
 from typing import Any, cast
 from uuid import UUID, uuid4
@@ -184,19 +185,23 @@ def create_csv_import(
         decoded = content.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
         raise TaxError("CSV must be UTF-8 encoded.") from exc
-    reader = csv.DictReader(io.StringIO(decoded, newline=""))
-    headers = reader.fieldnames
+    reader = csv.DictReader(io.StringIO(decoded, newline=""), strict=True)
+    try:
+        headers = reader.fieldnames
+        raw_rows = list(islice(reader, MAX_TAX_LOT_ROWS + 1))
+    except csv.Error as exc:
+        raise TaxError("CSV contains malformed quoting or an oversized field.") from exc
     if not headers or any(not header.strip() for header in headers):
         raise TaxError("CSV needs non-empty column headers.")
     if len(set(headers)) != len(headers):
         raise TaxError("CSV headers must be unique.")
     if any(header not in headers for header in mapping.values()):
         raise TaxError("A selected source column is missing.")
+    if len(raw_rows) > MAX_TAX_LOT_ROWS:
+        raise TaxError(f"Tax-lot CSV contains more than {MAX_TAX_LOT_ROWS} rows.")
 
     parsed: list[dict[str, Any]] = []
-    for row_number, raw in enumerate(reader, start=1):
-        if row_number > MAX_TAX_LOT_ROWS:
-            raise TaxError(f"Tax-lot CSV contains more than {MAX_TAX_LOT_ROWS} rows.")
+    for row_number, raw in enumerate(raw_rows, start=1):
         extra = raw.pop(None, [])
         raw_values: dict[str, Any] = {
             str(key): str(value or "") for key, value in raw.items()
@@ -515,65 +520,70 @@ def _adjustments_keep_nonnegative(
 def _quantity_reconciliation(
     session: Session, record: TaxLotImport, rows: list[TaxLotImportRow]
 ) -> tuple[list[dict[str, Any]], list[str]]:
-    gaps: list[str] = []
-    owned = portfolio.read_positions(session, record.account_id)
-    position_quantities: dict[UUID, Decimal] = {}
-    if owned.snapshot is None:
-        gaps.append(
-            "No selected accepted position snapshot is available for reconciliation."
-        )
-        snapshot_id = None
-    else:
-        snapshot_id = owned.snapshot.id
-        for position in owned.snapshot.positions:
-            position_quantities[position.security.id] = Decimal(position.quantity)
+    with localcontext() as context:
+        context.prec = 80
+        gaps: list[str] = []
+        owned = portfolio.read_positions(session, record.account_id)
+        position_quantities: dict[UUID, Decimal] = {}
+        if owned.snapshot is None:
+            gaps.append(
+                "No selected accepted position snapshot is available "
+                "for reconciliation."
+            )
+            snapshot_id = None
+        else:
+            snapshot_id = owned.snapshot.id
+            for position in owned.snapshot.positions:
+                position_quantities[position.security.id] = Decimal(position.quantity)
 
-    existing_lots = list(
-        session.scalars(
-            select(TaxLot).where(TaxLot.account_id == record.account_id).limit(1001)
-        )
-    )
-    if len(existing_lots) > 1000:
-        gaps.append("Lot reconciliation is capped at 1,000 existing lots.")
-        existing_lots = existing_lots[:1000]
-    adjustments = _adjustments(session, [lot.id for lot in existing_lots])
-    lot_quantities: dict[UUID, Decimal] = defaultdict(Decimal)
-    for lot in existing_lots:
-        quantity, _basis = lot_state(lot, adjustments.get(lot.id, []))
-        lot_quantities[lot.security_id] += quantity
-
-    for row in rows:
-        if row.row_status == "needs_review":
-            gaps.append(f"Row {row.row_number} needs review before publication.")
-        if row.row_status == "ready" and row.security_id and row.remaining_quantity:
-            lot_quantities[row.security_id] += row.remaining_quantity
-    if snapshot_id is None:
-        return [], gaps
-    differences: list[dict[str, Any]] = []
-    securities = list(
-        session.scalars(
-            select(Security).where(
-                Security.id.in_(set(position_quantities) | set(lot_quantities))
+        existing_lots = list(
+            session.scalars(
+                select(TaxLot).where(TaxLot.account_id == record.account_id).limit(1001)
             )
         )
-    )
-    by_id = {security.id: security for security in securities}
-    for security_id in sorted(set(position_quantities) | set(lot_quantities), key=str):
-        position_quantity = position_quantities.get(security_id, Decimal(0))
-        lot_quantity = lot_quantities.get(security_id, Decimal(0))
-        difference = lot_quantity - position_quantity
-        differences.append(
-            {
-                "security_id": security_id,
-                "ticker": by_id[security_id].display_ticker
-                if security_id in by_id
-                else None,
-                "position_quantity": str(position_quantity),
-                "lot_quantity": str(lot_quantity),
-                "difference": str(difference),
-            }
+        if len(existing_lots) > 1000:
+            gaps.append("Lot reconciliation is capped at 1,000 existing lots.")
+            existing_lots = existing_lots[:1000]
+        adjustments = _adjustments(session, [lot.id for lot in existing_lots])
+        lot_quantities: dict[UUID, Decimal] = defaultdict(Decimal)
+        for lot in existing_lots:
+            quantity, _basis = lot_state(lot, adjustments.get(lot.id, []))
+            lot_quantities[lot.security_id] += quantity
+
+        for row in rows:
+            if row.row_status == "needs_review":
+                gaps.append(f"Row {row.row_number} needs review before publication.")
+            if row.row_status == "ready" and row.security_id and row.remaining_quantity:
+                lot_quantities[row.security_id] += row.remaining_quantity
+        if snapshot_id is None:
+            return [], gaps
+        differences: list[dict[str, Any]] = []
+        securities = list(
+            session.scalars(
+                select(Security).where(
+                    Security.id.in_(set(position_quantities) | set(lot_quantities))
+                )
+            )
         )
-    return differences, gaps
+        by_id = {security.id: security for security in securities}
+        for security_id in sorted(
+            set(position_quantities) | set(lot_quantities), key=str
+        ):
+            position_quantity = position_quantities.get(security_id, Decimal(0))
+            lot_quantity = lot_quantities.get(security_id, Decimal(0))
+            difference = lot_quantity - position_quantity
+            differences.append(
+                {
+                    "security_id": security_id,
+                    "ticker": by_id[security_id].display_ticker
+                    if security_id in by_id
+                    else None,
+                    "position_quantity": str(position_quantity),
+                    "lot_quantity": str(lot_quantity),
+                    "difference": str(difference),
+                }
+            )
+        return differences, gaps
 
 
 def read_import(session: Session, import_id: UUID) -> dict[str, Any]:
@@ -713,6 +723,23 @@ def correct_import_row(
         setattr(row, attribute, value)
 
     diagnostics = dict(row.diagnostics)
+    # Failed parsing stores None as the candidate value. An unrelated edit
+    # must not turn malformed source text into an implicitly accepted unknown.
+    # Clearing the affected field explicitly is a reviewed correction too.
+    unresolved_source_errors = {
+        key: value
+        for key, value in diagnostics.items()
+        if key not in changes
+        and value
+        in {
+            "invalid",
+            "invalid_date",
+            "invalid_nonnegative_amount",
+            "too_long",
+            "invalid_currency",
+        }
+        and not (key == "ticker" and "security_id" in changes)
+    }
     for key in (
         "ticker",
         "source_lot_id",
@@ -726,7 +753,8 @@ def correct_import_row(
         "basis_currency",
     ):
         diagnostics.pop(key, None)
-    status = "ready"
+    diagnostics.update(unresolved_source_errors)
+    status = "needs_review" if unresolved_source_errors else "ready"
     if row.security_id is None:
         status = "needs_review"
         diagnostics["ticker"] = "unresolved"

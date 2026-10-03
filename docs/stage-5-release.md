@@ -5,6 +5,10 @@
 
 This record separates finance-owned offline research workflow evidence from shared-service and provider capabilities that have not been integrated. No SEC data, personal portfolio context, or personal-AI service was requested or called during this implementation.
 
+## 2026-10-03 review update
+
+The [repository review](maintainability-review.md) now establishes the frozen research/report/note workflow on migrated PostgreSQL, including a non-UTC session and exact supported fact digits. It fixes two research-write blockers concealed by SQLite: a status too long for its column and a child flush before its parent. The compact stored status preserves the existing public status contract. Fact reads and idempotency fingerprints no longer depend on Decimal context precision. Evidence freshness/empty-content rules and active-watchlist limiting are corrected; issuer-switch browser coverage prevents stale company drafts. The final aggregate gate passes 275 backend, 22 web-unit, 5 infrastructure and 7 browser tests; 15 real-DSQL tests remain skipped. Historical evidence below is retained as originally observed. These checks do not validate live retrieval, source authenticity, synthesis, monitoring or hosted promotion.
+
 ## Scope and dependency review
 
 The implementation follows [the Stage 5 plan](stage-5-implementation-plan.md), [roadmap](05-roadmap.md), and [ADR 0001](adr/0001-shared-personal-ai.md). Before coding, the current `personal-ai-system` research API and contracts were inspected read-only. Its research surface is a session workflow (`POST /v1/research`, followed by a streaming `/run`) whose request contains a question, freshness mode, and idempotency key. Its owner is resolved from an authenticated user token. Finance's current `PersonalAIClient` still exposes extraction only; there is no agreed finance service identity, issuer/filing/date eligibility request, approved evidence excerpt transport, or owner propagation contract. The service's user-token session API is not treated as a finance service contract.

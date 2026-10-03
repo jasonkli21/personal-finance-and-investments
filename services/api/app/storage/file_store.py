@@ -83,6 +83,8 @@ class PrivateFileStore:
             if max_bytes is None
             else min(self.max_object_bytes, max_bytes)
         )
+        if limit < 0:
+            raise ValueError("Private file read limit cannot be negative")
         descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
         with os.fdopen(descriptor, "rb") as stream:
             metadata = os.fstat(stream.fileno())
@@ -99,7 +101,8 @@ class PrivateFileStore:
 
     def _hash_file(self, path: Path) -> str:
         digest = hashlib.sha256()
-        with path.open("rb") as stream:
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        with os.fdopen(descriptor, "rb") as stream:
             metadata = os.fstat(stream.fileno())
             if not stat.S_ISREG(metadata.st_mode):
                 raise OSError("Private file path must be a regular file")

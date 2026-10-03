@@ -107,5 +107,6 @@ def get_finance_summary(
             account_id=account_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        code = 404 if "not found" in str(exc).casefold() else 422
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
     return FinanceSummaryRead.model_validate(result)

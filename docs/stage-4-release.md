@@ -5,6 +5,10 @@
 
 This record distinguishes locally implemented release machinery from credentialed launch evidence. A passed SQLite/PostgreSQL test or skipped AWS suite does not satisfy the real Aurora DSQL, bucket-policy, cost-approval, recovery, or HTTPS launch gates.
 
+## 2026-10-03 review update
+
+The [repository review](maintainability-review.md) verifies local recovery in the ordinary quality gate and moves infrastructure tests to `tests/infra`. Release hashes now cover fixtures, infrastructure tests and missing build/migration inputs; changes require new evidence. Authentication database failures return safe request-correlated 503s, callback session writes leave the async loop, and the container uses redacted route-template logs rather than logging callback queries. S3 duplicate reuse verifies object bytes and streaming cleanup handles malformed metadata. The current schema has 18 Alembic revisions and 95 DSQL migration steps; earlier step counts below describe their original stage. No real DSQL, S3, cloud runtime or AWS recovery gate was cleared.
+
 ## S4.1 — Production configuration, storage and authentication
 
 The API now accepts explicit `development`, `test`, and `production` settings. Production startup fails closed unless it has HTTPS origin, the single-person authentication configuration, Aurora DSQL, a separate migration role, private S3 storage, and secure cookies. Production's effective worker default is `false`; the same parsed value is checked and returned, and explicit `true` or malformed values fail startup. Import file limits cannot exceed the private-object limit. Local PostgreSQL and filesystem storage remain defaults for offline operation.
@@ -110,7 +114,7 @@ connection, or AWS resource call.
 Local guardrails are executable with:
 
 ```sh
-python3 scripts/stage4/test_infra_contract.py
+python3 tests/infra/test_infra_contract.py
 bash -n scripts/stage4/set-apprunner-log-retention.sh
 ```
 

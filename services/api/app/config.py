@@ -6,8 +6,21 @@ from os import environ
 from urllib.parse import urlsplit
 
 
-def _int_setting(name: str, default: int, *, minimum: int, maximum: int) -> int:
-    raw_value = environ.get(name, str(default))
+def _int_setting(
+    name: str,
+    default: int,
+    *,
+    minimum: int,
+    maximum: int,
+    fallback_env: str | None = None,
+) -> int:
+    raw_value = environ.get(name)
+    if raw_value is None:
+        raw_value = (
+            environ.get(fallback_env, str(default))
+            if fallback_env is not None
+            else str(default)
+        )
     try:
         value = int(raw_value)
     except ValueError as exc:
@@ -215,9 +228,10 @@ def load_settings() -> Settings:
             raise ValueError("DEMO_MODE only allows loopback or Compose database hosts")
     database_port = _int_setting(
         "DATABASE_PORT",
-        int(environ.get("POSTGRES_PORT", "5432")),
+        5432,
         minimum=1,
         maximum=65535,
+        fallback_env="POSTGRES_PORT",
     )
     pool_size = _int_setting("DATABASE_POOL_SIZE", 5, minimum=1, maximum=20)
     max_overflow = _int_setting("DATABASE_MAX_OVERFLOW", 5, minimum=0, maximum=20)

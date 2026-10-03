@@ -358,7 +358,7 @@ def test_cached_quote_asof_precedence_and_signed_percentages(
         },
     )
     assert reviewed_quote.status_code == 201
-    future_quote = client.post(
+    later_quote = client.post(
         "/v1/market-data/quotes",
         json={
             "security_id": str(security_id),
@@ -368,10 +368,15 @@ def test_cached_quote_asof_precedence_and_signed_percentages(
             "reason": "Synthetic later observation",
         },
     )
-    assert future_quote.status_code == 201
+    assert later_quote.status_code == 201
     valued = client.get(f"/v1/portfolio/owned/{account['id']}").json()
-    assert valued["total_usd"] == "10.0000000000"
-    assert valued["lines"][0]["price"] == "5.0000000000"
+    assert valued["total_usd"] == "198.0000000000"
+    assert valued["lines"][0]["price"] == "99.0000000000"
+    historical = client.get(
+        f"/v1/portfolio/owned/{account['id']}", params={"as_of": "2026-09-30"}
+    ).json()
+    assert historical["total_usd"] == "10.0000000000"
+    assert historical["lines"][0]["price"] == "5.0000000000"
     assert valued["lines"][0]["quality_status"] == "reviewed"
 
     signed_snapshot = client.put(
@@ -391,7 +396,7 @@ def test_cached_quote_asof_precedence_and_signed_percentages(
     )
     assert signed_snapshot.status_code == 200
     signed_value = client.get(f"/v1/portfolio/owned/{account['id']}").json()
-    assert signed_value["total_usd"] == "-5.0000000000"
+    assert signed_value["total_usd"] == "-99.0000000000"
     assert signed_value["percentages_available"] is False
     assert signed_value["lines"][0]["allocation_percent"] is None
 

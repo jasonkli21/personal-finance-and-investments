@@ -56,24 +56,26 @@ def chained_modified_dietz(
     """Chain Dietz subperiods at observed valuations; no missing marks are filled."""
     if len(points) < 2 or any(point.value <= 0 for point in points):
         return None
-    growth = Decimal(1)
-    for beginning, ending in zip(points, points[1:], strict=False):
-        interval_flows = [
-            flow
-            for flow in flows
-            if beginning.as_of < flow.effective_date <= ending.as_of
-        ]
-        period = modified_dietz(
-            beginning.value,
-            ending.value,
-            interval_flows,
-            beginning.as_of,
-            ending.as_of,
-        )
-        if period is None or period <= -1:
-            return None
-        growth *= Decimal(1) + period
-    return growth - Decimal(1)
+    with localcontext() as context:
+        context.prec = 60
+        growth = Decimal(1)
+        for beginning, ending in zip(points, points[1:], strict=False):
+            interval_flows = [
+                flow
+                for flow in flows
+                if beginning.as_of < flow.effective_date <= ending.as_of
+            ]
+            period = modified_dietz(
+                beginning.value,
+                ending.value,
+                interval_flows,
+                beginning.as_of,
+                ending.as_of,
+            )
+            if period is None or period <= -1:
+                return None
+            growth *= Decimal(1) + period
+        return growth - Decimal(1)
 
 
 def money_weighted_return(
@@ -87,12 +89,14 @@ def money_weighted_return(
     if start >= end or beginning <= 0 or ending < 0:
         return None, "insufficient_inputs"
     # Investor-perspective cash flows: portfolio contributions are outflows.
-    by_date: dict[date, Decimal] = {start: -beginning, end: ending}
-    for flow in flows:
-        if start < flow.effective_date <= end:
-            by_date[flow.effective_date] = (
-                by_date.get(flow.effective_date, Decimal(0)) - flow.amount
-            )
+    with localcontext() as context:
+        context.prec = 60
+        by_date: dict[date, Decimal] = {start: -beginning, end: ending}
+        for flow in flows:
+            if start < flow.effective_date <= end:
+                by_date[flow.effective_date] = (
+                    by_date.get(flow.effective_date, Decimal(0)) - flow.amount
+                )
     dated = sorted(by_date.items())
     signs = [1 if amount > 0 else -1 for _, amount in dated if amount != 0]
     sign_changes = sum(

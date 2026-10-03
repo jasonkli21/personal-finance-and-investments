@@ -1,6 +1,6 @@
 # Portfolio Intelligence
 
-Stage 1 delivers reviewed position/fund imports, dated owned valuation, reconciled one-level ETF exposure, issuer rollups, frozen reports, drill-down and CSV export. The first Stage 2 slice adds local text-layer brokerage PDF preview through the existing reviewed position-import flow; scanned PDFs, bank/card transactions, dashboards and background jobs remain pending. See [`docs/stage-2-release.md`](docs/stage-2-release.md) for its exact limits. The app works locally with PostgreSQL 16 and no provider keys. Production Aurora DSQL remains unverified.
+The local app includes reviewed position/fund imports, dated owned valuation, reconciled ETF exposure, frozen reports/export, text-layer brokerage PDF jobs, reviewed bank/card CSV transactions, finance summaries, historical performance, supplied tax lots, hypothetical sale/allocation/liquidity planning, and manual source-linked research. Stage 2 remains partial; Stage 3 is locally delivered; Stage 4 deployment tooling is prepared; Stage 5 provides an offline baseline. Scanned documents, live AI/retrieval, account sync and research monitoring remain gated. The app works with PostgreSQL 16 and no provider keys. Production Aurora DSQL remains unverified. See the [documentation index](docs/README.md) and [maintainability review](docs/maintainability-review.md) for current scope and evidence.
 
 Reusable AI capabilities will integrate through `personal-ai-system`; finance retains authoritative data, deterministic validation/calculations, workflows and UI. The current `PersonalAIClient` is a disabled extraction boundary with a synthetic fake, not a live integration. Leave `PERSONAL_AI_ENABLED=false`; true fails startup until an upstream contract and security/data-handling gates are implemented. See [ADR 0001](docs/adr/0001-shared-personal-ai.md). No AI service or model credentials are needed for local imports.
 
@@ -79,7 +79,7 @@ uv sync --directory services/api --locked
 pnpm check
 ```
 
-`pnpm check` first regenerates OpenAPI and TypeScript contracts into a temporary directory and fails if the committed generated files differ. It then runs ESLint and Ruff, Prettier and Ruff formatting checks, strict TypeScript and mypy checks, Vitest and pytest, then the production web build. Run `pnpm api:generate` to refresh contracts. The ordinary tests use synthetic data; PostgreSQL schema tests run when `TEST_DATABASE_URL` is set. GitHub Actions provides a disposable PostgreSQL 16 service for every quality run.
+`pnpm check` first regenerates OpenAPI and TypeScript contracts into a temporary directory and fails if the committed generated files differ. It then runs ESLint and Ruff, Prettier and Ruff formatting checks, strict TypeScript and mypy checks, Vitest, infrastructure guardrails and pytest, then the production web build. Two historical applied migrations (`0007` and `0015`) are excluded only from formatting; lint and migration checks still cover them. Run `pnpm api:generate` to refresh contracts. The ordinary tests use synthetic data; PostgreSQL schema tests run when `TEST_DATABASE_URL` is set, and isolated encrypted recovery drills additionally require a loopback `STAGE4_RECOVERY_TEST_ADMIN_URL` ending in `/postgres`. GitHub Actions provides a disposable PostgreSQL 16 service for every quality run. Browser journeys run separately with `pnpm test:e2e` and require the disposable E2E database opt-in.
 
 The API tests cover health/readiness, account and manual-position routes, stale two-client writes after refetch, immutable replacement history, arithmetic overflow/rounding/rollback, scoped identifier and alias identities, generated OpenAPI freshness, explicit backend and DSQL role validation, engine TLS/pool configuration, schema-drift rejection, migration-plan resumption, and capped OCC retry. Ordinary GitHub Actions CI provisions PostgreSQL 16 and runs fresh install plus populated `0002 → head` upgrade/manual replacement checks. A real DSQL suite remains gated on `RUN_DSQL_INTEGRATION=1` and `DSQL_TEST_CLUSTER=disposable`.
 
@@ -109,11 +109,12 @@ The GitHub Actions workflow in `.github/workflows/quality.yml` installs locked d
 
 ## Layout and next work
 
-- `apps/web`: React, TypeScript, Vite, Tailwind, generated OpenAPI schema, and account/position workflow.
-- `services/api`: FastAPI routes/domains, selected-backend readiness probe, and tests.
+- `apps/web/src`: React workspaces, shared form/response helpers and generated OpenAPI schema; unit tests in `apps/web/test`, browser journeys in `apps/web/e2e`.
+- `services/api/app`: FastAPI routes, finance domains, adapters, auth, workers and operator recovery/release tooling; backend tests in `services/api/tests`.
+- `tests/infra`: offline Terraform policy/configuration guardrails, included in `pnpm check`.
 - `compose.yaml`: local PostgreSQL 16 and API containers.
-- `docs/05-roadmap.md`: Stage 0–1 delivered; Stage 2–5 remain scoped future work.
+- `docs/05-roadmap.md`: milestone requirements; stage release records distinguish delivered code from remaining integration and launch gates.
 - `services/api/app/integrations/personal_ai.py`: optional extraction protocol/candidate boundary, disabled runtime and synthetic fake.
 - `fixtures/stage-0/`: synthetic positions/fund-holdings CSV examples and expected Decimal totals.
 
-Aurora DSQL configuration keys in `.env.example` are placeholders and are not needed for local development. The current plan, verification status, checked package versions and AWS references are recorded in [`docs/07-aurora-dsql-compatibility.md`](docs/07-aurora-dsql-compatibility.md). Stage 1 local MVP is delivered; select a later-stage task only when requested. Its implementation plan and release evidence distinguish historical requirements from current behavior; the plan is in [`docs/stage-1-implementation-plan.md`](docs/stage-1-implementation-plan.md).
+Aurora DSQL configuration keys in `.env.example` are placeholders and are not needed for local development. The compatibility contract and credentialed gates are in [`docs/07-aurora-dsql-compatibility.md`](docs/07-aurora-dsql-compatibility.md). Follow the requested task and current release evidence; roadmap descriptions alone do not establish completion. The API image disables Uvicorn's query-bearing access log and emits redacted request records with route templates, status, duration and request ID through the server logger.

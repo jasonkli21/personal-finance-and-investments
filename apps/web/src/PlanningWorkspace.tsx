@@ -1,3 +1,5 @@
+import { moneyDisplay as formatMoney } from './decimal-display'
+import { localDate } from './local-date'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query'
 import {
@@ -16,29 +18,6 @@ type OneTimeDraft = {
   changeType: 'purchase' | 'liability_payment' | 'other'
   amount: string
   label: string
-}
-
-function localDate(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-}
-
-function formatMoney(
-  value: string | null | undefined,
-  currency = 'USD',
-): string {
-  if (value === null || value === undefined) return 'Unavailable'
-  const number = Number(value)
-  if (!Number.isFinite(number)) return `${currency} ${value}`
-  try {
-    return new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency,
-      maximumFractionDigits: 2,
-    }).format(number)
-  } catch {
-    return `${currency} ${number.toFixed(2)}`
-  }
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -74,9 +53,7 @@ function PlanningResultView({ result }: { result: PlanningResult }) {
   const revisionAccounts = result.account_ids.filter(
     (accountId) => result.position_snapshot_ids[accountId],
   )
-  const isSameDay =
-    result.as_of === localDate() &&
-    new Date(result.as_of).toDateString() === new Date().toDateString()
+  const isSameDay = result.as_of === localDate()
   const changedAccounts = revisionAccounts.filter((accountId, index) => {
     const query = positionQueries[index]
     return (

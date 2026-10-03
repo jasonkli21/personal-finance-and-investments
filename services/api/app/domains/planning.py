@@ -411,197 +411,204 @@ def _history(
     end: date,
     months: int,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
-    gaps: list[str] = []
-    histories: dict[str, dict[str, Any]] = {}
-    transaction_rows = list(
-        session.execute(
-            select(
-                FinancialTransaction.id,
-                FinancialTransaction.amount,
-                FinancialTransaction.currency,
-                FinancialTransaction.classification,
-                FinancialTransaction.source_label,
+    with localcontext() as context:
+        context.prec = 80
+        gaps: list[str] = []
+        histories: dict[str, dict[str, Any]] = {}
+        transaction_rows = list(
+            session.execute(
+                select(
+                    FinancialTransaction.id,
+                    FinancialTransaction.amount,
+                    FinancialTransaction.currency,
+                    FinancialTransaction.classification,
+                    FinancialTransaction.source_label,
+                )
+                .outerjoin(
+                    ActiveTransferTransaction,
+                    ActiveTransferTransaction.transaction_id == FinancialTransaction.id,
+                )
+                .where(
+                    FinancialTransaction.account_id.in_(account_ids),
+                    FinancialTransaction.status == "published",
+                    FinancialTransaction.posted_date >= start,
+                    FinancialTransaction.posted_date <= end,
+                    FinancialTransaction.classification.not_in(EXCLUDED_CLASSES),
+                    ActiveTransferTransaction.transaction_id.is_(None),
+                )
+                .order_by(FinancialTransaction.posted_date, FinancialTransaction.id)
+                .limit(10001)
             )
-            .outerjoin(
-                ActiveTransferTransaction,
-                ActiveTransferTransaction.transaction_id == FinancialTransaction.id,
-            )
-            .where(
-                FinancialTransaction.account_id.in_(account_ids),
-                FinancialTransaction.status == "published",
-                FinancialTransaction.posted_date >= start,
-                FinancialTransaction.posted_date <= end,
-                FinancialTransaction.classification.not_in(EXCLUDED_CLASSES),
-                ActiveTransferTransaction.transaction_id.is_(None),
-            )
-            .order_by(FinancialTransaction.posted_date, FinancialTransaction.id)
-            .limit(10001)
         )
-    )
-    if len(transaction_rows) > 10000:
-        raise PlanningError("History exceeds 10,000 transactions; narrow the sample.")
-    for row in transaction_rows:
-        currency = row.currency or "UNKNOWN"
-        aggregate = histories.setdefault(
-            currency,
-            {
-                "currency": currency,
-                "income": Decimal(0),
-                "expenses": Decimal(0),
-                "unclassified": Decimal(0),
-                "published_count": 0,
-                "classified_count": 0,
-                "unclassified_count": 0,
-                "income_count": 0,
-                "expense_count": 0,
-                "sources": set(),
-            },
+        if len(transaction_rows) > 10000:
+            raise PlanningError(
+                "History exceeds 10,000 transactions; narrow the sample."
+            )
+        for row in transaction_rows:
+            currency = row.currency or "UNKNOWN"
+            aggregate = histories.setdefault(
+                currency,
+                {
+                    "currency": currency,
+                    "income": Decimal(0),
+                    "expenses": Decimal(0),
+                    "unclassified": Decimal(0),
+                    "published_count": 0,
+                    "classified_count": 0,
+                    "unclassified_count": 0,
+                    "income_count": 0,
+                    "expense_count": 0,
+                    "sources": set(),
+                },
+            )
+            aggregate["published_count"] += 1
+            aggregate["sources"].add(row.source_label)
+            if row.amount is None or row.currency is None:
+                gaps.append(
+                    f"Transaction {row.id} has no usable amount or currency and was "
+                    "excluded from historical cash-flow totals."
+                )
+                aggregate["unclassified_count"] += 1
+                continue
+            amount = Decimal(row.amount)
+            if row.classification == "income":
+                aggregate["income"] += amount
+                aggregate["income_count"] += 1
+                aggregate["classified_count"] += 1
+            elif row.classification in SPENDING_CLASSES:
+                aggregate["expenses"] -= amount
+                aggregate["expense_count"] += 1
+                aggregate["classified_count"] += 1
+            elif row.classification == "unclassified":
+                aggregate["unclassified"] += amount
+                aggregate["unclassified_count"] += 1
+            else:
+                aggregate["classified_count"] += 1
+
+        missing_date_count = int(
+            session.scalar(
+                select(func.count())
+                .select_from(FinancialTransaction)
+                .where(
+                    FinancialTransaction.account_id.in_(account_ids),
+                    FinancialTransaction.status == "published",
+                    FinancialTransaction.posted_date.is_(None),
+                )
+            )
+            or 0
         )
-        aggregate["published_count"] += 1
-        aggregate["sources"].add(row.source_label)
-        if row.amount is None or row.currency is None:
+        if missing_date_count:
             gaps.append(
-                f"Transaction {row.id} has no usable amount or currency and was "
-                "excluded from historical cash-flow totals."
+                f"{missing_date_count} published transaction(s) have no posted date "
+                "and cannot be placed in the selected history window."
             )
-            aggregate["unclassified_count"] += 1
-            continue
-        amount = Decimal(row.amount)
-        if row.classification == "income":
-            aggregate["income"] += amount
-            aggregate["income_count"] += 1
-            aggregate["classified_count"] += 1
-        elif row.classification in SPENDING_CLASSES:
-            aggregate["expenses"] -= amount
-            aggregate["expense_count"] += 1
-            aggregate["classified_count"] += 1
-        elif row.classification == "unclassified":
-            aggregate["unclassified"] += amount
-            aggregate["unclassified_count"] += 1
-        else:
-            aggregate["classified_count"] += 1
 
-    missing_date_count = int(
-        session.scalar(
-            select(func.count())
-            .select_from(FinancialTransaction)
-            .where(
-                FinancialTransaction.account_id.in_(account_ids),
-                FinancialTransaction.status == "published",
-                FinancialTransaction.posted_date.is_(None),
+        transaction_history: list[dict[str, Any]] = []
+        for currency, aggregate in sorted(histories.items()):
+            income = aggregate["income"]
+            expenses = aggregate["expenses"]
+            transaction_history.append(
+                {
+                    "currency": currency,
+                    "source_labels": sorted(aggregate["sources"]),
+                    "income_total": _text(income),
+                    "expenses_total": _text(expenses),
+                    "net_cash_flow": _text(income - expenses),
+                    "income_monthly_average": _text(
+                        _round(income / months) if aggregate["income_count"] else None
+                    ),
+                    "expenses_monthly_average": _text(
+                        _round(expenses / months)
+                        if aggregate["expense_count"]
+                        else None
+                    ),
+                    "published_transaction_count": aggregate["published_count"],
+                    "classified_transaction_count": aggregate["classified_count"],
+                    "unclassified_count": aggregate["unclassified_count"],
+                    "unclassified_signed_amount": _text(aggregate["unclassified"]),
+                }
             )
-        )
-        or 0
-    )
-    if missing_date_count:
+        if not transaction_rows:
+            gaps.append(
+                "No eligible published transactions were found in this sample; no "
+                "income or expense forecast was derived from history."
+            )
+        elif any(item["unclassified_count"] for item in transaction_history):
+            gaps.append(
+                "Published unclassified transactions remain visible but are excluded "
+                "from historical income and expense totals."
+            )
         gaps.append(
-            f"{missing_date_count} published transaction(s) have no posted date "
-            "and cannot be placed in the selected history window."
+            "Transaction history includes only selected accounts' published rows; "
+            "missing statements or feed coverage cannot be inferred from an "
+            "empty month."
         )
 
-    transaction_history: list[dict[str, Any]] = []
-    for currency, aggregate in sorted(histories.items()):
-        income = aggregate["income"]
-        expenses = aggregate["expenses"]
-        transaction_history.append(
+        event_rows = list(
+            session.execute(
+                select(
+                    InvestmentEvent.cash_amount,
+                    InvestmentEvent.currency,
+                    InvestmentEvent.review_status,
+                    InvestmentEvent.quality_status,
+                    InvestmentEvent.source_label,
+                )
+                .where(
+                    InvestmentEvent.account_id.in_(account_ids),
+                    InvestmentEvent.event_type == "dividend",
+                    InvestmentEvent.effective_date >= start,
+                    InvestmentEvent.effective_date <= end,
+                )
+                .order_by(InvestmentEvent.effective_date, InvestmentEvent.id)
+                .limit(10001)
+            )
+        )
+        if len(event_rows) > 10000:
+            raise PlanningError(
+                "Dividend history exceeds 10,000 events; narrow the sample."
+            )
+        dividend_totals: dict[str, dict[str, Any]] = {}
+        unreviewed_dividends = 0
+        for event in event_rows:
+            if (
+                event.review_status != "reviewed"
+                or event.quality_status not in {"reported", "manual"}
+                or event.cash_amount is None
+            ):
+                unreviewed_dividends += 1
+                continue
+            aggregate = dividend_totals.setdefault(
+                event.currency,
+                {"total": Decimal(0), "count": 0, "sources": set()},
+            )
+            aggregate["total"] += Decimal(event.cash_amount)
+            aggregate["count"] += 1
+            aggregate["sources"].add(event.source_label)
+        dividend_history = [
             {
                 "currency": currency,
+                "total": _text(aggregate["total"]),
+                "monthly_average": _text(_round(aggregate["total"] / months)),
+                "event_count": aggregate["count"],
                 "source_labels": sorted(aggregate["sources"]),
-                "income_total": _text(income),
-                "expenses_total": _text(expenses),
-                "net_cash_flow": _text(income - expenses),
-                "income_monthly_average": _text(
-                    _round(income / months) if aggregate["income_count"] else None
-                ),
-                "expenses_monthly_average": _text(
-                    _round(expenses / months) if aggregate["expense_count"] else None
-                ),
-                "published_transaction_count": aggregate["published_count"],
-                "classified_transaction_count": aggregate["classified_count"],
-                "unclassified_count": aggregate["unclassified_count"],
-                "unclassified_signed_amount": _text(aggregate["unclassified"]),
             }
-        )
-    if not transaction_rows:
-        gaps.append(
-            "No eligible published transactions were found in this sample; no "
-            "income or expense forecast was derived from history."
-        )
-    elif any(item["unclassified_count"] for item in transaction_history):
-        gaps.append(
-            "Published unclassified transactions remain visible but are excluded "
-            "from historical income and expense totals."
-        )
-    gaps.append(
-        "Transaction history includes only selected accounts' published rows; "
-        "missing statements or feed coverage cannot be inferred from an empty month."
-    )
-
-    event_rows = list(
-        session.execute(
-            select(
-                InvestmentEvent.cash_amount,
-                InvestmentEvent.currency,
-                InvestmentEvent.review_status,
-                InvestmentEvent.quality_status,
-                InvestmentEvent.source_label,
+            for currency, aggregate in sorted(dividend_totals.items())
+        ]
+        if unreviewed_dividends:
+            gaps.append(
+                f"{unreviewed_dividends} dividend event(s) are unreviewed, incomplete, "
+                "or missing cash amounts and are excluded from history."
             )
-            .where(
-                InvestmentEvent.account_id.in_(account_ids),
-                InvestmentEvent.event_type == "dividend",
-                InvestmentEvent.effective_date >= start,
-                InvestmentEvent.effective_date <= end,
+        if not dividend_history:
+            gaps.append(
+                "No reviewed dividend events were found in this sample; no dividend "
+                "forecast was derived from history."
             )
-            .order_by(InvestmentEvent.effective_date, InvestmentEvent.id)
-            .limit(10001)
-        )
-    )
-    if len(event_rows) > 10000:
-        raise PlanningError(
-            "Dividend history exceeds 10,000 events; narrow the sample."
-        )
-    dividend_totals: dict[str, dict[str, Any]] = {}
-    unreviewed_dividends = 0
-    for event in event_rows:
-        if (
-            event.review_status != "reviewed"
-            or event.quality_status not in {"reported", "manual"}
-            or event.cash_amount is None
-        ):
-            unreviewed_dividends += 1
-            continue
-        aggregate = dividend_totals.setdefault(
-            event.currency,
-            {"total": Decimal(0), "count": 0, "sources": set()},
-        )
-        aggregate["total"] += Decimal(event.cash_amount)
-        aggregate["count"] += 1
-        aggregate["sources"].add(event.source_label)
-    dividend_history = [
-        {
-            "currency": currency,
-            "total": _text(aggregate["total"]),
-            "monthly_average": _text(_round(aggregate["total"] / months)),
-            "event_count": aggregate["count"],
-            "source_labels": sorted(aggregate["sources"]),
-        }
-        for currency, aggregate in sorted(dividend_totals.items())
-    ]
-    if unreviewed_dividends:
         gaps.append(
-            f"{unreviewed_dividends} dividend event(s) are unreviewed, incomplete, "
-            "or missing cash amounts and are excluded from history."
+            "Dividend events and classified transaction income are shown separately "
+            "and may overlap; avoid counting the same observed payment twice."
         )
-    if not dividend_history:
-        gaps.append(
-            "No reviewed dividend events were found in this sample; no dividend "
-            "forecast was derived from history."
-        )
-    gaps.append(
-        "Dividend events and classified transaction income are shown separately "
-        "and may overlap; avoid counting the same observed payment twice."
-    )
-    return transaction_history, dividend_history, gaps
+        return transaction_history, dividend_history, gaps
 
 
 def _case(

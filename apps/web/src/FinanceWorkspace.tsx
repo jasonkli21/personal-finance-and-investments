@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { localDate } from './local-date'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createAccountBalance,
@@ -8,13 +9,6 @@ import {
 import type { components } from './api/schema'
 
 type Summary = components['schemas']['FinanceSummaryRead']
-
-function localDate(): string {
-  const now = new Date()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${now.getFullYear()}-${month}-${day}`
-}
 
 function firstOfCurrentMonth(): string {
   return localDate().slice(0, 7) + '-01'
@@ -49,7 +43,7 @@ export default function FinanceWorkspace() {
   const [accountId, setAccountId] = useState('')
   const [balanceKind, setBalanceKind] = useState<'asset' | 'liability'>('asset')
   const [amount, setAmount] = useState('')
-  const [currency, setCurrency] = useState('USD')
+  const [currency, setCurrency] = useState('')
   const [source, setSource] = useState('Manual statement balance')
   const [quality, setQuality] = useState<'reported' | 'estimated' | 'stale'>(
     'reported',
@@ -57,32 +51,29 @@ export default function FinanceWorkspace() {
   const [balanceKey, setBalanceKey] = useState(() => crypto.randomUUID())
   const [notice, setNotice] = useState('')
 
-  useEffect(() => {
-    if (!accountId && accounts.length) {
-      setAccountId(accounts[0].id)
-      setCurrency(accounts[0].base_currency)
-    }
-  }, [accountId, accounts])
-
   const summaryQuery = useQuery({
     queryKey: ['finance-summary', month, asOf],
     queryFn: () => fetchFinanceSummary({ month, asOf }),
     enabled: Boolean(month && asOf),
   })
   const summary = summaryQuery.data as Summary | undefined
-  const selectedAccount = accounts.find((account) => account.id === accountId)
+  const selectedAccountId = accountId || accounts[0]?.id || ''
+  const selectedAccount = accounts.find(
+    (account) => account.id === selectedAccountId,
+  )
+  const selectedCurrency = currency || selectedAccount?.base_currency || 'USD'
 
   const addBalance = useMutation({
     mutationFn: () => {
-      if (!accountId || !asOf || !amount || !source.trim()) {
+      if (!selectedAccountId || !asOf || !amount || !source.trim()) {
         throw new Error('Complete account, date, amount and source.')
       }
       return createAccountBalance({
-        account_id: accountId,
+        account_id: selectedAccountId,
         as_of: asOf,
         balance_kind: balanceKind,
         amount,
-        currency,
+        currency: selectedCurrency,
         source: source.trim(),
         quality_status: quality,
         idempotency_key: balanceKey,
@@ -244,7 +235,7 @@ export default function FinanceWorkspace() {
             Account
             <select
               className="rounded-lg border p-2"
-              value={accountId}
+              value={selectedAccountId}
               onChange={(event) => {
                 const nextId = event.target.value
                 setAccountId(nextId)
@@ -301,7 +292,7 @@ export default function FinanceWorkspace() {
             <input
               className="rounded-lg border p-2 uppercase"
               maxLength={3}
-              value={currency}
+              value={selectedCurrency}
               onChange={(event) =>
                 updateBalance(setCurrency, event.target.value.toUpperCase())
               }

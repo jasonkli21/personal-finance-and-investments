@@ -63,11 +63,13 @@ test('offline reviewed positions → ETF compositions → frozen NVDA drill-down
       .getByRole('combobox', { name: 'Select account', exact: true })
       .selectOption({ label: name })
     await page.getByLabel('Position and manual price as of').fill('2026-10-01')
-    await page.getByLabel('CSV file', { exact: true }).setInputFiles({
-      name: `${name}.csv`,
-      mimeType: 'text/csv',
-      buffer: Buffer.from(csv),
-    })
+    await page
+      .getByLabel('CSV or supported text PDF', { exact: true })
+      .setInputFiles({
+        name: `${name}.csv`,
+        mimeType: 'text/csv',
+        buffer: Buffer.from(csv),
+      })
     await page
       .getByRole('combobox', { name: 'Ticker / identifier', exact: true })
       .selectOption('ticker')
@@ -81,6 +83,10 @@ test('offline reviewed positions → ETF compositions → frozen NVDA drill-down
       .getByRole('combobox', { name: 'Currency (optional)', exact: true })
       .selectOption('currency')
     await page
+      .getByRole('region', {
+        name: 'Reviewed CSV or brokerage statement import',
+        exact: true,
+      })
       .getByRole('button', { name: 'Stage for review', exact: true })
       .click()
     await expect(
@@ -130,6 +136,10 @@ test('offline reviewed positions → ETF compositions → frozen NVDA drill-down
     name: 'Portfolio reports',
     exact: true,
   })
+  await report.getByRole('checkbox', { name: 'Brokerage', exact: true }).check()
+  await report
+    .getByRole('checkbox', { name: 'Retirement', exact: true })
+    .check()
   await report.getByRole('button', { name: 'Create / refresh report' }).click()
   await expect(
     report.getByText('Total portfolio NAV: USD 200,000.00', { exact: true }),

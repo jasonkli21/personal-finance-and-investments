@@ -25,6 +25,7 @@ from app.db.models import (
     TaxLotAdjustment,
 )
 from app.domains.tax import lot_state
+from app.providers.quotes import observation_time
 
 SALE_METHOD_VERSION = "hypothetical-lot-sale-v1"
 US_TAX_POLICY_VERSION = "us-federal-pub550-2025-holding-period-wash-sale-v1"
@@ -81,11 +82,12 @@ def _baseline(
         raise SalesSimulationError(
             "The account has no accepted current position snapshot."
         )
-    if request.sale_date < snapshot.snapshot_at.date():
+    snapshot_date = observation_time(snapshot.snapshot_at).date()
+    if request.sale_date < snapshot_date:
         raise SalesSimulationError(
             "Sale date cannot predate the current accepted position snapshot."
         )
-    if (date.today() - snapshot.snapshot_at.date()).days > 7:
+    if (date.today() - snapshot_date).days > 7:
         raise SalesSimulationError(
             "The accepted position snapshot is more than 7 days old. "
             "Refresh the position first."

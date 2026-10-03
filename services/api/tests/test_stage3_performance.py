@@ -1,7 +1,7 @@
 """Synthetic checks for Stage 3 Decimal return methods and bounded solving."""
 
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, localcontext
 
 from app.domains.performance import (
     ExternalFlow,
@@ -73,3 +73,32 @@ def test_modified_dietz_requires_positive_opening_value_and_period() -> None:
         )
         is None
     )
+
+
+def test_performance_math_does_not_inherit_caller_decimal_precision() -> None:
+    points = [
+        ValuationPoint(date(2026, 1, 1), Decimal("123.4567891234")),
+        ValuationPoint(date(2026, 2, 1), Decimal("200.0000000001")),
+        ValuationPoint(date(2027, 1, 1), Decimal("234.5678912345")),
+    ]
+    flows = [
+        ExternalFlow(date(2026, 1, 16), Decimal("12.3456789123")),
+        ExternalFlow(date(2026, 1, 16), Decimal("-0.0000000001")),
+    ]
+    expected_twr = chained_modified_dietz(points, flows)
+    expected_mwr = money_weighted_return(
+        points[0].value, points[-1].value, flows, points[0].as_of, points[-1].as_of
+    )
+    with localcontext() as context:
+        context.prec = 8
+        assert chained_modified_dietz(points, flows) == expected_twr
+        assert (
+            money_weighted_return(
+                points[0].value,
+                points[-1].value,
+                flows,
+                points[0].as_of,
+                points[-1].as_of,
+            )
+            == expected_mwr
+        )

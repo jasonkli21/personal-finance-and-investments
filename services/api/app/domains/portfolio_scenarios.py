@@ -466,6 +466,19 @@ def _simulate_portfolio(
             )
         cash_assumptions[cash_input.account_id] += Decimal(cash_input.amount)
 
+    # Explicit cash assumptions establish the pre-trade balance. Trades then
+    # settle in request order; a later sale cannot finance an earlier purchase.
+    settled_cash = {
+        account_id: cash_before[account_id] + cash_assumptions[account_id]
+        for account_id in selected_ids
+    }
+    for account_id in cash_assumptions:
+        if settled_cash[account_id] < 0:
+            raise PortfolioScenarioError(
+                f"{selected_accounts[account_id].name} would exceed available "
+                "cash under the cash-only policy."
+            )
+
     trade_results: list[dict[str, Any]] = []
     for trade in request.trades:
         account_id = trade.account_id
@@ -559,6 +572,12 @@ def _simulate_portfolio(
                 "Trade value exceeds NUMERIC(28, 10) precision."
             )
         cash_delta = -(gross + fee) if trade.side == "buy" else gross - fee
+        settled_cash[account_id] += cash_delta
+        if settled_cash[account_id] < 0:
+            raise PortfolioScenarioError(
+                f"{selected_accounts[account_id].name} would exceed available "
+                "cash when this trade settles; place funding sales first."
+            )
         cash_trade_deltas[account_id] += cash_delta
         existing["quantity"] = _text(quantity_after)
         existing["price"] = _text(unit_value_price)
@@ -705,7 +724,8 @@ def _simulate_portfolio(
         ),
         (
             "Cash-only financing is required. Each trade's settlement and "
-            "explicit cash changes must leave its account at nonnegative USD cash."
+            "explicit cash changes must leave its account at nonnegative USD cash. "
+            "Cash changes apply before trades, which settle in the entered order."
         ),
         (
             "ETF look-through uses the same one-level exposure engine and the "

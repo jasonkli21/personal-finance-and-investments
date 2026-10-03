@@ -1,3 +1,5 @@
+import AuthenticationGate from './AuthenticationGate'
+import { localDate } from './local-date'
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -264,8 +266,8 @@ function FinanceApp({
   const effectiveDate = selectedAccount
     ? (effectiveDates[selectedAccount.id] ??
       currentSnapshot?.effective_date ??
-      new Date().toISOString().slice(0, 10))
-    : new Date().toISOString().slice(0, 10)
+      localDate())
+    : localDate()
   const holdings = selectedAccount
     ? (holdingDrafts[selectedAccount.id] ??
       currentSnapshot?.positions.map(draftFromPosition) ??
@@ -939,19 +941,19 @@ function FinanceApp({
         accountId={selectedAccountId}
         effectiveDate={effectiveDate}
         expectedRevision={positionsQuery.data?.current_revision ?? 0}
-        onPublished={async () => {
-          if (selectedAccountId) {
+        onPublished={async (publishedAccountId) => {
+          if (publishedAccountId) {
             await queryClient.invalidateQueries({
-              queryKey: ['positions', selectedAccountId],
+              queryKey: ['positions', publishedAccountId],
             })
             setEffectiveDates((current) =>
-              withoutKey(current, selectedAccountId),
+              withoutKey(current, publishedAccountId),
             )
             setHoldingDrafts((current) =>
-              withoutKey(current, selectedAccountId),
+              withoutKey(current, publishedAccountId),
             )
             setHoldingBaseRevisions((current) =>
-              withoutKey(current, selectedAccountId),
+              withoutKey(current, publishedAccountId),
             )
           }
         }}
@@ -967,131 +969,8 @@ function FinanceApp({
   )
 }
 
-type SessionState = { authenticated: boolean; local_mode: boolean }
-
-async function readSession(): Promise<SessionState> {
-  const response = await fetch('/api/v1/auth/session', {
-    credentials: 'same-origin',
-    headers: { Accept: 'application/json' },
-  })
-  if (response.status === 401)
-    return { authenticated: false, local_mode: false }
-  if (!response.ok) throw new Error('Authentication status is unavailable.')
-  return (await response.json()) as SessionState
-}
-
-async function signOut() {
-  const response = await fetch('/api/v1/auth/logout', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { Accept: 'application/json' },
-  })
-  if (response.status === 401) return
-  if (!response.ok) throw new Error('Sign-out could not be completed.')
-}
-
-function AuthenticationGate() {
-  const queryClient = useQueryClient()
-  const [session, setSession] = useState<SessionState | null>(null)
-  const [checking, setChecking] = useState(true)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    let active = true
-    const refresh = async () => {
-      try {
-        const current = await readSession()
-        if (active) {
-          if (!current.authenticated) queryClient.clear()
-          setSession(current)
-          setError('')
-        }
-      } catch {
-        if (active) setError('The private session service is unavailable.')
-      } finally {
-        if (active) setChecking(false)
-      }
-    }
-    const expire = () => {
-      setSession({ authenticated: false, local_mode: false })
-      queryClient.clear()
-    }
-    const onFocus = () => void refresh()
-    window.addEventListener('finance:unauthorized', expire)
-    window.addEventListener('focus', onFocus)
-    const timer = window.setInterval(() => void refresh(), 60_000)
-    void refresh()
-    return () => {
-      active = false
-      window.clearInterval(timer)
-      window.removeEventListener('focus', onFocus)
-      window.removeEventListener('finance:unauthorized', expire)
-    }
-  }, [queryClient])
-
-  async function logout() {
-    setError('')
-    try {
-      await signOut()
-      queryClient.clear()
-      setSession({ authenticated: false, local_mode: false })
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Sign-out failed.')
-    }
-  }
-
-  if (checking && session === null) {
-    return (
-      <main className="mx-auto flex min-h-screen max-w-lg items-center px-5 py-10">
-        <p className="text-sm text-slate-600" role="status">
-          Checking private session…
-        </p>
-      </main>
-    )
-  }
-  if (session?.authenticated) {
-    return (
-      <FinanceApp
-        authenticated={!session.local_mode}
-        onLogout={() => void logout()}
-      />
-    )
-  }
-
-  return (
-    <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-5 py-10">
-      <section className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">
-          Private finance workspace
-        </p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-          Sign in
-        </h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Your financial workspace requires an active private session.
-        </p>
-        {error && (
-          <p
-            className="mt-5 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"
-            role="alert"
-          >
-            {error}
-          </p>
-        )}
-        <button
-          className="mt-6 w-full rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-          type="button"
-          onClick={() => window.location.assign('/api/v1/auth/login')}
-        >
-          Continue with identity provider
-        </button>
-      </section>
-    </main>
-  )
-}
-
 export default function App() {
-  return <AuthenticationGate />
+  return <AuthenticationGate workspace={FinanceApp} />
 }
 
 function messageFor(error: unknown): string {

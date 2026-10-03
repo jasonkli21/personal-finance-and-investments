@@ -1,6 +1,6 @@
 # Codex instructions — Personal Finance & Portfolio Intelligence
 
-This repository implements a local-first personal-finance and investment-analysis application through **Stage 1**. Existing code and release evidence describe delivered behavior; future-stage documents remain plans. The documents in `docs/` are the current requirements; do not assume every described capability is implemented. Read this file and `docs/README.md` before making changes.
+This repository implements a local-first personal-finance and investment-analysis application: Stage 0–1 are delivered locally, Stage 2 is partial, Stage 3 is delivered locally, Stage 4 deployment tooling is prepared, and Stage 5 has an offline research baseline. Existing code and stage release evidence describe delivered behavior; gated capabilities remain plans. The documents in `docs/` are the current requirements; do not assume every described capability is implemented. Read this file and `docs/README.md` before making changes.
 
 ## Read in this order
 
@@ -15,7 +15,7 @@ This repository implements a local-first personal-finance and investment-analysi
 
 ## Default implementation posture
 
-- Work **only on the requested stage/task**. Stage 0 and Stage 1 are delivered; consult release evidence before starting new work. Do not build future stages speculatively.
+- Work **only on the requested stage/task**. Consult each stage's release evidence and the current review before starting new work. Do not build gated capabilities speculatively.
 - Stack: React + TypeScript + Vite; Tailwind + shadcn/ui; TanStack Query/Table; ECharts; Python + FastAPI + Pydantic; SQLAlchemy 2 + Alembic + psycopg 3; **PostgreSQL 16 locally, Amazon Aurora DSQL in production**; Docker Compose; `uv` + `pnpm`.
 - Build a modular **single deployable backend**. Background jobs can share the backend codebase; no microservices, Kubernetes, Redis, or separate vector database in the MVP.
 - Local PostgreSQL or production Aurora DSQL is the source of truth for structured financial data in its respective environment. The local filesystem/private S3 holds original files. Local and production are independent unless the user explicitly imports/exports data.
@@ -52,7 +52,7 @@ This repository implements a local-first personal-finance and investment-analysi
 
 ## Commands and repository layout
 
-The current layout and future additions are distinguished in `docs/02-architecture.md`; actual commands and delivery evidence are in `README.md` and `docs/stage-1-release.md`. Proposed additions are not evidence that scripts or directories already exist. When bootstrapping, favor standard tooling and document the actual commands after implementation.
+The current layout and future additions are distinguished in `docs/02-architecture.md`; actual commands are in `README.md`, and stage release records plus `docs/maintainability-review.md` contain delivery evidence. Proposed additions are not evidence that scripts or directories already exist. Keep tests in `services/api/tests`, `apps/web/test`, `apps/web/e2e`, or `tests/infra`.
 
 ## Decisions needing evidence before changing
 

@@ -244,6 +244,18 @@ def test_invalid_database_port_fails_configuration(
         load_settings()
 
 
+def test_explicit_database_port_takes_precedence_over_invalid_compose_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clear_database_env(monkeypatch)
+    monkeypatch.setenv("DATABASE_PORT", "5433")
+    monkeypatch.setenv("POSTGRES_PORT", "invalid")
+    assert load_settings().database_port == 5433
+    monkeypatch.delenv("DATABASE_PORT")
+    with pytest.raises(ValueError, match="DATABASE_PORT must be an integer"):
+        load_settings()
+
+
 def configure_valid_production(monkeypatch: pytest.MonkeyPatch) -> None:
     clear_database_env(monkeypatch)
     for key in (

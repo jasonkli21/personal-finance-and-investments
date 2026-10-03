@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRevisionDraft } from './use-revision-draft'
+import { parseCsvHeader } from './csv-headers'
+import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   confirmTransfer,
@@ -43,34 +45,6 @@ const FIELDS: Field[] = [
   'raw_type',
 ]
 
-function readHeaders(text: string): string[] {
-  const first = text.replace(/^\uFEFF/, '').split(/\r?\n/, 1)[0] ?? ''
-  const values: string[] = []
-  let value = ''
-  let quoted = false
-  for (let i = 0; i < first.length; i += 1) {
-    const ch = first[i]
-    if (ch === '"') {
-      if (quoted && first[i + 1] === '"') {
-        value += '"'
-        i += 1
-      } else quoted = !quoted
-    } else if (ch === ',' && !quoted) {
-      values.push(value.trim())
-      value = ''
-    } else value += ch
-  }
-  values.push(value.trim())
-  if (
-    quoted ||
-    values.some((item) => !item) ||
-    new Set(values).size !== values.length
-  ) {
-    throw new Error('CSV headers must be valid, non-empty and unique.')
-  }
-  return values
-}
-
 function Section({
   title,
   children,
@@ -79,7 +53,10 @@ function Section({
   children: React.ReactNode
 }) {
   return (
-    <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section
+      aria-label={title}
+      className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+    >
       <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
       {children}
     </section>
@@ -95,6 +72,7 @@ export default function SpendingWorkspace() {
   })
   const accounts = (accountsQuery.data ?? []).filter((row) => row.active)
   const [accountId, setAccountId] = useState('')
+  const [transactionOffset, setTransactionOffset] = useState(0)
   const [file, setFile] = useState<File | null>(null)
   const [headers, setHeaders] = useState<string[]>([])
   const [mapping, setMapping] = useState<Record<Field, string>>({
@@ -107,6 +85,13 @@ export default function SpendingWorkspace() {
     raw_type: '',
   })
   const [importId, setImportId] = useState('')
+  const [dirtyRows, setDirtyRows] = useState<Record<string, boolean>>({})
+  const [rowVersions, setRowVersions] = useState<Record<string, number>>({})
+  const [draftEpoch, setDraftEpoch] = useState(0)
+  const [transactionVersions, setTransactionVersions] = useState<
+    Record<string, number>
+  >({})
+  const fileSelection = useRef(0)
   const [sourceLabel, setSourceLabel] = useState('Bank CSV')
   const [categoryName, setCategoryName] = useState('')
   const [merchant, setMerchant] = useState('')
@@ -132,11 +117,12 @@ export default function SpendingWorkspace() {
   })
   const review = reviewQuery.data as Review | undefined
   const transactionsQuery = useQuery({
-    queryKey: ['transactions', accountId],
-    queryFn: () => fetchTransactions(accountId),
+    queryKey: ['transactions', accountId, transactionOffset],
+    queryFn: () => fetchTransactions(accountId, transactionOffset, 201),
     enabled: Boolean(accountId),
   })
-  const transactions = transactionsQuery.data ?? []
+  const transactions = transactionsQuery.data?.slice(0, 200) ?? []
+  const hasMoreTransactions = (transactionsQuery.data?.length ?? 0) > 200
   const transfersQuery = useQuery({
     queryKey: ['transfer-candidates'],
     queryFn: fetchTransferCandidates,
@@ -161,6 +147,8 @@ export default function SpendingWorkspace() {
     },
     onSuccess: async (result) => {
       setImportId(result.id)
+      setDirtyRows({})
+      setDraftEpoch((current) => current + 1)
       setMessage(
         result.duplicate
           ? 'This source already has a review.'
@@ -182,7 +170,12 @@ export default function SpendingWorkspace() {
       row: Row
       input: components['schemas']['TransactionRowCorrection']
     }) => correctTransactionRow(importId, row.id, input),
-    onSuccess: async () => {
+    onSuccess: async (_result, { row }) => {
+      setDirtyRows((current) => ({ ...current, [row.id]: false }))
+      setRowVersions((current) => ({
+        ...current,
+        [row.id]: (current[row.id] ?? 0) + 1,
+      }))
       setMessage('Row saved. Recheck the updated review revision.')
       setError('')
       await client.invalidateQueries({
@@ -197,6 +190,10 @@ export default function SpendingWorkspace() {
   const publish = useMutation({
     mutationFn: () => {
       if (!review) throw new Error('Load a review first.')
+      if (Object.values(dirtyRows).some(Boolean))
+        throw new Error(
+          'Save or discard transaction row drafts before publishing.',
+        )
       return publishTransactionImport(importId, review.review_revision)
     },
     onSuccess: async () => {
@@ -308,7 +305,11 @@ export default function SpendingWorkspace() {
         category_id: categoryId,
         classification,
       }),
-    onSuccess: async () => {
+    onSuccess: async (_result, { row }) => {
+      setTransactionVersions((current) => ({
+        ...current,
+        [row.id]: (current[row.id] ?? 0) + 1,
+      }))
       setMessage('Classification saved.')
       await Promise.all([
         client.invalidateQueries({ queryKey: ['transactions', accountId] }),
@@ -358,12 +359,13 @@ export default function SpendingWorkspace() {
     row: Row,
     action?: 'keep' | 'duplicate' | 'update',
     target?: string,
+    expectedRevision = review?.review_revision ?? 0,
   ) {
     if (!review) return
     correction.mutate({
       row,
       input: {
-        expected_review_revision: review.review_revision,
+        expected_review_revision: expectedRevision,
         reason: action
           ? 'Identity reviewed: ' + action
           : 'Corrected transaction row',
@@ -381,39 +383,62 @@ export default function SpendingWorkspace() {
   }
 
   function selectFile(next: File | null) {
+    const selection = ++fileSelection.current
+    setHeaders([])
+    setMapping(
+      Object.fromEntries(FIELDS.map((field) => [field, ''])) as Record<
+        Field,
+        string
+      >,
+    )
     setFile(next)
     setImportId('')
     if (!next) return
-    void next.text().then((text) => {
-      try {
-        const parsed = readHeaders(text)
-        setHeaders(parsed)
-        const aliases: Record<Field, string[]> = {
-          posted_date: ['posted date', 'post date', 'date'],
-          transaction_date: ['transaction date', 'purchase date'],
-          amount: ['amount', 'transaction amount', 'debit', 'credit'],
-          currency: ['currency', 'currency code'],
-          description: ['description', 'name', 'merchant', 'details'],
-          provider_id: ['transaction id', 'provider id', 'fitid', 'reference'],
-          raw_type: ['type', 'transaction type'],
+    void next
+      .slice(0, 64_000)
+      .text()
+      .then((text) => {
+        if (selection !== fileSelection.current) return
+        try {
+          const parsed = parseCsvHeader(text)
+          setHeaders(parsed)
+          const aliases: Record<Field, string[]> = {
+            posted_date: ['posted date', 'post date', 'date'],
+            transaction_date: ['transaction date', 'purchase date'],
+            amount: ['amount', 'transaction amount', 'debit', 'credit'],
+            currency: ['currency', 'currency code'],
+            description: ['description', 'name', 'merchant', 'details'],
+            provider_id: [
+              'transaction id',
+              'provider id',
+              'fitid',
+              'reference',
+            ],
+            raw_type: ['type', 'transaction type'],
+          }
+          setMapping(
+            Object.fromEntries(
+              FIELDS.map((field) => [
+                field,
+                parsed.find((name) =>
+                  aliases[field].includes(
+                    name.toLowerCase().replace(/[_-]+/g, ' ').trim(),
+                  ),
+                ) ?? '',
+              ]),
+            ) as Record<Field, string>,
+          )
+          setError('')
+        } catch (cause) {
+          setError(
+            cause instanceof Error ? cause.message : 'Invalid CSV header.',
+          )
         }
-        setMapping(
-          Object.fromEntries(
-            FIELDS.map((field) => [
-              field,
-              parsed.find((name) =>
-                aliases[field].includes(
-                  name.toLowerCase().replace(/[_-]+/g, ' ').trim(),
-                ),
-              ) ?? '',
-            ]),
-          ) as Record<Field, string>,
-        )
-        setError('')
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : 'Invalid CSV header.')
-      }
-    })
+      })
+      .catch(() => {
+        if (selection === fileSelection.current)
+          setError('The selected file could not be read.')
+      })
   }
 
   return (
@@ -458,6 +483,7 @@ export default function SpendingWorkspace() {
               onChange={(event) => {
                 manualDraftKey.current = crypto.randomUUID()
                 setAccountId(event.target.value)
+                setTransactionOffset(0)
               }}
             >
               <option value="">Choose account</option>
@@ -540,7 +566,9 @@ export default function SpendingWorkspace() {
                 disabled={
                   review.status !== 'review' ||
                   unresolved > 0 ||
-                  publish.isPending
+                  publish.isPending ||
+                  correction.isPending ||
+                  Object.values(dirtyRows).some(Boolean)
                 }
                 onClick={() => publish.mutate()}
               >
@@ -563,15 +591,38 @@ export default function SpendingWorkspace() {
                 <tbody>
                   {review.rows.map((row) => (
                     <ReviewRow
-                      key={row.id}
+                      key={`${row.id}-${rowVersions[row.id] ?? 0}-${draftEpoch}`}
                       row={row}
-                      canEdit={review.status === 'review'}
+                      reviewRevision={review.review_revision}
+                      onDirty={() =>
+                        setDirtyRows((current) => ({
+                          ...current,
+                          [row.id]: true,
+                        }))
+                      }
+                      canEdit={
+                        review.status === 'review' &&
+                        !correction.isPending &&
+                        !publish.isPending
+                      }
                       onSave={correctRow}
                     />
                   ))}
                 </tbody>
               </table>
             </div>
+            <button
+              type="button"
+              className="rounded border px-3 py-2 text-sm"
+              disabled={correction.isPending || publish.isPending}
+              onClick={() => {
+                setDirtyRows({})
+                setDraftEpoch((current) => current + 1)
+                void reviewQuery.refetch()
+              }}
+            >
+              Discard row drafts and reload review
+            </button>
             <p className="text-xs text-slate-500">
               Exact-file reimports return the prior attempt.
               Same-date/amount/description rows without native IDs remain
@@ -706,6 +757,24 @@ export default function SpendingWorkspace() {
       </Section>
 
       <Section title="Published transactions">
+        {transactionsQuery.error && (
+          <p role="alert">{transactionsQuery.error.message}</p>
+        )}
+        {transactionsQuery.isFetching && accountId && (
+          <p role="status">Loading transactions…</p>
+        )}
+        {!accountId ? (
+          <p>Choose an account in the CSV review above.</p>
+        ) : (
+          transactionsQuery.data && (
+            <p className="text-sm text-slate-600">
+              {transactions.length
+                ? `Rows ${transactionOffset + 1}–${transactionOffset + transactions.length}`
+                : 'No transactions on this page.'}
+            </p>
+          )
+        )}
+
         <div className="overflow-x-auto">
           <table className="w-full min-w-[800px] text-left text-sm">
             <thead className="bg-slate-50">
@@ -721,13 +790,17 @@ export default function SpendingWorkspace() {
             <tbody>
               {transactions.map((row: Transaction) => (
                 <TransactionRow
-                  key={row.id}
+                  key={`${row.id}-${transactionVersions[row.id] ?? 0}`}
                   row={row}
                   categories={categories}
                   busy={updateTx.isPending}
                   onUnlink={(id) => unlink.mutate(id)}
-                  onSave={(categoryId, classification) =>
-                    updateTx.mutate({ row, categoryId, classification })
+                  onSave={(categoryId, classification, revision) =>
+                    updateTx.mutate({
+                      row: { ...row, revision },
+                      categoryId,
+                      classification,
+                    })
                   }
                 />
               ))}
@@ -739,6 +812,34 @@ export default function SpendingWorkspace() {
             No published transactions for this account.
           </p>
         )}
+        <div className="flex gap-3">
+          <button
+            className="rounded border px-3 py-2 text-sm disabled:opacity-50"
+            type="button"
+            disabled={
+              transactionOffset === 0 ||
+              transactionsQuery.isFetching ||
+              updateTx.isPending
+            }
+            onClick={() =>
+              setTransactionOffset((current) => Math.max(0, current - 200))
+            }
+          >
+            Previous transactions
+          </button>
+          <button
+            className="rounded border px-3 py-2 text-sm disabled:opacity-50"
+            type="button"
+            disabled={
+              !hasMoreTransactions ||
+              transactionsQuery.isFetching ||
+              updateTx.isPending
+            }
+            onClick={() => setTransactionOffset((current) => current + 200)}
+          >
+            Next transactions
+          </button>
+        </div>
       </Section>
 
       <Section title="Possible account transfers">
@@ -781,34 +882,26 @@ export default function SpendingWorkspace() {
 function ReviewRow({
   row,
   canEdit,
+  reviewRevision,
+  onDirty,
   onSave,
 }: {
   row: Row
   canEdit: boolean
+  reviewRevision: number
+  onDirty: () => void
   onSave: (
     row: Row,
     action?: 'keep' | 'duplicate' | 'update',
     target?: string,
+    expectedRevision?: number,
   ) => void
 }) {
-  const [posted, setPosted] = useState(row.posted_date ?? '')
-  const [amount, setAmount] = useState(row.amount ?? '')
-  const [currency, setCurrency] = useState(row.currency ?? '')
-  const [description, setDescription] = useState(row.description)
-  const [providerId, setProviderId] = useState(
-    row.provider_transaction_id ?? '',
-  )
+  const draftState = useRevisionDraft(row, reviewRevision, onDirty)
+  const draft = draftState.value
   const candidates = row.duplicate_candidates ?? []
   const nativeConflict = Boolean(row.diagnostics.native_id_conflict)
   const resolved = ['ready', 'duplicate', 'update'].includes(row.status)
-  const draft = {
-    ...row,
-    posted_date: posted || null,
-    amount: amount || null,
-    currency: currency || null,
-    description,
-    provider_transaction_id: providerId || null,
-  }
   return (
     <tr className="border-t align-top">
       <td className="p-2">{row.row_number}</td>
@@ -817,8 +910,10 @@ function ReviewRow({
           type="date"
           className="w-36 rounded border p-1"
           disabled={!canEdit || row.status === 'duplicate'}
-          value={posted}
-          onChange={(event) => setPosted(event.target.value)}
+          value={draft.posted_date ?? ''}
+          onChange={(event) =>
+            draftState.update({ posted_date: event.target.value })
+          }
         />
       </td>
       <td className="p-2">
@@ -826,8 +921,10 @@ function ReviewRow({
           inputMode="decimal"
           className="w-28 rounded border p-1"
           disabled={!canEdit || row.status === 'duplicate'}
-          value={amount}
-          onChange={(event) => setAmount(event.target.value)}
+          value={draft.amount ?? ''}
+          onChange={(event) =>
+            draftState.update({ amount: event.target.value })
+          }
         />
       </td>
       <td className="p-2">
@@ -835,16 +932,20 @@ function ReviewRow({
           className="w-16 rounded border p-1"
           maxLength={3}
           disabled={!canEdit || row.status === 'duplicate'}
-          value={currency}
-          onChange={(event) => setCurrency(event.target.value.toUpperCase())}
+          value={draft.currency ?? ''}
+          onChange={(event) =>
+            draftState.update({ currency: event.target.value.toUpperCase() })
+          }
         />
       </td>
       <td className="p-2">
         <input
           className="w-64 rounded border p-1"
           disabled={!canEdit || row.status === 'duplicate'}
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
+          value={draft.description ?? ''}
+          onChange={(event) =>
+            draftState.update({ description: event.target.value })
+          }
         />
         <p
           className="max-w-64 truncate text-xs text-slate-500"
@@ -858,8 +959,10 @@ function ReviewRow({
           className="w-40 rounded border p-1 font-mono text-xs"
           aria-label={`Provider transaction ID for row ${row.row_number}`}
           disabled={!canEdit || row.status === 'duplicate'}
-          value={providerId}
-          onChange={(event) => setProviderId(event.target.value)}
+          value={draft.provider_transaction_id ?? ''}
+          onChange={(event) =>
+            draftState.update({ provider_transaction_id: event.target.value })
+          }
         />
         {Boolean(row.diagnostics.repeated_provider_id_in_file) && (
           <p className="mt-1 text-xs text-amber-800">
@@ -887,7 +990,9 @@ function ReviewRow({
             <button
               className="rounded border px-2 py-1 text-xs"
               type="button"
-              onClick={() => onSave(draft)}
+              onClick={() =>
+                onSave(draft, undefined, undefined, draftState.revision)
+              }
             >
               Save correction
             </button>
@@ -896,7 +1001,9 @@ function ReviewRow({
                 <button
                   className="rounded border px-2 py-1 text-xs"
                   type="button"
-                  onClick={() => onSave(draft, 'duplicate', id)}
+                  onClick={() =>
+                    onSave(draft, 'duplicate', id, draftState.revision)
+                  }
                 >
                   Duplicate
                 </button>
@@ -904,7 +1011,9 @@ function ReviewRow({
                   <button
                     className="rounded border px-2 py-1 text-xs"
                     type="button"
-                    onClick={() => onSave(draft, 'update', id)}
+                    onClick={() =>
+                      onSave(draft, 'update', id, draftState.revision)
+                    }
                   >
                     Update existing
                   </button>
@@ -916,7 +1025,9 @@ function ReviewRow({
               <button
                 className="rounded border px-2 py-1 text-xs"
                 type="button"
-                onClick={() => onSave(draft, 'keep')}
+                onClick={() =>
+                  onSave(draft, 'keep', undefined, draftState.revision)
+                }
               >
                 Keep separate
               </button>
@@ -942,18 +1053,51 @@ function TransactionRow({
   onSave: (
     categoryId: string | null,
     classification: components['schemas']['TransactionPatch']['classification'],
+    revision: number,
   ) => void
 }) {
   const client = useQueryClient()
   const [editingSplits, setEditingSplits] = useState(false)
-  const [splitAmounts, setSplitAmounts] = useState(['', ''])
-  const [splitCategories, setSplitCategories] = useState(['', ''])
-  const [splitLoaded, setSplitLoaded] = useState(false)
+  const [splitDraft, setSplitDraft] = useState<{
+    amounts: string[]
+    categories: string[]
+  } | null>(null)
+  const [splitRevision, setSplitRevision] = useState(row.revision)
+  const draft = useRevisionDraft(
+    {
+      categoryId: row.category_id ?? '',
+      classification:
+        row.classification as components['schemas']['TransactionPatch']['classification'],
+    },
+    row.revision,
+  )
   const splitQuery = useQuery({
     queryKey: ['transaction-splits', row.id],
     queryFn: () => fetchTransactionSplits(row.id),
     enabled: editingSplits,
   })
+  const splitAmounts =
+    splitDraft?.amounts ??
+    (splitQuery.data?.length
+      ? splitQuery.data.map((split) => split.amount)
+      : ['', ''])
+  const splitCategories =
+    splitDraft?.categories ??
+    (splitQuery.data?.length
+      ? splitQuery.data.map((split) => split.category_id ?? '')
+      : ['', ''])
+  function setSplitAmounts(update: (values: string[]) => string[]) {
+    setSplitDraft({
+      amounts: update(splitAmounts),
+      categories: splitCategories,
+    })
+  }
+  function setSplitCategories(update: (values: string[]) => string[]) {
+    setSplitDraft({
+      amounts: splitAmounts,
+      categories: update(splitCategories),
+    })
+  }
   const saveSplits = useMutation({
     mutationFn: () => {
       const amounts = splitAmounts.map((value) => value.trim())
@@ -961,7 +1105,7 @@ function TransactionRow({
         throw new Error('Enter an amount for each split.')
       }
       return replaceTransactionSplits(row.id, {
-        expected_revision: row.revision,
+        expected_revision: splitRevision,
         reason: 'Updated from spending workspace',
         splits: amounts.map((amount, index) => ({
           amount,
@@ -980,25 +1124,7 @@ function TransactionRow({
       })
     },
   })
-  useEffect(() => {
-    if (editingSplits && splitQuery.data && !splitLoaded) {
-      setSplitAmounts(
-        splitQuery.data.length
-          ? splitQuery.data.map((split) => split.amount)
-          : ['', ''],
-      )
-      setSplitCategories(
-        splitQuery.data.length
-          ? splitQuery.data.map((split) => split.category_id ?? '')
-          : ['', ''],
-      )
-      setSplitLoaded(true)
-    }
-  }, [editingSplits, splitLoaded, splitQuery.data])
-  const [categoryId, setCategoryId] = useState(row.category_id ?? '')
-  const [classification, setClassification] = useState(
-    row.classification as components['schemas']['TransactionPatch']['classification'],
-  )
+  const { categoryId, classification } = draft.value
   return (
     <>
       <tr className="border-t">
@@ -1015,7 +1141,9 @@ function TransactionRow({
             value={classification ?? 'unclassified'}
             disabled={busy}
             onChange={(event) =>
-              setClassification(event.target.value as typeof classification)
+              draft.update({
+                classification: event.target.value as typeof classification,
+              })
             }
           >
             <option value="unclassified">Unclassified</option>
@@ -1033,7 +1161,9 @@ function TransactionRow({
             className="rounded border p-1"
             value={categoryId}
             disabled={busy}
-            onChange={(event) => setCategoryId(event.target.value)}
+            onChange={(event) =>
+              draft.update({ categoryId: event.target.value })
+            }
           >
             <option value="">Uncategorized</option>
             {categories.map((category) => (
@@ -1048,15 +1178,28 @@ function TransactionRow({
             className="rounded border px-2 py-1 text-xs"
             type="button"
             disabled={busy}
-            onClick={() => onSave(categoryId || null, classification)}
+            onClick={() =>
+              onSave(categoryId || null, classification, draft.revision)
+            }
           >
             Save
           </button>
+          {draft.dirty && (
+            <button
+              className="ml-1 rounded border px-2 py-1 text-xs"
+              type="button"
+              disabled={busy}
+              onClick={draft.discard}
+            >
+              Discard edit
+            </button>
+          )}
           <button
             className="ml-1 rounded border px-2 py-1 text-xs"
             type="button"
             onClick={() => {
-              setSplitLoaded(false)
+              setSplitDraft(null)
+              setSplitRevision(row.revision)
               setEditingSplits((value) => !value)
             }}
           >
@@ -1119,14 +1262,18 @@ function TransactionRow({
               <button
                 className="rounded border px-2 py-1 text-xs"
                 type="button"
-                disabled={saveSplits.isPending}
+                disabled={
+                  saveSplits.isPending ||
+                  splitQuery.data === undefined ||
+                  splitQuery.isError
+                }
                 onClick={() => saveSplits.mutate()}
               >
                 Save exact split
               </button>
-              {saveSplits.error && (
+              {(saveSplits.error || splitQuery.error) && (
                 <p role="alert" className="text-xs text-rose-800">
-                  {saveSplits.error.message}
+                  {(saveSplits.error || splitQuery.error)?.message}
                 </p>
               )}
             </div>

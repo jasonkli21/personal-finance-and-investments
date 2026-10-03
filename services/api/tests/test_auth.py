@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import secrets
+import threading
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import replace
@@ -18,6 +19,7 @@ import pytest
 from fastapi.testclient import TestClient
 from joserfc import jwk, jwt
 from sqlalchemy import create_engine, select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -182,6 +184,111 @@ def test_session_database_retry_reuses_one_token_and_logical_session(
         assert session.scalar(select(AuthSession.id)) == context.session_id
         assert len(session.scalars(select(SecurityAuditEvent.id)).all()) == 1
     engine.dispose()
+
+
+@pytest.mark.parametrize("path", ["/v1/accounts", "/v1/auth/session"])
+def test_session_outage_is_redacted_and_correlated(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+    path: str,
+) -> None:
+    configure_auth(monkeypatch, tmp_path)
+    engine = create_engine("sqlite://", poolclass=StaticPool)
+    application = create_app(engine=engine)
+
+    def unavailable(*_args: Any, **_kwargs: Any) -> None:
+        raise OperationalError(
+            "sensitive SQL", {"token": "private-token"}, RuntimeError("private-data")
+        )
+
+    monkeypatch.setattr("app.main.get_principal", unavailable)
+    response = TestClient(application).get(path)
+    engine.dispose()
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Database unavailable"}
+    assert response.headers["Cache-Control"] == "no-store"
+    assert response.headers["X-Request-ID"] in caplog.text
+    assert "OperationalError" in caplog.text
+    assert all(
+        secret not in caplog.text
+        for secret in ("sensitive SQL", "private-token", "private-data")
+    )
+
+
+def test_callback_persistence_does_not_block_other_requests(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    configure_auth(monkeypatch, tmp_path)
+    engine = create_engine("sqlite://", poolclass=StaticPool)
+    application = create_app(engine=engine)
+    application.state.oidc_client = SimpleNamespace(
+        load_server_metadata=_constant_async(
+            {
+                "issuer": ISSUER,
+                "authorization_endpoint": f"{ISSUER}/authorize",
+                "token_endpoint": f"{ISSUER}/token",
+                "jwks_uri": f"{ISSUER}/jwks",
+            }
+        ),
+        authorize_access_token=_constant_async(
+            {
+                "userinfo": {
+                    "iss": ISSUER,
+                    "sub": SUBJECT,
+                    "aud": CLIENT_ID,
+                    "exp": 2_000_000_000,
+                }
+            }
+        ),
+    )
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow_create(*_args: Any, **_kwargs: Any) -> None:
+        started.set()
+        if not release.wait(2):
+            raise AssertionError("Callback persistence blocked the event loop")
+        return None
+
+    monkeypatch.setattr("app.auth.routes.create_session", slow_create)
+
+    async def requests() -> None:
+        transport = httpx.ASGITransport(app=application)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="https://finance.example.test"
+        ) as client:
+            callback_task = asyncio.create_task(client.get("/v1/auth/callback"))
+            try:
+                assert await asyncio.to_thread(started.wait, 2)
+                assert (await client.get("/health")).status_code == 200
+            finally:
+                release.set()
+                await callback_task
+
+    try:
+        asyncio.run(requests())
+    finally:
+        engine.dispose()
+
+
+def test_callback_logs_exclude_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    configure_auth(monkeypatch, tmp_path)
+    application = create_app(engine=create_engine("sqlite://"))
+    application.state.oidc_client = None
+    with caplog.at_level("INFO", logger="uvicorn.error"):
+        response = TestClient(application).get(
+            "/v1/auth/callback?code=private-code&state=private-state"
+        )
+    assert response.status_code == 503
+    assert "route=/v1/auth/callback" in caplog.text
+    assert "private-code" not in caplog.text
+    assert "private-state" not in caplog.text
+    application.state.database_engine.dispose()
 
 
 def test_verified_claim_allowlist_checks_issuer_subject_audience_and_expiry(

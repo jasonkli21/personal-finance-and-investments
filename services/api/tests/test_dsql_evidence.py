@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from app.release import dsql_evidence
 from app.release.dsql_evidence import (
     CONFIG_KEYS,
     FIXTURE_VERSION,
@@ -33,6 +34,35 @@ def test_junit_summary_counts_skips_as_nonpassing(tmp_path: Path) -> None:
 
     assert counts == {"tests": 2, "passed": 1, "failed": 0, "errors": 0, "skipped": 1}
     assert cases == {"passed", "skipped"}
+
+
+def test_evidence_binds_migration_runtime_and_synthetic_fixture_files() -> None:
+    build, schema, fixtures = dsql_evidence._source_paths()
+    root = dsql_evidence.REPOSITORY_ROOT
+    for relative in ("services/api/alembic.ini", "services/api/alembic/env.py"):
+        assert root / relative in build
+        assert root / relative in schema
+    assert root / "fixtures/stage-5/synthetic-research-evaluation.json" in fixtures
+    assert root / "tests/infra/test_infra_contract.py" in fixtures
+
+
+def test_fixture_edits_invalidate_release_fingerprint(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(dsql_evidence, "REPOSITORY_ROOT", tmp_path)
+    monkeypatch.setattr(dsql_evidence, "API_ROOT", tmp_path / "services/api")
+    fixture = tmp_path / "fixtures/synthetic.json"
+    fixture.parent.mkdir()
+    fixture.write_text('{"expected": 1}')
+    for paths in dsql_evidence._source_paths():
+        for path in paths:
+            if not path.exists():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("synthetic file")
+    before = _fingerprints()
+    fixture.write_text('{"expected": 2}')
+    after = _fingerprints()
+    assert before["fixture_sha256"] != after["fixture_sha256"]
 
 
 def test_promotion_gate_rejects_skipped_real_cluster_suite(tmp_path: Path) -> None:

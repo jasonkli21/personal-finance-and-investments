@@ -24,6 +24,8 @@ class S3FileStore:
     ) -> None:
         if not bucket or not region:
             raise ValueError("Private S3 bucket and AWS region are required")
+        if max_object_bytes < 1:
+            raise ValueError("Private file size limit must be positive")
         self.bucket = bucket
         self.max_object_bytes = max_object_bytes
         self._kms_key_id = kms_key_id
@@ -70,13 +72,10 @@ class S3FileStore:
                     ) from exc
                 if code != "412":
                     raise
-                # An identical content key is immutable and safe to reuse only
-                # after the object metadata and byte count confirm its identity.
-                head = self._client.head_object(Bucket=self.bucket, Key=key)
-                metadata = head.get("Metadata", {})
-                if metadata.get("sha256") != digest or head.get("ContentLength") != len(
-                    content
-                ):
+                # Metadata alone cannot establish byte identity after corruption
+                # or an out-of-band replacement. Use the same hash verification
+                # as reads before referencing an existing immutable original.
+                if len(self.read(key)) != len(content):
                     raise OSError("Private S3 object identity mismatch") from exc
                 break
         return key, digest
@@ -89,13 +88,14 @@ class S3FileStore:
             if max_bytes is None
             else min(self.max_object_bytes, max_bytes)
         )
+        if limit < 0:
+            raise ValueError("Private file read limit cannot be negative")
         response = self._client.get_object(Bucket=self.bucket, Key=key)
-        size = int(response.get("ContentLength", 0))
-        if size < 0 or size > limit:
-            response["Body"].close()
-            raise ValueError("Private file exceeds the configured read limit")
         body = response["Body"]
         try:
+            size = int(response["ContentLength"])
+            if size < 0 or size > limit:
+                raise ValueError("Private file exceeds the configured read limit")
             content = cast(bytes, body.read(limit + 1))
         finally:
             body.close()

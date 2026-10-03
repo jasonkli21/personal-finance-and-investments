@@ -76,7 +76,7 @@ def _date(value: str) -> date:
     raise InvalidCsv("Missing or invalid holdings-effective date")
 
 
-def _records(content: bytes) -> list[list[str]]:
+def _records(content: bytes, max_rows: int) -> list[list[str]]:
     if (
         not content
         or b"\0" in content
@@ -84,7 +84,16 @@ def _records(content: bytes) -> list[list[str]]:
     ):
         raise InvalidCsv("Upload a UTF-8 CSV, not binary/HTML content")
     try:
-        return list(csv.reader(io.StringIO(content.decode("utf-8-sig")), strict=True))
+        records: list[list[str]] = []
+        reader = csv.reader(io.StringIO(content.decode("utf-8-sig")), strict=True)
+        # Bound metadata/blank lines as well as holdings before materializing
+        # the entire upload. A small file of newlines can otherwise allocate
+        # millions of Python lists before the holdings-row limit is checked.
+        for row in reader:
+            if len(records) >= max_rows + 100:
+                raise InvalidCsv("CSV exceeds configured row limit")
+            records.append(row)
+        return records
     except (UnicodeError, csv.Error) as exc:
         raise InvalidCsv("Malformed UTF-8 CSV") from exc
 
@@ -111,7 +120,7 @@ def _xlsx(content: bytes, max_rows: int) -> list[list[str]]:
                 ]
             rows: list[list[str]] = []
             for row in xml("xl/worksheets/sheet1.xml").findall(".//x:row", ns):
-                if len(rows) > max_rows + 100:
+                if len(rows) >= max_rows + 100:
                     raise InvalidCsv("Workbook exceeds configured row limit")
                 values: list[str] = []
                 for cell in row.findall("x:c", ns):
@@ -127,13 +136,27 @@ def _xlsx(content: bytes, max_rows: int) -> list[list[str]]:
                         values.append("")
                     value = cell.findtext("x:v", default="", namespaces=ns)
                     if cell.attrib.get("t") == "s":
-                        value = strings[int(value)]
+                        string_index = int(value)
+                        if not 0 <= string_index < len(strings):
+                            raise InvalidCsv("Workbook string reference is invalid")
+                        value = strings[string_index]
                     elif cell.attrib.get("t") == "inlineStr":
-                        value = "".join(cell.find("x:is", ns).itertext())  # type: ignore[union-attr]
+                        inline = cell.find("x:is", ns)
+                        if inline is None:
+                            raise InvalidCsv("Workbook inline string is missing")
+                        value = "".join(inline.itertext())
                     values[index - 1] = value
                 rows.append(values)
             return rows
-    except (BadZipFile, KeyError, ET.ParseError, IndexError, ValueError) as exc:
+    except (
+        BadZipFile,
+        KeyError,
+        ET.ParseError,
+        IndexError,
+        ValueError,
+        RuntimeError,
+        NotImplementedError,
+    ) as exc:
         raise InvalidCsv("Invalid supported SPDR workbook") from exc
 
 
@@ -149,7 +172,9 @@ def parse_fund(
 ) -> ParsedFund:
     if format_id not in {"manual", "ishares", "spdr"}:
         raise InvalidCsv("Unsupported fund format")
-    records = _xlsx(content, max_rows) if format_id == "spdr" else _records(content)
+    records = (
+        _xlsx(content, max_rows) if format_id == "spdr" else _records(content, max_rows)
+    )
     header_index = 0
     source_url = None
     if format_id == "ishares":

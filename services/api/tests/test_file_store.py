@@ -178,3 +178,39 @@ def test_s3_store_retries_one_conditional_conflict() -> None:
     assert len(client.put_calls) == 2
     assert store.read(key) == b"retry-safe synthetic"
     assert key == f"{digest}.blob"
+
+
+def test_duplicate_s3_write_verifies_bytes_before_reusing_original() -> None:
+    client = MemoryS3()
+    store = S3FileStore("synthetic-private-bucket", "us-east-1", client=client)
+    key, _digest = store.put(b"safe")
+    # Same metadata and byte count, different actual bytes.
+    client.objects[key]["Body"] = b"evil"
+    with pytest.raises(OSError, match="hash mismatch"):
+        store.put(b"safe")
+
+
+@pytest.mark.parametrize("size", ["invalid", None])
+def test_s3_stream_closes_when_size_metadata_is_malformed(size: Any) -> None:
+    client = MemoryS3()
+    store = S3FileStore("synthetic-private-bucket", "us-east-1", client=client)
+    key, _digest = store.put(b"safe")
+    body = BytesIO(b"safe")
+    client.get_object = lambda **_kwargs: {  # type: ignore[method-assign]
+        "ContentLength": size,
+        "Body": body,
+    }
+    with pytest.raises((ValueError, TypeError)):
+        store.read(key)
+    assert body.closed
+
+
+def test_storage_read_limits_cannot_be_negative(tmp_path: Path) -> None:
+    stores = (
+        PrivateFileStore(tmp_path / "private"),
+        S3FileStore("synthetic-private-bucket", "us-east-1", client=MemoryS3()),
+    )
+    for store in stores:
+        key, _digest = store.put(b"safe")
+        with pytest.raises(ValueError, match="cannot be negative"):
+            store.read(key, max_bytes=-2)

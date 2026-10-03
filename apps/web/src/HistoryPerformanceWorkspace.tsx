@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { createSubmissionKey } from './submission-key'
+import { localDate } from './local-date'
+import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createInvestmentEvent,
@@ -12,13 +14,6 @@ import type { components } from './api/schema'
 import { decimalDisplay } from './decimal-display'
 
 type EventType = components['schemas']['InvestmentEventCreate']['event_type']
-
-function localDate(): string {
-  const now = new Date()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${now.getFullYear()}-${month}-${day}`
-}
 
 function priorYear(): string {
   const value = new Date()
@@ -43,6 +38,7 @@ function percent(value: string | null): string {
 
 export default function HistoryPerformanceWorkspace() {
   const queryClient = useQueryClient()
+  const eventKey = useRef(createSubmissionKey())
   const accountsQuery = useQuery({
     queryKey: ['accounts'],
     queryFn: fetchAccounts,
@@ -152,7 +148,10 @@ export default function HistoryPerformanceWorkspace() {
       ) {
         throw new Error('Enter a negative withdrawal amount.')
       }
-      return createInvestmentEvent({
+      const input: Omit<
+        components['schemas']['InvestmentEventCreate'],
+        'idempotency_key'
+      > = {
         account_id: selectedAccountId,
         event_type: eventType,
         effective_date: effectiveDate,
@@ -168,10 +167,14 @@ export default function HistoryPerformanceWorkspace() {
         source_event_id: sourceEventId || null,
         evidence_ref: evidenceRef || null,
         quality_status: 'manual',
-        idempotency_key: crypto.randomUUID(),
+      }
+      return createInvestmentEvent({
+        ...input,
+        idempotency_key: eventKey.current.forPayload(input),
       })
     },
     onSuccess: async () => {
+      eventKey.current.reset()
       setNotice(
         'Event saved with manual source status. Existing snapshots were not changed.',
       )

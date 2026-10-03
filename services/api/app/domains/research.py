@@ -45,6 +45,10 @@ from app.db.models import (
     utc_now,
 )
 
+# Keep the persisted code within the original VARCHAR(32) contract. The public
+# DTO retains its descriptive status so existing clients remain compatible.
+BASELINE_VALIDATION_STATUS = "unverified_values_links_checked"
+
 
 class ResearchNotFound(LookupError):
     """A requested finance research record does not exist."""
@@ -65,7 +69,7 @@ def _wire_value(value: object) -> object:
     if isinstance(value, UUID):
         return str(value)
     if isinstance(value, Decimal):
-        return format(value.normalize(), "f") if value else "0"
+        return _decimal_string(value)
     return value
 
 
@@ -120,8 +124,8 @@ def create_fact(
     if existing is not None:
         proposed = data.model_dump(mode="json")
         if data.normalized_value is not None:
-            proposed["normalized_value"] = format(
-                Decimal(data.normalized_value).normalize(), "f"
+            proposed["normalized_value"] = _decimal_string(
+                Decimal(data.normalized_value)
             )
         current = {key: _wire_value(getattr(existing, key)) for key in proposed}
         if _fingerprint(proposed) != _fingerprint(current):
@@ -293,6 +297,7 @@ def active_watchlist(session: Session) -> list[ResearchWatchlistRead]:
                 ),
             )
             .join(Issuer, Issuer.id == ResearchWatchlistEvent.issuer_id)
+            .where(ResearchWatchlistEvent.action == "added")
             .order_by(Issuer.display_name, Issuer.id)
             .limit(500)
         )
@@ -306,7 +311,6 @@ def active_watchlist(session: Session) -> list[ResearchWatchlistRead]:
             changed_at=event.created_at,
         )
         for event, issuer in rows
-        if event.action == "added"
     ]
 
 
@@ -346,103 +350,112 @@ def _optional_uuid(value: object) -> UUID | None:
 def portfolio_context_from_report(
     report: dict[str, Any], *, issuer_id: UUID, issuer_name: str
 ) -> ResearchPortfolioContext:
-    if report.get("reconciled") is not True:
-        raise ResearchConflict("Selected portfolio report does not reconcile")
-    matching = next(
-        (
-            row
-            for row in report.get("issuer_rows", [])
-            if row.get("id") == str(issuer_id)
-        ),
-        None,
-    )
-    common: dict[str, Any] = {
-        "report_id": UUID(report["id"]),
-        "report_input_hash": str(report["input_hash"]),
-        "report_generated_at": report["generated_at"],
-        "valuation_at": report["valuation_at"],
-        "account_ids": [UUID(value) for value in report.get("account_ids", [])],
-        "nav_status": report["nav_status"],
-        "issuer_id": issuer_id,
-        "issuer_name": issuer_name,
-        "reconciled": True,
-        "warnings": list(report.get("warnings", [])),
-    }
-    if matching is None:
-        return ResearchPortfolioContext(
-            status="issuer_unmapped",
-            direct_exposure=None,
-            indirect_exposure=None,
-            total_exposure=None,
-            contributions=[],
-            warnings=[
-                *common["warnings"],
-                "No direct or ETF-derived exposure maps to this issuer in the report.",
-            ],
-            **{key: value for key, value in common.items() if key != "warnings"},
+    with localcontext() as context:
+        context.prec = 80
+        if report.get("reconciled") is not True:
+            raise ResearchConflict("Selected portfolio report does not reconcile")
+        matching = next(
+            (
+                row
+                for row in report.get("issuer_rows", [])
+                if row.get("id") == str(issuer_id)
+            ),
+            None,
         )
+        common: dict[str, Any] = {
+            "report_id": UUID(report["id"]),
+            "report_input_hash": str(report["input_hash"]),
+            "report_generated_at": report["generated_at"],
+            "valuation_at": report["valuation_at"],
+            "account_ids": [UUID(value) for value in report.get("account_ids", [])],
+            "nav_status": report["nav_status"],
+            "issuer_id": issuer_id,
+            "issuer_name": issuer_name,
+            "reconciled": True,
+            "warnings": list(report.get("warnings", [])),
+        }
+        if matching is None:
+            return ResearchPortfolioContext(
+                status="issuer_unmapped",
+                direct_exposure=None,
+                indirect_exposure=None,
+                total_exposure=None,
+                contributions=[],
+                warnings=[
+                    *common["warnings"],
+                    "No direct or ETF-derived exposure maps to this issuer "
+                    "in the report.",
+                ],
+                **{key: value for key, value in common.items() if key != "warnings"},
+            )
 
-    source_rows = matching.get("contributions", [])
-    if len(source_rows) > 100:
-        raise ResearchConflict(
-            "Selected issuer has over 100 source contributions; "
-            "create a narrower report"
+        source_rows = matching.get("contributions", [])
+        if len(source_rows) > 100:
+            raise ResearchConflict(
+                "Selected issuer has over 100 source contributions; "
+                "create a narrower report"
+            )
+        contributions = [
+            ResearchPortfolioContribution(
+                account_id=UUID(str(row["account_id"])),
+                account_name=str(row["account_name"]),
+                exposure_kind=row["category"],
+                amount=str(row["amount"]),
+                security_id=UUID(str(row["security_id"])),
+                position_id=UUID(str(row["position_id"])),
+                position_snapshot_id=UUID(str(row["position_snapshot_id"])),
+                position_as_of=row["position_as_of"],
+                position_source=str(row["position_source"]),
+                position_quality=str(row["position_quality"]),
+                quote_id=_optional_uuid(row.get("quote_id")),
+                quote_as_of=row.get("quote_as_of"),
+                quote_source=row.get("quote_source"),
+                quality_status=str(row["quality_status"]),
+                fund_snapshot_id=_optional_uuid(row.get("fund_snapshot_id")),
+                fund_as_of=row.get("fund_as_of"),
+                fund_fetched_at=row.get("fund_fetched_at"),
+                fund_source=row.get("fund_source"),
+                fund_source_url=row.get("fund_source_url"),
+                fund_quality=row.get("fund_quality"),
+                fund_stale=bool(row.get("fund_stale", False)),
+            )
+            for row in source_rows
+        ]
+        direct = Decimal(str(matching["direct"]))
+        indirect = Decimal(str(matching["indirect"]))
+        total = Decimal(str(matching["total"]))
+        contribution_direct = sum(
+            (
+                Decimal(row.amount)
+                for row in contributions
+                if row.exposure_kind == "direct"
+            ),
+            Decimal(0),
         )
-    contributions = [
-        ResearchPortfolioContribution(
-            account_id=UUID(str(row["account_id"])),
-            account_name=str(row["account_name"]),
-            exposure_kind=row["category"],
-            amount=str(row["amount"]),
-            security_id=UUID(str(row["security_id"])),
-            position_id=UUID(str(row["position_id"])),
-            position_snapshot_id=UUID(str(row["position_snapshot_id"])),
-            position_as_of=row["position_as_of"],
-            position_source=str(row["position_source"]),
-            position_quality=str(row["position_quality"]),
-            quote_id=_optional_uuid(row.get("quote_id")),
-            quote_as_of=row.get("quote_as_of"),
-            quote_source=row.get("quote_source"),
-            quality_status=str(row["quality_status"]),
-            fund_snapshot_id=_optional_uuid(row.get("fund_snapshot_id")),
-            fund_as_of=row.get("fund_as_of"),
-            fund_fetched_at=row.get("fund_fetched_at"),
-            fund_source=row.get("fund_source"),
-            fund_source_url=row.get("fund_source_url"),
-            fund_quality=row.get("fund_quality"),
-            fund_stale=bool(row.get("fund_stale", False)),
+        contribution_indirect = sum(
+            (
+                Decimal(row.amount)
+                for row in contributions
+                if row.exposure_kind == "indirect"
+            ),
+            Decimal(0),
         )
-        for row in source_rows
-    ]
-    direct = Decimal(str(matching["direct"]))
-    indirect = Decimal(str(matching["indirect"]))
-    total = Decimal(str(matching["total"]))
-    contribution_direct = sum(
-        (Decimal(row.amount) for row in contributions if row.exposure_kind == "direct"),
-        Decimal(0),
-    )
-    contribution_indirect = sum(
-        (
-            Decimal(row.amount)
-            for row in contributions
-            if row.exposure_kind == "indirect"
-        ),
-        Decimal(0),
-    )
-    if (
-        direct + indirect != total
-        or contribution_direct != direct
-        or contribution_indirect != indirect
-    ):
-        raise ResearchConflict("Issuer contributions do not reconcile to the report")
-    return ResearchPortfolioContext(
-        status="matched",
-        direct_exposure=_decimal_string(direct),
-        indirect_exposure=_decimal_string(indirect),
-        total_exposure=_decimal_string(total),
-        contributions=contributions,
-        **common,
-    )
+        if (
+            direct + indirect != total
+            or contribution_direct != direct
+            or contribution_indirect != indirect
+        ):
+            raise ResearchConflict(
+                "Issuer contributions do not reconcile to the report"
+            )
+        return ResearchPortfolioContext(
+            status="matched",
+            direct_exposure=_decimal_string(direct),
+            indirect_exposure=_decimal_string(indirect),
+            total_exposure=_decimal_string(total),
+            contributions=contributions,
+            **common,
+        )
 
 
 def company_research(session: Session, issuer_id: UUID) -> ResearchCompanyRead:
@@ -564,7 +577,12 @@ def compare_facts(session: Session, data: FactComparisonCreate) -> dict[str, obj
 def _decimal_string(value: Decimal | None) -> str | None:
     if value is None:
         return None
-    return format(value.normalize(), "f") if value else "0"
+    if not value:
+        return "0"
+    # Decimal.normalize() uses the ambient precision and can round derived
+    # comparisons. Formatting and removing insignificant zeroes is exact.
+    text = format(value, "f")
+    return text.rstrip("0").rstrip(".") if "." in text else text
 
 
 def _result_bytes(snapshot: dict[str, object]) -> bytes:
@@ -709,14 +727,20 @@ def create_baseline_run(
         id=uuid4(),
         run_id=run.id,
         schema_version="finance-research-baseline-v1",
-        validation_status="source_links_checked_unverified_values",
+        validation_status=BASELINE_VALIDATION_STATUS,
         result_hash=hashlib.sha256(encoded).hexdigest(),
         result_snapshot=snapshot,
         generated_at=now,
     )
-    records = [run, result]
+    # These models deliberately have no ORM relationship graph. Flush the
+    # parent before its result/context so real FK enforcement does not depend
+    # on the order SQLAlchemy happens to assign unrelated mappers. Both flushes
+    # remain in the same bounded, retried transaction.
+    session.add(run)
+    session.flush()
+    session.add(result)
     if portfolio_context is not None or thesis_note is not None:
-        records.append(
+        session.add(
             ResearchRunContext(
                 id=uuid4(),
                 run_id=run.id,
@@ -726,7 +750,6 @@ def create_baseline_run(
                 thesis_note_id=thesis_note.id if thesis_note else None,
             )
         )
-    session.add_all(records)
     session.flush()
     return run, result, False
 
@@ -751,6 +774,11 @@ def read_run(
     session: Session, run_id: UUID, *, duplicate: bool = False
 ) -> ResearchRunRead:
     run, result = research_run(session, run_id)
+    if result.validation_status not in {
+        BASELINE_VALIDATION_STATUS,
+        "source_links_checked_unverified_values",
+    }:
+        raise ResearchNotFound("Frozen research validation state is unavailable")
     return ResearchRunRead(
         id=run.id,
         issuer_id=run.issuer_id,

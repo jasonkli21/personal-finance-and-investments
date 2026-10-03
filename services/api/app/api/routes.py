@@ -150,10 +150,14 @@ def post_issuer(request: Request, data: IssuerCreate) -> IssuerRead:
     try:
         issuer = run_database_unit(
             request.app.state.session_factory,
-            lambda session: imports.issuer_create(session, data.display_name),
+            lambda session: securities.create_issuer(session, data.display_name),
         )
-    except imports.ImportConflict as exc:
+    except securities.CatalogConflict as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        raise HTTPException(
+            status_code=409, detail="Catalog identity changed; reload and retry."
+        ) from exc
     return IssuerRead(id=issuer.id, display_name=issuer.display_name)
 
 
@@ -185,12 +189,16 @@ def post_security(request: Request, data: SecurityCreate) -> SecurityRead:
     try:
         security = run_database_unit(
             request.app.state.session_factory,
-            lambda session: imports.security_create(session, data),
+            lambda session: securities.create_security(session, data),
         )
-    except imports.ImportConflict as exc:
+    except securities.CatalogConflict as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    except imports.ImportNotFound as exc:
+    except securities.CatalogNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        raise HTTPException(
+            status_code=409, detail="Catalog identity changed; reload and retry."
+        ) from exc
     return _security_read(security)
 
 
@@ -201,7 +209,7 @@ def patch_security_issuer(
     try:
         security = run_database_unit(
             request.app.state.session_factory,
-            lambda session: imports.assign_security_issuer(
+            lambda session: securities.assign_issuer(
                 session,
                 security_id,
                 data.issuer_id,
@@ -209,11 +217,11 @@ def patch_security_issuer(
                 data.reason,
             ),
         )
-    except imports.ImportRevisionConflict as exc:
+    except securities.CatalogRevisionConflict as exc:
         raise HTTPException(
             status_code=409, detail="Issuer mapping changed; reload and review again."
         ) from exc
-    except imports.ImportNotFound as exc:
+    except securities.CatalogNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return _security_read(security)
 
@@ -388,7 +396,8 @@ async def post_position_import_preview(
         request, request.app.state.max_import_file_bytes
     )
     try:
-        import_id, duplicate = imports.create_position_import(
+        import_id, duplicate = await asyncio.to_thread(
+            imports.create_position_import,
             request.app.state.session_factory,
             request.app.state.file_store,
             content=content,
@@ -410,26 +419,30 @@ async def post_position_import_preview(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except imports.ImportNotFound as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    with request.app.state.session_factory() as session:
-        attempt = session.get(ImportAttempt, import_id)
-        if attempt is None:
-            raise HTTPException(status_code=404, detail="Import not found.")
-        batch_count = session.scalar(
-            select(func.count(ImportBatch.id)).where(
-                ImportBatch.import_id == import_id,
-                ImportBatch.purpose == "preview",
-                ImportBatch.review_revision == 1,
+
+    def read_result() -> ImportCreated:
+        with request.app.state.session_factory() as session:
+            attempt = session.get(ImportAttempt, import_id)
+            if attempt is None:
+                raise HTTPException(status_code=404, detail="Import not found.")
+            batch_count = session.scalar(
+                select(func.count(ImportBatch.id)).where(
+                    ImportBatch.import_id == import_id,
+                    ImportBatch.purpose == "preview",
+                    ImportBatch.review_revision == 1,
+                )
             )
-        )
-        return ImportCreated(
-            id=attempt.id,
-            kind="positions",
-            status=attempt.status,
-            review_revision=attempt.review_revision,
-            row_count=attempt.row_count,
-            batch_count=int(batch_count or 0),
-            duplicate=duplicate,
-        )
+            return ImportCreated(
+                id=attempt.id,
+                kind="positions",
+                status=attempt.status,
+                review_revision=attempt.review_revision,
+                row_count=attempt.row_count,
+                batch_count=int(batch_count or 0),
+                duplicate=duplicate,
+            )
+
+    return await asyncio.to_thread(read_result)
 
 
 @router.get("/imports/{import_id}", response_model=ImportReviewRead)

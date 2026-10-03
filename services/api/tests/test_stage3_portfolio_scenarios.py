@@ -520,3 +520,37 @@ def test_cash_assumption_is_explicit_and_foreign_trade_is_rejected(
         == "Explicit synthetic cash contribution"
     )
     assert cash_only.json()["cash"][0]["cash_after"] == "10.0000000000"
+
+
+def test_cash_only_trades_settle_in_order_without_borrowing_from_later_sales(
+    scenario_client: TestClient,
+) -> None:
+    client = scenario_client
+    account_id = _account(client)
+    owned_id = _security(client, "OWNED")
+    new_id = _security(client, "NEW")
+    cash_id = _security(client, "CASH", "cash")
+    _positions(client, account_id, [(owned_id, "10", "100"), (cash_id, "0", None)])
+    before_records = _record_counts(client)
+    sale = {
+        "account_id": account_id,
+        "security_id": owned_id,
+        "side": "sell",
+        "quantity": "1",
+        "price": "100",
+        "currency": "USD",
+    }
+    purchase = {**sale, "security_id": new_id, "side": "buy"}
+    unfunded = client.post(
+        "/v1/simulations/portfolio",
+        json=_payload(account_id, trades=[purchase, sale]),
+    )
+    assert unfunded.status_code == 422
+    assert "place funding sales first" in unfunded.json()["detail"]
+    funded = client.post(
+        "/v1/simulations/portfolio",
+        json=_payload(account_id, trades=[sale, purchase]),
+    )
+    assert funded.status_code == 200, funded.text
+    assert Decimal(funded.json()["cash"][0]["cash_after"]) == 0
+    assert _record_counts(client) == before_records

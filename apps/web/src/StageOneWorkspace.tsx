@@ -1,4 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { createSubmissionKey } from './submission-key'
+import { localDateTime } from './local-date'
+import { parseCsvHeader } from './csv-headers'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   cancelImport,
@@ -38,42 +41,6 @@ const EMPTY_MAP: FieldMap = {
   asset_type: '',
 }
 
-function parseCsvHeader(source: string): string[] {
-  const headers: string[] = []
-  let field = ''
-  let quoted = false
-  const firstRecord = source.replace(/^\uFEFF/, '')
-  for (let index = 0; index < firstRecord.length; index += 1) {
-    const character = firstRecord[index]
-    if (character === '"') {
-      if (quoted && firstRecord[index + 1] === '"') {
-        field += '"'
-        index += 1
-      } else {
-        quoted = !quoted
-      }
-    } else if (
-      (character === ',' || character === '\n' || character === '\r') &&
-      !quoted
-    ) {
-      headers.push(field.trim())
-      field = ''
-      if (character !== ',') break
-    } else {
-      field += character
-    }
-  }
-  if (quoted) throw new Error('The first CSV header row has an unclosed quote.')
-  if (field || headers.length === 0) headers.push(field.trim())
-  if (
-    headers.some((header) => !header) ||
-    new Set(headers).size !== headers.length
-  ) {
-    throw new Error('CSV headers must be non-empty and unique.')
-  }
-  return headers
-}
-
 function Section({
   title,
   children,
@@ -82,7 +49,10 @@ function Section({
   children: React.ReactNode
 }) {
   return (
-    <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <section
+      aria-label={title}
+      className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+    >
       <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
       {children}
     </section>
@@ -98,7 +68,7 @@ export default function StageOneWorkspace({
   accountId: string
   effectiveDate: string
   expectedRevision: number
-  onPublished: () => Promise<void> | void
+  onPublished: (accountId: string) => Promise<void> | void
 }) {
   const queryClient = useQueryClient()
   const [file, setFile] = useState<File | null>(null)
@@ -110,9 +80,8 @@ export default function StageOneWorkspace({
   const [pendingJobId, setPendingJobId] = useState(
     () => localStorage.getItem('stage2-pdf-job-id') ?? '',
   )
-  const [uploadIdempotencyKey, setUploadIdempotencyKey] = useState(() =>
-    crypto.randomUUID(),
-  )
+  const uploadKey = useRef(createSubmissionKey())
+  const fileSelection = useRef(0)
   const [rowDrafts, setRowDrafts] = useState<
     Record<
       string,
@@ -135,19 +104,14 @@ export default function StageOneWorkspace({
   const [identifierValue, setIdentifierValue] = useState('')
   const [quoteSecurityId, setQuoteSecurityId] = useState('')
   const [quotePrice, setQuotePrice] = useState('')
-  const [quoteDate, setQuoteDate] = useState(() => {
-    const now = new Date()
-    return new Date(now.getTime() - now.getTimezoneOffset() * 60_000)
-      .toISOString()
-      .slice(0, 16)
-  })
+  const [quoteDate, setQuoteDate] = useState(localDateTime)
   const [quoteReason, setQuoteReason] = useState('')
   const [page, setPage] = useState(0)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
 
   const catalogQuery = useQuery({
-    queryKey: ['catalog'],
+    queryKey: ['securities'],
     queryFn: fetchSecurities,
   })
   const issuersQuery = useQuery({
@@ -187,44 +151,54 @@ export default function StageOneWorkspace({
   }, [pendingJobId])
 
   useEffect(() => {
-    setUploadIdempotencyKey(crypto.randomUUID())
-  }, [accountId, effectiveDate, file, replaceExisting, sourceLabel])
-
-  useEffect(() => {
-    const job = jobQuery.data
-    if (!pendingJobId || !job) return
-    if (job.status === 'completed' && job.result) {
-      const positionImportId = job.result.position_import_id
-      if (typeof positionImportId !== 'string') {
-        setError('The document job completed without a review reference.')
+    const processJob = (job: components['schemas']['JobRead'] | undefined) => {
+      if (!pendingJobId || !job) return
+      if (job.status === 'completed' && job.result) {
+        const positionImportId = job.result.position_import_id
+        if (typeof positionImportId !== 'string') {
+          setError('The document job completed without a review reference.')
+          setPendingJobId('')
+          return
+        }
+        setImportId(positionImportId)
+        setRowDrafts({})
+        setPage(0)
+        setNotice(
+          job.result.duplicate === true
+            ? 'This source was already reviewed; its prior result is shown.'
+            : 'PDF staged privately. Review every row, evidence reference, and discrepancy before publishing.',
+        )
+        setError('')
         setPendingJobId('')
-        return
+        void queryClient.invalidateQueries({
+          queryKey: ['import-review', positionImportId],
+        })
+      } else if (job.status === 'failed') {
+        setError(
+          `Document processing failed (${job.safe_error_code ?? 'unknown_error'}). Use a CSV export or retry the same source.`,
+        )
+        uploadKey.current.reset()
+        setPendingJobId('')
+      } else if (job.status === 'cancelled') {
+        setNotice('Document processing was cancelled before publication.')
+        uploadKey.current.reset()
+        setPendingJobId('')
       }
-      setImportId(positionImportId)
-      setRowDrafts({})
-      setPage(0)
-      setNotice(
-        job.result.duplicate === true
-          ? 'This source was already reviewed; its prior result is shown.'
-          : 'PDF staged privately. Review every row, evidence reference, and discrepancy before publishing.',
-      )
-      setError('')
-      setPendingJobId('')
-      void queryClient.invalidateQueries({
-        queryKey: ['import-review', positionImportId],
-      })
-    } else if (job.status === 'failed') {
-      setError(
-        `Document processing failed (${job.safe_error_code ?? 'unknown_error'}). Use a CSV export or retry the same source.`,
-      )
-      setUploadIdempotencyKey(crypto.randomUUID())
-      setPendingJobId('')
-    } else if (job.status === 'cancelled') {
-      setNotice('Document processing was cancelled before publication.')
-      setUploadIdempotencyKey(crypto.randomUUID())
-      setPendingJobId('')
     }
-  }, [jobQuery.data, pendingJobId, queryClient])
+    return queryClient.getQueryCache().subscribe((event) => {
+      if (
+        event.type === 'updated' &&
+        event.query.queryKey[0] === 'job' &&
+        event.query.queryKey[1] === pendingJobId &&
+        event.query.state.status === 'success'
+      ) {
+        processJob(
+          event.query.state.data as
+            components['schemas']['JobRead'] | undefined,
+        )
+      }
+    })
+  }, [pendingJobId, queryClient])
 
   const previewMutation = useMutation({
     mutationFn: async () => {
@@ -236,7 +210,14 @@ export default function StageOneWorkspace({
           expectedRevision,
           sourceLabel,
           file,
-          idempotencyKey: uploadIdempotencyKey,
+          idempotencyKey: uploadKey.current.forPayload({
+            accountId,
+            effectiveDate,
+            expectedRevision,
+            sourceLabel,
+            replaceExisting,
+            fileSelection: fileSelection.current,
+          }),
           replaceExisting,
         })
         return { kind: 'job' as const, jobId: result.id }
@@ -291,7 +272,7 @@ export default function StageOneWorkspace({
     onSuccess: async (job) => {
       await queryClient.invalidateQueries({ queryKey: ['job', pendingJobId] })
       if (job.status === 'cancelled') {
-        setUploadIdempotencyKey(crypto.randomUUID())
+        uploadKey.current.reset()
         setPendingJobId('')
         setNotice('Document processing cancelled.')
       } else {
@@ -343,21 +324,28 @@ export default function StageOneWorkspace({
   const publishMutation = useMutation({
     mutationFn: () => {
       if (!review) throw new Error('Load an import review first.')
+      if (review.account_id !== accountId)
+        throw new Error(
+          'Select the account captured by this review before publishing.',
+        )
       if (Object.keys(rowDrafts).length)
         throw new Error(
           'Save corrections or discard row drafts before publishing.',
         )
-      return publishImport(importId, review.review_revision)
+      const publishedAccountId = review.account_id
+      return publishImport(importId, review.review_revision).then(() => ({
+        publishedAccountId,
+      }))
     },
-    onSuccess: async () => {
+    onSuccess: async ({ publishedAccountId }) => {
       setNotice(
         'Reviewed position snapshot published atomically to the account.',
       )
       setError('')
       await Promise.all([
-        onPublished(),
+        onPublished(publishedAccountId),
         queryClient.invalidateQueries({
-          queryKey: ['owned-portfolio', accountId],
+          queryKey: ['owned-portfolio', publishedAccountId],
         }),
         queryClient.invalidateQueries({
           queryKey: ['import-review', importId],
@@ -413,7 +401,7 @@ export default function StageOneWorkspace({
       setSecurityName('')
       setIdentifierValue('')
       setQuoteSecurityId(security.id)
-      await queryClient.invalidateQueries({ queryKey: ['catalog'] })
+      await queryClient.invalidateQueries({ queryKey: ['securities'] })
       setNotice(`Security “${security.display_ticker ?? security.name}” added.`)
       setError('')
     },
@@ -447,6 +435,8 @@ export default function StageOneWorkspace({
   })
 
   async function chooseFile(nextFile: File | null) {
+    const selection = ++fileSelection.current
+    uploadKey.current.reset()
     setFile(nextFile)
     setHeaders([])
     setMapping(EMPTY_MAP)
@@ -462,9 +452,10 @@ export default function StageOneWorkspace({
       return
     }
     try {
-      setHeaders(parseCsvHeader(await nextFile.slice(0, 64_000).text()))
+      const found = parseCsvHeader(await nextFile.slice(0, 64_000).text())
+      if (selection === fileSelection.current) setHeaders(found)
     } catch (reason) {
-      setError(messageFor(reason))
+      if (selection === fileSelection.current) setError(messageFor(reason))
     }
   }
 
@@ -840,6 +831,15 @@ export default function StageOneWorkspace({
                 Loading review rows…
               </p>
             )}
+            {review && review.account_id !== accountId && (
+              <p
+                role="alert"
+                className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900"
+              >
+                This review belongs to another account. Select its captured
+                account before publishing.
+              </p>
+            )}
             {review && (
               <div className="space-y-4 border-t border-slate-200 pt-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -850,7 +850,8 @@ export default function StageOneWorkspace({
                     </p>
                     <p className="text-xs text-slate-500">
                       Review revision {review.review_revision}; captured account
-                      revision {review.expected_account_revision}
+                      revision {review.expected_account_revision} · account{' '}
+                      {review.account_id} · effective {review.effective_date}
                     </p>
                   </div>
                   {review.rows.length > 50 && (
@@ -1055,6 +1056,7 @@ export default function StageOneWorkspace({
                     disabled={
                       publishMutation.isPending ||
                       review.status !== 'review' ||
+                      review.account_id !== accountId ||
                       !review.rows.every(
                         (row) => row.row_status === 'ready' || row.excluded,
                       )

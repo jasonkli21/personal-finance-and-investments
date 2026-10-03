@@ -44,6 +44,7 @@ from sqlalchemy import (
     Text,
     Uuid,
     bindparam,
+    create_engine,
     func,
     inspect,
     select,
@@ -52,6 +53,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection, Engine, make_url
+from sqlalchemy.pool import NullPool
 from sqlalchemy.sql.schema import Table
 
 from app.db.dsql_migrations import DSQL_MIGRATIONS
@@ -1412,9 +1414,7 @@ def restore_archive(
                 }:
                     raise RecoveryError("Restore marker phase is unknown")
 
-            database_engine = __import__("sqlalchemy").create_engine(
-                target_url, poolclass=__import__("sqlalchemy").pool.NullPool
-            )
+            database_engine = create_engine(target_url, poolclass=NullPool)
             with database_engine.connect() as connection:
                 if connection.dialect.name != "postgresql":
                     raise RecoveryError("Recovery target must be PostgreSQL")

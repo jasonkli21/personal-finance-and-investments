@@ -1,6 +1,6 @@
 # Document ingestion and AI design
 
-**Status:** Stage 1 deterministic imports delivered; first Stage 2 text-PDF preview slice implemented; Stage 2/5 AI flows remain gated/planned | **Updated:** 2026-10-02
+**Status:** Stage 1 deterministic imports delivered; Stage 2 text-PDF jobs and reviewed transaction CSVs partially delivered; Stage 5 offline research baseline delivered; AI/OCR/transport remain gated | **Updated:** 2026-10-03
 
 **Stage 1:** reviewed position CSV, generic/iShares fund CSV and SPDR XLSX; no AI consumer.
 **Stage 2:** A supported text-layer brokerage PDF can be privately previewed through the existing reviewed position-import workflow. Scanned PDFs, screenshots, transaction imports, optional AI and bank connectivity remain pending or gated; see [Stage 2 release status](stage-2-release.md).

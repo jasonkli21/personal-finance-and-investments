@@ -19,15 +19,13 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.api.contracts import ImportRowCorrection
+from app.api.contracts import ImportRowCorrection, QuoteCreate
 from app.db.models import (
     Account,
     ImportAttempt,
     ImportBatch,
     ImportReviewEvent,
     ImportRow,
-    Issuer,
-    IssuerMappingEvent,
     PositionSnapshot,
     PositionSnapshotLine,
     PrivateFile,
@@ -915,12 +913,10 @@ def publish_position_import(
             raise ImportBlocked(
                 f"{len(blockers)} row(s) need correction or explicit exclusion."
             )
-        if len(rows) != attempt.row_count or any(
-            row.security_id is None for row in rows
-        ):
-            raise ImportBlocked(
-                "Every source position must be resolved before publication"
-            )
+        if len(rows) != attempt.row_count:
+            raise ImportBlocked("Position import rows are incomplete.")
+        # Excluded rows retain their raw source and review reason without
+        # requiring a catalog identity for data the user explicitly omits.
         publish_rows = [row for row in rows if not row.excluded]
         if not publish_rows:
             raise ImportBlocked(
@@ -1212,119 +1208,13 @@ def publish_position_import(
     return run_database_unit(session_factory, finalize)
 
 
-def issuer_create(session: Session, display_name: str) -> Issuer:
-    normalized = " ".join(display_name.casefold().split())
-    existing = session.scalar(
-        select(Issuer).where(Issuer.normalized_name == normalized)
-    )
-    if existing is not None:
-        raise ImportConflict("An issuer with this normalized name already exists.")
-    issuer = Issuer(
-        id=uuid4(), normalized_name=normalized, display_name=display_name.strip()
-    )
-    session.add(issuer)
-    session.flush()
-    return issuer
-
-
-def security_create(session: Session, data: Any) -> Security:
-    if data.issuer_id is not None and session.get(Issuer, data.issuer_id) is None:
-        raise ImportNotFound("Issuer not found.")
-    ticker = data.display_ticker.strip().upper() if data.display_ticker else None
-    if ticker and session.scalar(
-        select(Security.id).where(Security.display_ticker == ticker)
-    ):
-        raise ImportConflict("A security with this ticker already exists.")
-    security = Security(
-        id=uuid4(),
-        security_type=data.security_type,
-        display_ticker=ticker,
-        name=data.name.strip(),
-        issuer_id=data.issuer_id,
-        currency=data.currency,
-    )
-    session.add(security)
-    session.flush()
-    if data.issuer_id is not None:
-        session.add(
-            IssuerMappingEvent(
-                id=uuid4(),
-                security_id=security.id,
-                previous_issuer_id=None,
-                issuer_id=data.issuer_id,
-                reason="Reviewed during local catalog creation",
-            )
-        )
-    if data.identifier_namespace and data.identifier_value:
-        value = data.identifier_value.strip()
-        session.add(
-            SecurityIdentifier(
-                id=uuid4(),
-                security_id=security.id,
-                namespace=data.identifier_namespace.strip().casefold(),
-                exchange=data.identifier_exchange.strip().upper(),
-                value=value,
-                normalized_value=value.upper(),
-                valid_from=date.today(),
-                valid_to=None,
-                source="manual_review",
-                review_status="reviewed",
-            )
-        )
-    session.flush()
-    return security
-
-
-def assign_security_issuer(
-    session: Session,
-    security_id: UUID,
-    issuer_id: UUID | None,
-    expected_issuer_id: UUID | None,
-    reason: str,
-) -> Security:
-    security = session.get(Security, security_id)
-    if security is None:
-        raise ImportNotFound
-    if security.issuer_id != expected_issuer_id:
-        raise ImportRevisionConflict
-    if issuer_id is not None and session.get(Issuer, issuer_id) is None:
-        raise ImportNotFound("Issuer not found.")
-    previous = security.issuer_id
-    moved = session.execute(
-        update(Security)
-        .where(
-            Security.id == security_id,
-            Security.issuer_id == expected_issuer_id
-            if expected_issuer_id is not None
-            else Security.issuer_id.is_(None),
-        )
-        .values(issuer_id=issuer_id)
-        .execution_options(synchronize_session=False)
-    )
-    if getattr(moved, "rowcount", 0) != 1:
-        raise ImportRevisionConflict
-    security.issuer_id = issuer_id
-    session.add(
-        IssuerMappingEvent(
-            id=uuid4(),
-            security_id=security_id,
-            previous_issuer_id=previous,
-            new_issuer_id=issuer_id,
-            reason=reason.strip(),
-            changed_at=utc_now(),
-        )
-    )
-    session.flush()
-    return security
-
-
-def record_manual_quote(session: Session, data: Any) -> Quote:
+def record_manual_quote(session: Session, data: QuoteCreate) -> Quote:
     security = session.get(Security, data.security_id)
     if security is None:
         raise ImportNotFound("Security not found.")
     if security.currency != data.currency:
         raise ImportBlocked("Quote currency must match the selected security.")
-    if data.as_of.date() > date.today():
+    if data.as_of.astimezone(UTC) > utc_now():
         raise ImportBlocked("Future quote observations are not accepted.")
     try:
         price = _decimal(

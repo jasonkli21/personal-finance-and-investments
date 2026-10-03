@@ -1,6 +1,6 @@
 # Personal Finance & Portfolio Intelligence — Docs
 
-**Status:** Stage 0 local exit gate complete; Stage 1 local MVP complete; Stage 2 in progress; Stage 3 locally complete; Stage 4.1–4.6 release tooling prepared locally; cloud/DSQL launch gates unverified
+**Status:** Stage 0–1 locally complete; Stage 2 partial; Stage 3 locally complete; Stage 4.1–4.6 tooling prepared; Stage 5 offline baseline; cloud/DSQL and live-service gates unverified
 **Last reviewed:** 2026-10-03
 **Databases:** PostgreSQL 16 local/personal; Aurora DSQL required for production  
 **Deployment:** local indefinitely; AWS deployment optional until ready, with production targeting DSQL  
@@ -41,6 +41,9 @@ The plans below expand the roadmap into execution backlogs using the phase-plan 
 | [`stage-4-recovery-runbook.md`](stage-4-recovery-runbook.md) | Encrypted portable export, isolated local restore procedure, synthetic drill evidence, and cloud recovery gates |
 | [stage-4-operations-runbook.md](stage-4-operations-runbook.md) | Evidence-bound release gate, schema-safe rollback/repair, incident pause, and retained-resource exit inventory |
 | [`stage-5-implementation-plan.md`](stage-5-implementation-plan.md) | 5.1–5.6: public filings/facts, portfolio/thesis context, shared personal-AI retrieval and cited research and optional monitoring |
+| [`stage-5-release.md`](stage-5-release.md) | Actual offline research baseline and live-service/monitoring gates |
+| [`stage-5-evaluation.md`](stage-5-evaluation.md) | Synthetic evaluation scope and limits |
+| [`maintainability-review.md`](maintainability-review.md) | Repository-wide review, contained fixes, validation and remaining findings |
 
 Task IDs follow roadmap packages (`S0.3` corresponds to 0.3); dotted subtask suffixes split a package into smaller slices. `S3.R` is the Stage 3 completion/evaluation task, not a new product stage. Dependency order takes precedence over numeric order. Stage 4 may follow Stage 1; research requires reliable portfolio data and only consumes later history/jobs when those features are available. Local completion never substitutes for the real-DSQL production gate.
 
@@ -55,7 +58,7 @@ Stage 1 was reviewed against Stage 0 commit `81b220e` on 2026-10-02. Its plan no
 5. **Predictable financial math.** Use decimal arithmetic, reconciliation tests, clear currencies, and deterministic calculation paths.
 6. **Privacy before automation.** No personal statements sent to free cloud models by default; cloud use requires affirmative opt-in.
 7. **Stage capabilities.** Prefer small, testable vertical slices to speculative abstractions or early infrastructure complexity.
-8. **Shared AI, finance authority.** Finance owns its data, deterministic math, validation, workflows and UI; reusable AI capabilities integrate through personal-AI. Generic extraction, research, memory and model infrastructure are not duplicated here. Stage 1 has a disabled boundary only.
+8. **Shared AI, finance authority.** Finance owns its data, deterministic math, validation, workflows and UI; reusable AI capabilities integrate through personal-AI. Generic extraction, retrieval, memory and model infrastructure are not duplicated here. Current finance research is a manual, deterministic baseline; the service boundary remains disabled.
 9. **One app, two SQL targets.** Use a DSQL-compatible schema and domain logic from the beginning; gate production releases on real DSQL migration and behavior tests.
 
 ## The critical user journey
@@ -70,7 +73,7 @@ Stage 1 was reviewed against Stage 0 commit `81b220e` on 2026-10-02. Its plan no
 
 ## Source-of-truth hierarchy
 
-- Delivered behavior: current code/OpenAPI and `stage-1-release.md`; future plans do not imply implemented capability. The integration handoff guides direction, with reconciled decisions in ADR 0001.
+- Delivered behavior: current code/OpenAPI, each stage's release record, and the latest maintainability review; plans do not imply implemented capability. The integration handoff guides direction, with reconciled decisions in ADR 0001.
 - Product behavior and scope: `01-product-spec.md`.
 - Technical design: `02-architecture.md`; DSQL-specific decisions: `07-aurora-dsql-compatibility.md`.
 - External-source claims and URLs: `03-data-sources.md`; reverify before implementation.
@@ -79,6 +82,8 @@ Stage 1 was reviewed against Stage 0 commit `81b220e` on 2026-10-02. Its plan no
 - `AGENTS.md` gives Codex implementation instructions. In a conflict, flag it and reconcile docs before guessing.
 
 ## Current implementation and next task
+
+Stage 5 adds manually registered filing references and facts, deterministic comparisons, frozen local portfolio context and thesis notes, manual watchlists, and a provisional evidence validator. Live retrieval, AI synthesis and scheduled monitoring remain gated; [Stage 5 release evidence](stage-5-release.md) distinguishes the offline baseline from the intended full stage. The [2026-10-03 maintainability review](maintainability-review.md) contains the latest local validation and unresolved findings; the earlier counts below describe their original runs.
 
 Stage 1.1–1.3 is delivered at `f75e101`, `9053d1f`, and `0874f21`: reviewed CSV positions, generic/iShares CSV and SPDR XLSX fund compositions, dated manual/cached quotes, one-level exposure/issuer views and frozen report export. Stage 2 implementation is underway: private text-layer brokerage PDF preview, partial reviewed transaction and finance summaries, and local jobs are present; its remaining acceptance work is recorded in [Stage 2 release notes](stage-2-release.md). Stage 3 local implementation and evaluation are complete: S3.1 history/performance, S3.2 source-backed tax lots, S3.3 read-only hypothetical lot-sale comparison, S3.4 read-only hypothetical portfolio scenarios, and S3.5 read-only liquidity planning. Stage 4.1–4.6 configuration, authentication, storage, infrastructure, DSQL evidence machinery, cost controls, encrypted portable recovery, the fail-closed release verifier, and operations runbooks are prepared locally. No cloud resource has been provisioned; live Aurora DSQL, HTTPS, S3 security, cloud recovery, target-account availability, and operations remain unverified. Current evidence and the remaining gates are recorded in [Stage 4 release status](stage-4-release.md). The disabled `PersonalAIClient` seam remains inactive; no live upstream service calls occur. Historical checks below remain historical; see the Stage 1 release for its full-suite evidence.
 

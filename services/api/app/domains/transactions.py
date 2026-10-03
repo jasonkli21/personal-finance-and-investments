@@ -5,14 +5,16 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
+import json
 import re
+from copy import deepcopy
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -45,8 +47,10 @@ from app.storage.file_store import FileStore
 
 TRANSACTION_PARSER_VERSION = "bank-card-csv/1"
 MAX_TRANSACTION_ROWS = 500
+MAX_TRANSACTION_REVIEW_BYTES = 2_000_000
 _AMOUNT = re.compile(r"^-?\d{1,14}(?:\.\d{1,10})?$")
 _REQUIRED = {"posted_date", "amount", "description"}
+_MAPPED_FIELDS = _REQUIRED | {"transaction_date", "currency", "raw_type", "provider_id"}
 
 
 class TransactionError(ValueError):
@@ -219,6 +223,11 @@ def create_csv_import(
     ):
         raise TransactionError("Map posted_date, amount and description columns.")
 
+    if set(mapping) - _MAPPED_FIELDS or len(set(mapping.values())) != len(mapping):
+        raise TransactionError("Map each supported transaction field to one column.")
+    if b"\x00" in content:
+        raise TransactionError("CSV cannot contain NUL characters.")
+
     with session_factory() as session:
         account = session.get(Account, account_id)
         if account is None or not account.active:
@@ -227,16 +236,25 @@ def create_csv_import(
 
     try:
         text = content.decode("utf-8-sig")
-        reader = csv.DictReader(io.StringIO(text, newline=""))
-        if not reader.fieldnames:
-            raise TransactionError("CSV needs a header row.")
-        missing = [name for name in mapping.values() if name not in reader.fieldnames]
+        reader = csv.DictReader(io.StringIO(text, newline=""), strict=True)
+        headers = reader.fieldnames
+        if (
+            not headers
+            or len(headers) > 100
+            or any(not header.strip() for header in headers)
+            or len(set(headers)) != len(headers)
+        ):
+            raise TransactionError(
+                "CSV needs between 1 and 100 unique, nonempty headers."
+            )
+        missing = [name for name in mapping.values() if name not in headers]
         if missing:
             raise TransactionError("A selected source column is missing.")
         parsed_rows: list[dict[str, Any]] = []
         for row_number, raw in enumerate(reader, start=1):
             if row_number > max_rows:
                 raise TransactionError("Transaction CSV contains more than 500 rows.")
+            missing_fields = any(value is None for value in raw.values())
             extra_fields = raw.pop(None, [])
             raw_values: dict[str, Any] = {
                 str(key): str(value or "") for key, value in raw.items()
@@ -249,14 +267,38 @@ def create_csv_import(
                 key: raw_values.get(header, "").strip()
                 for key, header in mapping.items()
             }
+            if any(
+                len(value) > 2000
+                for value in raw_values.values()
+                if isinstance(value, str)
+            ):
+                raise TransactionError(f"CSV row {row_number} has an oversized field.")
+            for field, maximum in {
+                "posted_date": 100,
+                "transaction_date": 100,
+                "amount": 100,
+                "currency": 40,
+                "raw_type": 120,
+                "provider_id": 200,
+            }.items():
+                if len(values.get(field, "")) > maximum:
+                    raise TransactionError(
+                        f"CSV row {row_number} {field} exceeds {maximum} characters."
+                    )
             posted = _date(values.get("posted_date"))
             transaction_date = _date(values.get("transaction_date"))
             amount = _amount(values.get("amount"))
             raw_currency = values.get("currency", "")
             currency = (raw_currency or base_currency).upper()
-            description = values.get("description", "")[:2000]
+            description = values.get("description", "")
             diagnostics: dict[str, Any] = {}
             status = "ready"
+            if extra_fields or missing_fields:
+                status = "needs_review"
+                diagnostics["columns"] = "row_does_not_match_header"
+            if values.get("transaction_date") and transaction_date is None:
+                status = "needs_review"
+                diagnostics["transaction_date"] = "invalid"
             if posted is None:
                 status = "needs_review"
                 diagnostics["posted_date"] = "missing_or_invalid"
@@ -298,10 +340,22 @@ def create_csv_import(
                     "diagnostics": diagnostics,
                 }
             )
-    except UnicodeDecodeError as exc:
-        raise TransactionError("CSV must be UTF-8 encoded.") from exc
+    except (UnicodeDecodeError, csv.Error) as exc:
+        raise TransactionError("CSV must be well-formed UTF-8 text.") from exc
     if not parsed_rows:
         raise TransactionError("CSV contains no transaction rows.")
+    # These rows are committed together. UTF-8 upload size does not bound the
+    # escaped JSON write size; leave ample room below DSQL's 10 MiB changed-data
+    # limit for normalized columns, audit records, identities, and index writes.
+    review_bytes = sum(
+        len(json.dumps(row, ensure_ascii=True, default=str).encode("utf-8"))
+        for row in parsed_rows
+    )
+    if review_bytes > MAX_TRANSACTION_REVIEW_BYTES:
+        raise TransactionError(
+            "Normalized transaction rows exceed the 2 MB write budget; "
+            "split the CSV into smaller imports. Source values are not truncated."
+        )
 
     key, digest = file_store.put(content)
     now = utc_now()
@@ -313,7 +367,14 @@ def create_csv_import(
             )
         )
         if by_key is not None:
-            if by_key.file_sha256 != digest or by_key.account_id != account_id:
+            if (
+                by_key.file_sha256 != digest
+                or by_key.account_id != account_id
+                or by_key.source_label != label
+                or by_key.statement_start != statement_start
+                or by_key.statement_end != statement_end
+                or by_key.diagnostics.get("mapping") != mapping
+            ):
                 raise TransactionConflict(
                     "Idempotency key was already used for another import."
                 )
@@ -332,11 +393,23 @@ def create_csv_import(
             .order_by(TransactionImport.created_at)
         )
         if old is not None:
+            if (
+                old.diagnostics.get("mapping") != mapping
+                or old.statement_start != statement_start
+                or old.statement_end != statement_end
+            ):
+                raise TransactionConflict(
+                    "This source already has a different interpretation; "
+                    "cancel the unpublished review before importing again."
+                )
             return old.id, True
 
+        # Review classifications depend on this transaction's database snapshot.
+        # A serialization retry must recompute them from pristine parsed input.
+        rows_to_stage = deepcopy(parsed_rows)
         # Keep repeated native IDs in the source for explicit row review.
         seen_provider_ids: dict[str, int] = {}
-        for row in parsed_rows:
+        for row in rows_to_stage:
             provider_id = row["provider_transaction_id"]
             if provider_id and provider_id in seen_provider_ids:
                 row["status"] = "needs_review"
@@ -387,6 +460,8 @@ def create_csv_import(
             if existing is not None:
                 identical = (
                     existing.posted_date == row["posted_date"]
+                    and existing.transaction_date == row["transaction_date"]
+                    and existing.raw_type == row["raw_type"]
                     and existing.amount == row["amount"]
                     and existing.currency == row["currency"]
                     and existing.raw_description == row["raw_description"]
@@ -410,16 +485,16 @@ def create_csv_import(
             statement_start=statement_start,
             statement_end=statement_end,
             review_revision=1,
-            row_count=len(parsed_rows),
+            row_count=len(rows_to_stage),
             status="review",
-            diagnostics={"mapping": mapping, "row_count": len(parsed_rows)},
+            diagnostics={"mapping": mapping, "row_count": len(rows_to_stage)},
             created_at=now,
             updated_at=now,
         )
         session.add(import_row)
         session.flush()
         row_ids_by_number: dict[int, UUID] = {}
-        for row in parsed_rows:
+        for row in rows_to_stage:
             repeated_row_number = row["diagnostics"].get("repeated_provider_row_number")
             if repeated_row_number is not None:
                 earlier_id = row_ids_by_number.get(int(repeated_row_number))
@@ -927,6 +1002,8 @@ def publish_import(
                 if existing is not None:
                     same = (
                         existing.posted_date == row.posted_date
+                        and existing.transaction_date == row.transaction_date
+                        and existing.raw_type == row.raw_type
                         and existing.amount == row.amount
                         and existing.currency == row.currency
                         and existing.raw_description == row.raw_description
@@ -1097,48 +1174,66 @@ def create_category_rule(
     return row
 
 
-def _transaction_read(session: Session, row: FinancialTransaction) -> dict[str, Any]:
-    category = (
-        session.get(SpendingCategory, row.category_id) if row.category_id else None
-    )
-    split_count = int(
-        session.scalar(
-            select(func.count(TransactionSplit.id)).where(
-                TransactionSplit.transaction_id == row.id
-            )
+def _transaction_reads(
+    session: Session, rows: list[FinancialTransaction]
+) -> dict[UUID, dict[str, Any]]:
+    """Load related display data once for a bounded transaction result set."""
+    if not rows:
+        return {}
+    identifiers = [row.id for row in rows]
+    category_ids = {row.category_id for row in rows if row.category_id is not None}
+    categories = {
+        category.id: category
+        for category in session.scalars(
+            select(SpendingCategory).where(SpendingCategory.id.in_(category_ids))
         )
-        or 0
-    )
-    transfer_id = session.scalar(
-        select(TransferMatch.id).where(
-            TransferMatch.status == "confirmed",
-            or_(
-                TransferMatch.first_transaction_id == row.id,
-                TransferMatch.second_transaction_id == row.id,
-            ),
-        )
-    )
-    return {
-        "id": row.id,
-        "account_id": row.account_id,
-        "posted_date": row.posted_date,
-        "transaction_date": row.transaction_date,
-        "amount": str(row.amount),
-        "currency": row.currency,
-        "raw_description": row.raw_description,
-        "description": row.description,
-        "raw_type": row.raw_type,
-        "provider_transaction_id": row.provider_transaction_id,
-        "source_label": row.source_label,
-        "classification": row.classification,
-        "category_id": row.category_id,
-        "category_slug": category.slug if category else None,
-        "category_name": category.display_name if category else None,
-        "category_source": row.category_source,
-        "revision": row.revision,
-        "split_count": split_count,
-        "transfer_match_id": transfer_id,
     }
+    split_counts = {
+        identity: count
+        for identity, count in session.execute(
+            select(TransactionSplit.transaction_id, func.count(TransactionSplit.id))
+            .where(TransactionSplit.transaction_id.in_(identifiers))
+            .group_by(TransactionSplit.transaction_id)
+        )
+    }
+    transfer_ids = {
+        transaction_id: transfer_id
+        for transaction_id, transfer_id in session.execute(
+            select(
+                ActiveTransferTransaction.transaction_id,
+                ActiveTransferTransaction.transfer_id,
+            ).where(ActiveTransferTransaction.transaction_id.in_(identifiers))
+        )
+    }
+    result: dict[UUID, dict[str, Any]] = {}
+    for row in rows:
+        category = categories.get(row.category_id) if row.category_id else None
+        result[row.id] = {
+            "id": row.id,
+            "account_id": row.account_id,
+            "posted_date": row.posted_date,
+            "transaction_date": row.transaction_date,
+            "amount": str(row.amount),
+            "currency": row.currency,
+            "raw_description": row.raw_description,
+            "description": row.description,
+            "raw_type": row.raw_type,
+            "provider_transaction_id": row.provider_transaction_id,
+            "source_label": row.source_label,
+            "classification": row.classification,
+            "category_id": row.category_id,
+            "category_slug": category.slug if category else None,
+            "category_name": category.display_name if category else None,
+            "category_source": row.category_source,
+            "revision": row.revision,
+            "split_count": split_counts.get(row.id, 0),
+            "transfer_match_id": transfer_ids.get(row.id),
+        }
+    return result
+
+
+def _transaction_read(session: Session, row: FinancialTransaction) -> dict[str, Any]:
+    return _transaction_reads(session, [row])[row.id]
 
 
 def list_transactions(
@@ -1148,6 +1243,7 @@ def list_transactions(
     start_date: date | None,
     end_date: date | None,
     limit: int,
+    offset: int = 0,
 ) -> list[dict[str, Any]]:
     query = select(FinancialTransaction).where(
         FinancialTransaction.status == "published"
@@ -1158,12 +1254,16 @@ def list_transactions(
         query = query.where(FinancialTransaction.posted_date >= start_date)
     if end_date:
         query = query.where(FinancialTransaction.posted_date <= end_date)
-    rows = session.scalars(
-        query.order_by(
-            FinancialTransaction.posted_date.desc(), FinancialTransaction.id
-        ).limit(limit)
+    rows = list(
+        session.scalars(
+            query.order_by(
+                FinancialTransaction.posted_date.desc(), FinancialTransaction.id
+            )
+            .offset(offset)
+            .limit(limit)
+        )
     )
-    return [_transaction_read(session, row) for row in rows]
+    return list(_transaction_reads(session, rows).values())
 
 
 def create_manual_transaction(
@@ -1420,6 +1520,7 @@ def transfer_candidates(session: Session, *, limit: int = 200) -> list[dict[str,
         )
     )
     linked_ids = set(session.scalars(select(ActiveTransferTransaction.transaction_id)))
+    display_rows = _transaction_reads(session, rows)
     result: list[dict[str, Any]] = []
     for index, first in enumerate(rows):
         if first.id in linked_ids or first.amount is None or first.posted_date is None:
@@ -1441,8 +1542,8 @@ def transfer_candidates(session: Session, *, limit: int = 200) -> list[dict[str,
                 continue
             result.append(
                 {
-                    "first_transaction": _transaction_read(session, first),
-                    "second_transaction": _transaction_read(session, second),
+                    "first_transaction": display_rows[first.id],
+                    "second_transaction": display_rows[second.id],
                     "date_gap_days": gap,
                     "reason": (
                         "Opposite signed amounts match across accounts "

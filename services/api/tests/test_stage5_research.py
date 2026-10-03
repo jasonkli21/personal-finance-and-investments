@@ -5,17 +5,21 @@ from __future__ import annotations
 import json
 from collections.abc import Iterator
 from datetime import UTC, datetime
+from decimal import Decimal, localcontext
 from pathlib import Path
 from typing import Any, cast
+from unittest.mock import Mock
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select
+from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 from test_funds import catalog as create_fund_security
 from test_funds import upload as upload_fund
 
+from app.api.research_contracts import ReportedFactCreate, ReportedFactRead
 from app.db.models import (
     Account,
     Base,
@@ -31,6 +35,7 @@ from app.db.models import (
     ResearchWatchlistEvent,
     Security,
 )
+from app.domains.research import ResearchConflict, create_fact
 from app.integrations.personal_ai import DisabledPersonalAIClient
 from app.integrations.research_evidence import (
     EvidenceScopeDocument,
@@ -185,6 +190,38 @@ def test_reported_facts_are_exact_decimal_and_idempotent(
     assert invalid_precision.status_code == 422
 
 
+def test_fact_idempotency_and_reads_preserve_all_digits_at_reduced_precision() -> None:
+    value = "123456789012345678.1234567891"
+    payload = {
+        **_fixture()["facts"][0],
+        "document_id": uuid4(),
+        "normalized_value": value,
+    }
+    data = ReportedFactCreate.model_validate(payload)
+    existing = ReportedFact(
+        **{**data.model_dump(), "normalized_value": Decimal(value)},
+        id=uuid4(),
+        quality_status="user_supplied_unverified",
+        created_at=datetime.now(UTC),
+    )
+    # SQLite stores NUMERIC through floating point. Isolate fingerprinting with
+    # an exact model value; the migrated PostgreSQL gate tests real persistence.
+    session = Mock(spec=Session)
+    session.get.return_value = ResearchDocument()
+    session.scalar.return_value = existing
+
+    with localcontext() as context:
+        context.prec = 8
+        record, duplicate = create_fact(cast(Session, session), data)
+        assert record is existing and duplicate
+        assert ReportedFactRead.model_validate(record).normalized_value == value
+        changed = ReportedFactCreate.model_validate(
+            {**payload, "normalized_value": "123456789012345678.1234567892"}
+        )
+        with pytest.raises(ResearchConflict, match="Idempotency key"):
+            create_fact(cast(Session, session), changed)
+
+
 def test_research_reads_are_bounded_and_do_not_change_financial_records(
     research_client: TestClient,
 ) -> None:
@@ -211,6 +248,52 @@ def test_research_reads_are_bounded_and_do_not_change_financial_records(
         assert session.scalar(select(func.count()).select_from(ResearchDocument)) == 2
         assert session.scalar(select(func.count()).select_from(ReportedFact)) == 2
         assert session.scalar(select(func.count()).select_from(Issuer)) == 1
+
+
+def test_removed_watchlist_members_do_not_hide_active_entries_at_read_limit(
+    research_client: TestClient,
+) -> None:
+    factory = cast(Any, research_client.app).state.session_factory
+    active_id = uuid4()
+    with factory() as session:
+        for index in range(501):
+            issuer_id = uuid4()
+            session.add(
+                Issuer(
+                    id=issuer_id,
+                    normalized_name=f"archived synthetic {index}",
+                    display_name=f"Archived synthetic {index:03}",
+                )
+            )
+            session.add(
+                ResearchWatchlistEvent(
+                    id=uuid4(),
+                    issuer_id=issuer_id,
+                    version=1,
+                    action="removed",
+                    idempotency_key=f"removed-{index}",
+                )
+            )
+        session.add(
+            Issuer(
+                id=active_id,
+                normalized_name="z active synthetic",
+                display_name="Z active synthetic",
+            )
+        )
+        session.add(
+            ResearchWatchlistEvent(
+                id=uuid4(),
+                issuer_id=active_id,
+                version=1,
+                action="added",
+                idempotency_key="active",
+            )
+        )
+        session.commit()
+    response = research_client.get("/v1/research/watchlist")
+    assert response.status_code == 200, response.text
+    assert [row["issuer_id"] for row in response.json()] == [str(active_id)]
 
 
 def test_company_view_and_comparison_require_comparable_fiscal_facts(

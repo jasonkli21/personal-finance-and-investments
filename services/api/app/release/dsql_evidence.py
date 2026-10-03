@@ -105,11 +105,17 @@ def _source_paths() -> tuple[list[Path], list[Path], list[Path]]:
         API_ROOT / "pyproject.toml",
         API_ROOT / "uv.lock",
         API_ROOT / "Dockerfile",
+        API_ROOT / ".dockerignore",
+        API_ROOT / "alembic.ini",
+        API_ROOT / "alembic" / "env.py",
+        API_ROOT / "alembic" / "script.py.mako",
         REPOSITORY_ROOT / "package.json",
         REPOSITORY_ROOT / "pnpm-lock.yaml",
         REPOSITORY_ROOT / "pnpm-workspace.yaml",
         REPOSITORY_ROOT / "apps" / "web" / "package.json",
         REPOSITORY_ROOT / "apps" / "web" / "vite.config.ts",
+        REPOSITORY_ROOT / "apps" / "web" / "tsconfig.json",
+        REPOSITORY_ROOT / "apps" / "web" / "index.html",
     ]
     build_files.extend(app_sources)
     build_files.extend(migrations)
@@ -121,6 +127,8 @@ def _source_paths() -> tuple[list[Path], list[Path], list[Path]]:
     schema_files = [
         API_ROOT / "app" / "db" / "dsql_migrations.py",
         API_ROOT / "app" / "db" / "models.py",
+        API_ROOT / "alembic.ini",
+        API_ROOT / "alembic" / "env.py",
         *migrations,
     ]
     fixture_files = sorted((API_ROOT / "tests").glob("test_*.py"))
@@ -133,8 +141,11 @@ def _source_paths() -> tuple[list[Path], list[Path], list[Path]]:
         for path in sorted(test_dir.rglob("*"))
         if path.is_file()
     )
-    fixture_files.append(
-        REPOSITORY_ROOT / "scripts" / "stage4" / "test_infra_contract.py"
+    fixture_files.extend(
+        path
+        for directory in (REPOSITORY_ROOT / "tests", REPOSITORY_ROOT / "fixtures")
+        for path in sorted(directory.rglob("*"))
+        if path.is_file() and "__pycache__" not in path.parts
     )
     return build_files, schema_files, fixture_files
 
@@ -174,6 +185,8 @@ def _require_committed_api_source() -> None:
             "package.json",
             "pnpm-lock.yaml",
             "pnpm-workspace.yaml",
+            "tests/infra",
+            "fixtures",
         ],
         cwd=REPOSITORY_ROOT,
         check=True,

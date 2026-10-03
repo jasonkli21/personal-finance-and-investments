@@ -1,4 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { createSubmissionKey } from './submission-key'
+import { useRevisionDraft } from './use-revision-draft'
+import { localDate } from './local-date'
+import { parseCsvHeader } from './csv-headers'
+import { useRef, useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   correctTaxLotImportRow,
@@ -40,34 +44,6 @@ const IMPORT_FIELDS: { key: LotField; label: string; required?: boolean }[] = [
   { key: 'basis_currency', label: 'Basis currency' },
   { key: 'evidence_ref', label: 'Evidence reference' },
 ]
-
-function today(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-}
-
-function csvHeaders(value: string): string[] {
-  const line = value.split(/\r?\n/, 1)[0] ?? ''
-  const headers: string[] = []
-  let current = ''
-  let quoted = false
-  for (let index = 0; index < line.length; index += 1) {
-    const char = line[index]
-    if (char === '"' && line[index + 1] === '"' && quoted) {
-      current += '"'
-      index += 1
-    } else if (char === '"') {
-      quoted = !quoted
-    } else if (char === ',' && !quoted) {
-      headers.push(current.trim())
-      current = ''
-    } else {
-      current += char
-    }
-  }
-  headers.push(current.trim())
-  return headers.map((header) => header.replace(/^\uFEFF/, ''))
-}
 
 function initialMapping(headers: string[]): Record<string, string> {
   const normalized = headers.map((header) => header.trim().toLowerCase())
@@ -121,34 +97,48 @@ function ReviewRow({
   securities,
   onCorrect,
   busy,
+  onDirty,
 }: {
   row: LotRow
   review: Review
   securities: Awaited<ReturnType<typeof fetchSecurities>>
   onCorrect: (data: Correction) => void
   busy: boolean
+  onDirty: () => void
 }) {
-  const [securityId, setSecurityId] = useState(row.security_id ?? '')
-  const [sourceLotId, setSourceLotId] = useState(row.raw_source_lot_id ?? '')
-  const [acquiredAt, setAcquiredAt] = useState(row.acquired_at ?? '')
-  const [initialQuantity, setInitialQuantity] = useState(
-    row.initial_quantity ?? '',
+  const draft = useRevisionDraft(
+    {
+      securityId: row.security_id ?? '',
+      sourceLotId: row.raw_source_lot_id ?? '',
+      acquiredAt: row.acquired_at ?? '',
+      initialQuantity: row.initial_quantity ?? '',
+      remainingQuantity: row.remaining_quantity ?? '',
+      initialBasis: row.initial_basis ?? '',
+      remainingBasis: row.remaining_basis ?? '',
+      basisCurrency: row.basis_currency ?? '',
+      evidenceRef: row.evidence_ref ?? '',
+      reason: 'Corrected after source review',
+    },
+    review.review_revision,
+    onDirty,
   )
-  const [remainingQuantity, setRemainingQuantity] = useState(
-    row.remaining_quantity ?? '',
-  )
-  const [initialBasis, setInitialBasis] = useState(row.initial_basis ?? '')
-  const [remainingBasis, setRemainingBasis] = useState(
-    row.remaining_basis ?? '',
-  )
-  const [basisCurrency, setBasisCurrency] = useState(row.basis_currency ?? '')
-  const [evidenceRef, setEvidenceRef] = useState(row.evidence_ref ?? '')
-  const [reason, setReason] = useState('Corrected after source review')
+  const {
+    securityId,
+    sourceLotId,
+    acquiredAt,
+    initialQuantity,
+    remainingQuantity,
+    initialBasis,
+    remainingBasis,
+    basisCurrency,
+    evidenceRef,
+    reason,
+  } = draft.value
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const correction: Correction = {
-      expected_revision: review.review_revision,
+      expected_revision: draft.revision,
       reason,
     }
     if (securityId !== (row.security_id ?? ''))
@@ -204,7 +194,9 @@ function ReviewRow({
             <select
               className="rounded border border-slate-300 p-2 text-sm"
               value={securityId}
-              onChange={(event) => setSecurityId(event.target.value)}
+              onChange={(event) =>
+                draft.update({ securityId: event.target.value })
+              }
             >
               <option value="">Unresolved</option>
               {securities
@@ -226,7 +218,9 @@ function ReviewRow({
               className="rounded border border-slate-300 p-2 text-sm"
               maxLength={200}
               value={sourceLotId}
-              onChange={(event) => setSourceLotId(event.target.value)}
+              onChange={(event) =>
+                draft.update({ sourceLotId: event.target.value })
+              }
             />
           </label>
           <label className="grid gap-1 text-xs font-medium">
@@ -235,7 +229,9 @@ function ReviewRow({
               className="rounded border border-slate-300 p-2 text-sm"
               type="date"
               value={acquiredAt}
-              onChange={(event) => setAcquiredAt(event.target.value)}
+              onChange={(event) =>
+                draft.update({ acquiredAt: event.target.value })
+              }
             />
           </label>
           <label className="grid gap-1 text-xs font-medium">
@@ -244,7 +240,9 @@ function ReviewRow({
               className="rounded border border-slate-300 p-2 text-sm"
               inputMode="decimal"
               value={initialQuantity}
-              onChange={(event) => setInitialQuantity(event.target.value)}
+              onChange={(event) =>
+                draft.update({ initialQuantity: event.target.value })
+              }
             />
           </label>
           <label className="grid gap-1 text-xs font-medium">
@@ -253,7 +251,9 @@ function ReviewRow({
               className="rounded border border-slate-300 p-2 text-sm"
               inputMode="decimal"
               value={remainingQuantity}
-              onChange={(event) => setRemainingQuantity(event.target.value)}
+              onChange={(event) =>
+                draft.update({ remainingQuantity: event.target.value })
+              }
             />
           </label>
           <label className="grid gap-1 text-xs font-medium">
@@ -262,7 +262,9 @@ function ReviewRow({
               className="rounded border border-slate-300 p-2 text-sm"
               inputMode="decimal"
               value={initialBasis}
-              onChange={(event) => setInitialBasis(event.target.value)}
+              onChange={(event) =>
+                draft.update({ initialBasis: event.target.value })
+              }
             />
           </label>
           <label className="grid gap-1 text-xs font-medium">
@@ -271,7 +273,9 @@ function ReviewRow({
               className="rounded border border-slate-300 p-2 text-sm"
               inputMode="decimal"
               value={remainingBasis}
-              onChange={(event) => setRemainingBasis(event.target.value)}
+              onChange={(event) =>
+                draft.update({ remainingBasis: event.target.value })
+              }
             />
           </label>
           <label className="grid gap-1 text-xs font-medium">
@@ -281,7 +285,9 @@ function ReviewRow({
               maxLength={3}
               value={basisCurrency}
               onChange={(event) =>
-                setBasisCurrency(event.target.value.toUpperCase())
+                draft.update({
+                  basisCurrency: event.target.value.toUpperCase(),
+                })
               }
             />
           </label>
@@ -290,7 +296,9 @@ function ReviewRow({
             <input
               className="rounded border border-slate-300 p-2 text-sm"
               value={evidenceRef}
-              onChange={(event) => setEvidenceRef(event.target.value)}
+              onChange={(event) =>
+                draft.update({ evidenceRef: event.target.value })
+              }
             />
           </label>
           <label className="grid gap-1 text-xs font-medium md:col-span-3">
@@ -298,7 +306,7 @@ function ReviewRow({
             <input
               className="rounded border border-slate-300 p-2 text-sm"
               value={reason}
-              onChange={(event) => setReason(event.target.value)}
+              onChange={(event) => draft.update({ reason: event.target.value })}
               required
             />
           </label>
@@ -317,6 +325,7 @@ function ReviewRow({
 
 export default function TaxLotWorkspace() {
   const queryClient = useQueryClient()
+  const adjustmentKey = useRef(createSubmissionKey())
   const accountsQuery = useQuery({
     queryKey: ['accounts'],
     queryFn: fetchAccounts,
@@ -331,10 +340,15 @@ export default function TaxLotWorkspace() {
   const securities = securitiesQuery.data ?? []
   const [accountId, setAccountId] = useState('')
   const [file, setFile] = useState<File | null>(null)
+  const fileSelection = useRef(0)
+  const [fileError, setFileError] = useState('')
   const [headers, setHeaders] = useState<string[]>([])
   const [mapping, setMapping] = useState<Record<string, string>>({})
   const [sourceLabel, setSourceLabel] = useState('Brokerage tax lots')
   const [importId, setImportId] = useState('')
+  const [dirtyRows, setDirtyRows] = useState<Record<string, boolean>>({})
+  const [rowVersions, setRowVersions] = useState<Record<string, number>>({})
+  const [draftEpoch, setDraftEpoch] = useState(0)
   const [importNotice, setImportNotice] = useState('')
   const [acknowledgeDifferences, setAcknowledgeDifferences] = useState(false)
   const [publishReason, setPublishReason] = useState(
@@ -351,14 +365,14 @@ export default function TaxLotWorkspace() {
   const [quantityDelta, setQuantityDelta] = useState('')
   const [basisDelta, setBasisDelta] = useState('')
   const [adjustmentCurrency, setAdjustmentCurrency] = useState('')
-  const [adjustmentDate, setAdjustmentDate] = useState(today)
+  const [adjustmentDate, setAdjustmentDate] = useState(localDate)
   const [adjustmentSource, setAdjustmentSource] = useState(
     'Manual source-backed adjustment',
   )
   const [adjustmentReason, setAdjustmentReason] = useState('')
   const [adjustmentEvidence, setAdjustmentEvidence] = useState('')
   const [saleSecurityId, setSaleSecurityId] = useState('')
-  const [saleDate, setSaleDate] = useState(today)
+  const [saleDate, setSaleDate] = useState(localDate)
   const [saleTargetType, setSaleTargetType] = useState<'shares' | 'value'>(
     'shares',
   )
@@ -409,6 +423,8 @@ export default function TaxLotWorkspace() {
     },
     onSuccess: async (result) => {
       setImportId(result.id)
+      setDirtyRows({})
+      setDraftEpoch((current) => current + 1)
       setPage(0)
       setAcknowledgeDifferences(false)
       setImportNotice(
@@ -423,7 +439,12 @@ export default function TaxLotWorkspace() {
   const correction = useMutation({
     mutationFn: ({ rowId, data }: { rowId: string; data: Correction }) =>
       correctTaxLotImportRow(importId, rowId, data),
-    onSuccess: async () => {
+    onSuccess: async (_result, { rowId }) => {
+      setDirtyRows((current) => ({ ...current, [rowId]: false }))
+      setRowVersions((current) => ({
+        ...current,
+        [rowId]: (current[rowId] ?? 0) + 1,
+      }))
       await queryClient.invalidateQueries({
         queryKey: ['tax-lot-import', importId],
       })
@@ -434,6 +455,8 @@ export default function TaxLotWorkspace() {
   const publish = useMutation({
     mutationFn: () => {
       if (!importQuery.data) throw new Error('Load the import review first.')
+      if (Object.values(dirtyRows).some(Boolean))
+        throw new Error('Save or discard tax-lot row drafts before publishing.')
       return publishTaxLotImport(importId, {
         expected_revision: importQuery.data.review_revision,
         acknowledge_quantity_differences: acknowledgeDifferences,
@@ -457,7 +480,10 @@ export default function TaxLotWorkspace() {
         throw new Error(
           'Select a lot and enter a quantity or basis adjustment.',
         )
-      return createTaxLotAdjustment(adjustmentLotId, {
+      const input: Omit<
+        components['schemas']['TaxLotAdjustmentCreate'],
+        'idempotency_key'
+      > = {
         adjustment_type: adjustmentType,
         quantity_delta: quantityDelta || null,
         basis_delta: basisDelta || null,
@@ -466,10 +492,17 @@ export default function TaxLotWorkspace() {
         source_label: adjustmentSource,
         reason: adjustmentReason,
         evidence_ref: adjustmentEvidence || null,
-        idempotency_key: crypto.randomUUID(),
+      }
+      return createTaxLotAdjustment(adjustmentLotId, {
+        ...input,
+        idempotency_key: adjustmentKey.current.forPayload({
+          lotId: adjustmentLotId,
+          ...input,
+        }),
       })
     },
     onSuccess: async () => {
+      adjustmentKey.current.reset()
       setQuantityDelta('')
       setBasisDelta('')
       setAdjustmentReason('')
@@ -597,6 +630,14 @@ export default function TaxLotWorkspace() {
         </p>
       </header>
 
+      {fileError && (
+        <p
+          role="alert"
+          className="rounded-lg bg-rose-50 p-3 text-sm text-rose-900"
+        >
+          {fileError}
+        </p>
+      )}
       {(preview.error ||
         correction.error ||
         publish.error ||
@@ -662,13 +703,27 @@ export default function TaxLotWorkspace() {
               type="file"
               accept=".csv,text/csv"
               onChange={async (event) => {
+                const selection = ++fileSelection.current
                 const selected = event.target.files?.[0] ?? null
                 setFile(selected)
-                const found = selected
-                  ? csvHeaders(await selected.slice(0, 128_000).text())
-                  : []
-                setHeaders(found)
-                setMapping(initialMapping(found))
+                setHeaders([])
+                setMapping({})
+                setFileError('')
+                try {
+                  const found = selected
+                    ? parseCsvHeader(await selected.slice(0, 64_000).text())
+                    : []
+                  if (selection !== fileSelection.current) return
+                  setHeaders(found)
+                  setMapping(initialMapping(found))
+                } catch (error) {
+                  if (selection === fileSelection.current)
+                    setFileError(
+                      error instanceof Error
+                        ? error.message
+                        : 'The selected file could not be read.',
+                    )
+                }
               }}
             />
           </label>
@@ -777,20 +832,35 @@ export default function TaxLotWorkspace() {
           <div className="space-y-3">
             {visibleRows.map((row) => (
               <ReviewRow
-                key={`${row.id}-${review.review_revision}`}
+                key={`${row.id}-${rowVersions[row.id] ?? 0}-${draftEpoch}`}
                 row={row}
                 review={review}
                 securities={securities}
-                busy={correction.isPending}
+                busy={correction.isPending || publish.isPending}
+                onDirty={() =>
+                  setDirtyRows((current) => ({ ...current, [row.id]: true }))
+                }
                 onCorrect={(data) => correction.mutate({ rowId: row.id, data })}
               />
             ))}
           </div>
+          <button
+            type="button"
+            className="rounded border px-3 py-2 text-sm"
+            disabled={correction.isPending || publish.isPending}
+            onClick={() => {
+              setDirtyRows({})
+              setDraftEpoch((current) => current + 1)
+              void importQuery.refetch()
+            }}
+          >
+            Discard lot drafts and reload review
+          </button>
           {rows.length > 50 && (
             <div className="flex items-center gap-3 text-sm">
               <button
                 className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50"
-                disabled={page === 0}
+                disabled={page === 0 || Object.values(dirtyRows).some(Boolean)}
                 onClick={() => setPage((current) => current - 1)}
               >
                 Previous
@@ -801,7 +871,10 @@ export default function TaxLotWorkspace() {
               </span>
               <button
                 className="rounded border border-slate-300 px-3 py-1 disabled:opacity-50"
-                disabled={(page + 1) * 50 >= rows.length}
+                disabled={
+                  (page + 1) * 50 >= rows.length ||
+                  Object.values(dirtyRows).some(Boolean)
+                }
                 onClick={() => setPage((current) => current + 1)}
               >
                 Next
@@ -840,6 +913,8 @@ export default function TaxLotWorkspace() {
                 type="button"
                 disabled={
                   publish.isPending ||
+                  correction.isPending ||
+                  Object.values(dirtyRows).some(Boolean) ||
                   blockingRows ||
                   (needsAcknowledgement && !acknowledgeDifferences)
                 }
@@ -986,7 +1061,7 @@ export default function TaxLotWorkspace() {
               <input
                 className="rounded-lg border border-slate-300 p-2"
                 type="date"
-                max={today()}
+                max={localDate()}
                 value={adjustmentDate}
                 onChange={(event) => setAdjustmentDate(event.target.value)}
               />

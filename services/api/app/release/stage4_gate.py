@@ -97,6 +97,8 @@ def _require_committed_release_sources() -> None:
             "apps/web",
             "infra/terraform",
             "scripts/stage4",
+            "tests/infra",
+            "fixtures",
             ".env.example",
             "package.json",
             "pnpm-lock.yaml",

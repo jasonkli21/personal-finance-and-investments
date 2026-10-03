@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import UTC, date, timedelta
 from typing import Any, cast
 from uuid import UUID, uuid4
 
@@ -297,22 +297,42 @@ def cancel_job(session: Session, job_id: UUID) -> dict[str, Any]:
         raise JobNotFound("Job not found.")
     if row.status in {"completed", "failed", "cancelled"}:
         return _read(row)
-    if row.status == "pending":
-        row.status = "cancelled"
-        row.progress_stage = "cancelled"
-    elif row.lease_until is not None and row.lease_until <= utc_now():
-        row.status = "cancelled"
-        row.progress_stage = "cancelled"
-        row.lease_generation += 1
-        row.lease_owner = None
-        row.lease_until = None
+    now = utc_now()
+    lease_until = row.lease_until
+    if lease_until is not None and lease_until.tzinfo is None:
+        lease_until = lease_until.replace(tzinfo=UTC)
+    terminal = row.status == "pending" or (
+        lease_until is not None and lease_until <= now
+    )
+    values: dict[str, Any] = {"updated_at": now}
+    if terminal:
+        values.update(
+            status="cancelled",
+            progress_stage="cancelled",
+            lease_generation=row.lease_generation + 1,
+            lease_owner=None,
+            lease_until=None,
+        )
     else:
-        row.cancel_requested = True
-        row.progress_stage = "cancellation_requested"
-    row.updated_at = utc_now()
-    session.flush()
-    if row.status == "cancelled":
+        values.update(cancel_requested=True, progress_stage="cancellation_requested")
+    # A worker may finish or reclaim the job after this read. Cancellation
+    # must not overwrite that newer state or clear the new owner's lease.
+    changed = session.execute(
+        update(Job)
+        .where(
+            Job.id == job_id,
+            Job.status == row.status,
+            Job.lease_generation == row.lease_generation,
+        )
+        .values(**values)
+        .execution_options(synchronize_session=False)
+    )
+    if getattr(changed, "rowcount", None) != 1:
+        raise JobConflict("Job state changed; reload before cancelling.")
+    session.refresh(row)
+    if terminal:
         _cancel_staging(session, row.payload)
+
     return _read(row)
 
 
@@ -382,9 +402,23 @@ def claim_next_job(
                         expected_revision=attempt.review_revision,
                         reason="Worker lease expired after cancellation was requested",
                     )
+        exhausted_ids = list(
+            session.scalars(
+                select(Job.id)
+                .where(
+                    Job.status == "running",
+                    Job.lease_until.is_not(None),
+                    Job.lease_until <= now,
+                    Job.attempts >= Job.max_attempts,
+                )
+                .order_by(Job.id)
+                .limit(100)
+            )
+        )
         session.execute(
             update(Job)
             .where(
+                Job.id.in_(exhausted_ids),
                 Job.status == "running",
                 Job.lease_until.is_not(None),
                 Job.lease_until <= now,
@@ -471,8 +505,15 @@ def job_cancelled_or_stale(
         if row is None:
             return True, False
         cancelled = row.status == "cancelled" or row.cancel_requested
-        current = row.status == "running" and (
-            row.lease_owner == claim.owner and row.lease_generation == claim.generation
+        lease_until = row.lease_until
+        if lease_until is not None and lease_until.tzinfo is None:
+            lease_until = lease_until.replace(tzinfo=UTC)
+        current = (
+            row.status == "running"
+            and row.lease_owner == claim.owner
+            and row.lease_generation == claim.generation
+            and lease_until is not None
+            and lease_until > utc_now()
         )
         return cancelled, not current
 
@@ -496,6 +537,7 @@ def progress_job(
                 Job.status == "running",
                 Job.lease_owner == claim.owner,
                 Job.lease_generation == claim.generation,
+                Job.lease_until > now,
                 Job.cancel_requested.is_(False),
             )
             .values(
@@ -525,6 +567,7 @@ def complete_job(
                 Job.status == "running",
                 Job.lease_owner == claim.owner,
                 Job.lease_generation == claim.generation,
+                Job.lease_until > now,
                 Job.cancel_requested.is_(False),
             )
             .values(
@@ -639,6 +682,7 @@ def fail_job(
                 Job.status == "running",
                 Job.lease_owner == claim.owner,
                 Job.lease_generation == claim.generation,
+                Job.lease_until > now,
             )
             .values(
                 status=case(

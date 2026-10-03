@@ -1,14 +1,13 @@
 """Stage 3 historical event, reconciliation, and performance routes."""
 
-from collections.abc import Iterator
 from datetime import date
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, sessionmaker
 
+from app.api.routes import SessionDependency
 from app.api.stage3_contracts import (
     HistoryReconciliationRead,
     InvestmentEventCreate,
@@ -20,15 +19,6 @@ from app.db.transactions import run_database_unit
 from app.domains import history
 
 router = APIRouter(prefix="/v1")
-
-
-def get_session(request: Request) -> Iterator[Session]:
-    session_factory: sessionmaker[Session] = request.app.state.session_factory
-    with session_factory() as session:
-        yield session
-
-
-SessionDependency = Annotated[Session, Depends(get_session)]
 
 
 def _raise_history(exc: history.HistoryError) -> HTTPException:

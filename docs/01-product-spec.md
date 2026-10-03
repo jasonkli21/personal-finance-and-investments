@@ -1,8 +1,8 @@
 # Product specification
 
-**Status:** Stage 1 local MVP delivered; later tiers planned | **Updated:** 2026-10-02 | **MVP:** Stage 1
+**Status:** Stage 0–1 local MVP delivered; Stage 2 partial; Stage 3 locally delivered; Stage 4 tooling prepared; Stage 5 offline baseline | **Updated:** 2026-10-03 | **MVP:** Stage 1
 
-The finance app owns financial state, deterministic calculations/validation, workflows and UI. Reusable AI extraction, research/search and attributable preference memory integrate through `personal-ai-system`; they do not replace finance records. See [the ownership ADR](adr/0001-shared-personal-ai.md). Stage 1 has no AI feature or live AI transport. [Release evidence](stage-1-release.md) records actual capabilities and limits; this specification also includes future requirements.
+The finance app owns financial state, deterministic calculations/validation, workflows and UI. Reusable AI extraction, research/search and attributable preference memory integrate through `personal-ai-system`; they do not replace finance records. See [the ownership ADR](adr/0001-shared-personal-ai.md). The implemented research baseline uses manual source references and deterministic calculations; live AI transport remains disabled. The [documentation index](README.md) links the release evidence for each stage; this specification also includes future requirements. The [maintainability review](maintainability-review.md) records current implementation gaps.
 
 ## 1. Problem and product promise
 

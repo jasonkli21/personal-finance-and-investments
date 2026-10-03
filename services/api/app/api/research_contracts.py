@@ -194,7 +194,11 @@ class ReportedFactRead(BaseModel):
         if value is None:
             return None
         parsed = Decimal(str(value))
-        return format(parsed.normalize(), "f") if parsed else "0"
+        if not parsed:
+            return "0"
+        # Formatting is exact even if a caller uses a reduced Decimal precision.
+        text = format(parsed, "f")
+        return text.rstrip("0").rstrip(".") if "." in text else text
 
 
 class ResearchFactObservation(BaseModel):

@@ -46,6 +46,12 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+# Applied migrations are immutable. Keep lint/runtime validation for these two
+# historical files, whose formatting predates the current whole-tree gate.
+exclude = [
+    "alembic/versions/0007_stage2_document_ingestion.py",
+    "alembic/versions/0015_stage4_authentication.py",
+]
 
 [tool.mypy]
 python_version = "3.12"

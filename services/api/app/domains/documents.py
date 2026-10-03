@@ -286,7 +286,12 @@ def read_document_file(
     )
     if source is None:
         raise DocumentNotFound
-    content = file_store.read(source.storage_key)
+    try:
+        content = file_store.read(source.storage_key)
+    except (OSError, ValueError) as exc:
+        raise DocumentError(
+            "Private source is unavailable or failed validation."
+        ) from exc
     if hashlib.sha256(content).hexdigest() != source.content_hash:
         raise DocumentError("Private source integrity check failed.")
     return content, source.content_type, source.original_name

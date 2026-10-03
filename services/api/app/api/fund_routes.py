@@ -1,5 +1,6 @@
 "Fund upload/review/history HTTP boundary; no provider IO inside DB retries."
 
+import asyncio
 import json
 from datetime import date
 from typing import Annotated
@@ -57,7 +58,8 @@ async def upload(
             isinstance(k, str) and isinstance(v, str) for k, v in mapping.items()
         ):
             raise imports.InvalidCsv("Mapping must be an object of header names")
-        identifier, duplicate = funds.preview(
+        identifier, duplicate = await asyncio.to_thread(
+            funds.preview,
             request.app.state.session_factory,
             request.app.state.file_store,
             content=content,
@@ -75,18 +77,23 @@ async def upload(
         raise HTTPException(status_code=422, detail="Invalid mapping JSON") from exc
     except imports.ImportErrorBase as exc:
         raise error(exc) from exc
-    with request.app.state.session_factory() as session:
-        attempt = session.get(ImportAttempt, identifier)
-        assert attempt
-        return ImportCreated(
-            id=identifier,
-            kind="fund",
-            status=attempt.status,
-            review_revision=attempt.review_revision,
-            row_count=attempt.row_count,
-            batch_count=attempt.batch_count,
-            duplicate=duplicate,
-        )
+
+    def read_result() -> ImportCreated:
+        with request.app.state.session_factory() as session:
+            attempt = session.get(ImportAttempt, identifier)
+            if attempt is None:
+                raise HTTPException(status_code=404, detail="Fund import not found.")
+            return ImportCreated(
+                id=identifier,
+                kind="fund",
+                status=attempt.status,
+                review_revision=attempt.review_revision,
+                row_count=attempt.row_count,
+                batch_count=attempt.batch_count,
+                duplicate=duplicate,
+            )
+
+    return await asyncio.to_thread(read_result)
 
 
 @router.patch("/fund-imports/{import_id}/rows/{row_id}", response_model=ImportRowRead)
@@ -122,7 +129,8 @@ def publish(request: Request, import_id: UUID, data: ImportAction) -> FundSnapsh
         raise error(exc) from exc
     with request.app.state.session_factory() as session:
         snapshot = session.get(FundSnapshot, identifier)
-        assert snapshot
+        if snapshot is None:
+            raise HTTPException(status_code=404, detail="Fund snapshot not found.")
         return FundSnapshotRead.model_validate(funds.snapshot_read(session, snapshot))
 
 
@@ -147,8 +155,8 @@ def refresh(fund_id: UUID) -> None:
     raise HTTPException(
         status_code=409,
         detail=(
-            "Automatic retrieval is disabled pending verified access rights. D"
-            "ownload official full holdings and upload them for review; last a"
-            "ccepted data remains available."
+            "Automatic retrieval is disabled pending verified access rights. "
+            "Download official full holdings and upload them for review; "
+            "last accepted data remains available."
         ),
     )

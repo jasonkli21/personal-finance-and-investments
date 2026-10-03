@@ -1,6 +1,6 @@
 # Technical architecture and data model
 
-**Status:** Stage 1 local implementation plus future design; live DSQL unverified | **Updated:** 2026-10-02
+**Status:** Local portfolio/finance/planning and offline research implementation; cloud and live-service gates remain | **Updated:** 2026-10-03
 
 ## 1. Architecture decision
 
@@ -12,12 +12,13 @@ React + TypeScript SPA (Vite)
 FastAPI application
   |-- accounts / securities / positions
   |-- market_data / etf_holdings / exposure
-  |-- imports / spending / taxes / research (as stages unlock)
+  |-- imports / spending / taxes / history / simulations / planning
+  |-- research: local user-entered sources, facts, thesis and frozen results
   |-- finance providers: quotes, fund formats, account sync (later)
   |-- PersonalAIClient -> personal-ai-system (optional; transport deferred)
-  |-- jobs service: enqueue, run, status, retries (Stage 2 planned)
+  |-- jobs service: enqueue, lease, run, status, retries (local PDF preview)
   +---- DatabaseEngine: local PostgreSQL 16 OR production Aurora DSQL
-  +---- PrivateFileStore -> local files; S3 adapter planned in Stage 4
+  +---- FileStore -> local private files OR prepared private S3 adapter
 Python worker/scheduler -> same domain services and interfaces
 ```
 
@@ -62,7 +63,7 @@ Finance remains a single deployable backend. The separately owned `personal-ai-s
 ├── compose.yaml
 ├── docs/                         # These handoff documents
 ├── apps/
-│   └── web/                       # Vite React TypeScript app
+│   └── web/                       # src/ workspaces; test/ unit tests; e2e/ browser tests
 ├── services/
 │   └── api/
 │       ├── pyproject.toml
@@ -70,7 +71,7 @@ Finance remains a single deployable backend. The separately owned `personal-ai-s
 │       ├── app/
 │       │   ├── main.py
 │       │   ├── config.py
-│       │   ├── api/               # Routes and generated OpenAPI contracts
+│       │   ├── api/               # Routes and Pydantic contracts; web types generated from OpenAPI
 │       │   ├── db/                # DatabaseEngineFactory, sessions, local/DSQL migration paths
 │       │   ├── domains/            # Current flat Python modules:
 │       │   │   ├── accounts.py
@@ -79,18 +80,27 @@ Finance remains a single deployable backend. The separately owned `personal-ai-s
 │       │   │   ├── imports.py
 │       │   │   ├── funds.py
 │       │   │   ├── exposure.py
-│       │   │   └── reports.py
+│       │   │   ├── reports.py
+│       │   │   ├── documents.py / transactions.py / finance_summary.py / jobs.py
+│       │   │   ├── history.py / performance.py / tax.py / sales.py
+│       │   │   └── portfolio_scenarios.py / planning.py / research.py
 │       │   ├── providers/          # Offline quotes and issuer format parsers
 │       │   ├── integrations/
-│       │   │   └── personal_ai.py  # Disabled protocol/candidate boundary
-│       │   ├── jobs/              # Planned Stage 2; not created
+│       │   │   ├── personal_ai.py  # Disabled protocol/candidate boundary
+│       │   │   └── research_evidence.py # Provisional local validation envelope
+│       │   ├── auth/              # OIDC and database-backed personal sessions
+│       │   ├── ingestion/         # Bounded local brokerage PDF subprocess
+│       │   ├── jobs/              # Local in-process polling worker
+│       │   ├── recovery/          # Operator-only encrypted portable archive/restore
+│       │   ├── release/           # Fail-closed DSQL and deployment evidence checks
 │       │   └── storage/
 │       └── tests/
 ├── fixtures/                      # Synthetic data only
+├── tests/infra/                   # Offline Terraform guardrails
 └── infra/                         # Stage 4 single-region Terraform (prepared; not applied)
 ```
 
-The current domain modules are files, not per-domain packages. Spending/ingestion, tax and research are separate domain additions; the Stage 2 worker is disabled in production pending real DSQL lease evidence. Stage 4 Terraform is prepared locally and has not been applied. Keep meaningful boundaries between API handlers, domain calculations, ORM mappings, infrastructure, and provider-specific code.
+The current domain modules are files, not per-domain packages. Catalog authoring lives in `securities.py`; imports consume catalog records. Owned valuation and frozen reports share the accepted-quote selector. Frontend authentication, revision-bound drafts and raw-upload response handling have small shared components. These are current responsibilities, without introducing repository/service wrappers around SQLAlchemy. The Stage 2 worker is disabled in production pending real DSQL lease evidence. Stage 4 Terraform is prepared locally and has not been applied. See the [maintainability review](maintainability-review.md) for findings and validation.
 
 ## 4. Conceptual relational schema
 
@@ -164,14 +174,14 @@ The actual backend currently uses `/v1`; Vite strips `/api` from browser `/api/v
 - `GET /portfolio/exposure/{issuer_or_security_id}/breakdown`
 - `GET /funds/{security_id}/snapshots`, `POST /funds/{security_id}/refresh`, `POST /funds/{security_id}/upload`
 - `GET /market-data/quotes/status`
-- Later: transactions, categories, tax-lot simulation, research, async job status.
+- Delivered later-stage routes include transactions/categories/transfers, finance balances/summaries, investment history/performance, tax-lot review/adjustments, hypothetical simulations/planning, local research, and job status/cancellation. OpenAPI defines their exact contracts.
 
 The Stage 0 implementation exposes account create/list/patch, bounded local security resolution, and account-scoped manual position GET/PUT. Manual replacement compares a per-account revision counter, appends a new snapshot and lines, and moves the account's selected-snapshot pointer in one transaction. Prior revision payloads and lines remain immutable; lifecycle status can change from accepted to superseded. Replacing the current selection does not erase prior contents and may select any effective date. Financial values cross OpenAPI as strings; manual price date is the snapshot effective date. Avoid API-generated recommendations or direct execution endpoints. Use pagination for large holdings tables and version response envelopes for derived metrics and source-quality disclosures.
 
 ## 7. Background work, caching and offline operation
 
 - Current Stage 1: manual/cached quote observations, reviewed official-download uploads and on-demand frozen reports. Live issuer refresh returns an explicit unavailable reason. Refresh CLIs and scheduling are future work, not existing commands. Keep future external fetches/AI calls outside all DB transactions and retries.
-- During Stage 2: implement a provider-neutral job abstraction with idempotency keys and safe retries; use local PostgreSQL polling and a validated DSQL optimistic lease or AWS SQS for cloud, never an assumed `SKIP LOCKED` cross-target contract. Store diagnostics without leaking source documents.
+- Stage 2 currently uses local polling with conditional lease-owner/generation/expiry fences and bounded recovery. The worker handles PDF preview. Parsed-output reuse, cleanup and complete restart acceptance remain partial; a cloud worker requires a validated DSQL lease or AWS SQS contract. Store diagnostics without leaking source documents.
 - Cache source observations by provider/security/as-of/response hash; retain historical fund snapshots. Recalculate derived exposure on demand initially; memoize by portfolio snapshot + quote revision + fund snapshot IDs if queries get slow.
 - **Offline contract:** a manually entered portfolio and imported/local ETF CSV can be viewed and recalculated without external networking, API keys or an AI model.
 

@@ -4,6 +4,10 @@
 **Suite:** `stage5-offline-evaluation-v1`
 **Fixture:** [`fixtures/stage-5/synthetic-research-evaluation.json`](../fixtures/stage-5/synthetic-research-evaluation.json)
 
+## Subsequent repository review
+
+The [2026-10-03 repository review](maintainability-review.md) adds actual migrated PostgreSQL research persistence and exact-decimal idempotency coverage, as well as an issuer-switch browser regression. It fixes the research status-width/parent-flush failures hidden by the earlier SQLite evaluation, removes the reported lint/deprecation blockers and makes the aggregate quality gate green. The earlier run counts and limitations below describe the original evaluation; PostgreSQL persistence is now locally verified. A complete browser company-to-cited-report acceptance journey, accessible-source/authenticity checks, semantic synthesis evaluation, shared-service parity and real DSQL remain unverified.
+
 ## Scope and reproducibility
 
 This is a deterministic, synthetic-only evaluation of Finance's offline research baseline. It uses invented company values and non-resolving SEC-shaped references; it does not fetch SEC/IR content, call a model or shared research service, or use personal financial data. Run it with:

@@ -1,7 +1,10 @@
 """Minimal API and database-readiness smoke tests."""
 
+import asyncio
+from pathlib import Path
 from typing import Self, cast
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine
 from sqlalchemy.exc import OperationalError
@@ -54,3 +57,31 @@ def test_ready_uses_database_engine() -> None:
     )
     assert response.status_code == 200
     assert response.json() == {"status": "ready"}
+
+
+def test_failed_worker_does_not_skip_pool_disposal(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("PRIVATE_FILE_DIR", str(tmp_path / "private"))
+    monkeypatch.setenv("JOB_WORKER_ENABLED", "true")
+    disposed = False
+
+    async def failed_worker(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("Synthetic worker failure")
+
+    def dispose() -> None:
+        nonlocal disposed
+        disposed = True
+
+    engine = FakeEngine()
+    monkeypatch.setattr(engine, "dispose", dispose)
+    monkeypatch.setattr("app.jobs.runner.run_worker", failed_worker)
+    application = create_app(engine=cast(Engine, engine))
+
+    async def lifespan() -> None:
+        async with application.router.lifespan_context(application):
+            await asyncio.sleep(0)
+
+    with pytest.raises(RuntimeError, match="Synthetic worker failure"):
+        asyncio.run(lifespan())
+    assert disposed

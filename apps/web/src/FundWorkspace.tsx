@@ -1,3 +1,4 @@
+import { localDate } from './local-date'
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -12,10 +13,13 @@ import {
 
 export default function FundWorkspace() {
   const queries = useQueryClient()
-  const catalog = useQuery({ queryKey: ['catalog'], queryFn: fetchSecurities })
+  const catalog = useQuery({
+    queryKey: ['securities'],
+    queryFn: fetchSecurities,
+  })
   const [fund, setFund] = useState('')
   const [format, setFormat] = useState('manual')
-  const [date, setDate] = useState('2026-10-01')
+  const [date, setDate] = useState(localDate)
   const [unit, setUnit] = useState('percent')
   const [file, setFile] = useState<File | null>(null)
   const [identifier, setIdentifier] = useState('ticker')
@@ -132,6 +136,12 @@ export default function FundWorkspace() {
           <select
             aria-label="Fund composition security"
             value={fund}
+            disabled={
+              upload.isPending ||
+              accept.isPending ||
+              cancel.isPending ||
+              correct.isPending
+            }
             onChange={(e) => {
               setBaseRevisions({})
               setWeights({})

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, time, timedelta
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, localcontext
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -19,20 +19,8 @@ from app.db.models import (
     Security,
 )
 from app.domains import performance, portfolio
+from app.providers.quotes import observation_time
 
-EVENT_TYPES = {
-    "buy",
-    "sell",
-    "dividend",
-    "fee",
-    "deposit",
-    "withdrawal",
-    "transfer_in",
-    "transfer_out",
-    "split",
-    "adjustment",
-    "other",
-}
 RETURN_QUANTUM = Decimal("0.000000000001")
 EXTERNAL_EVENT_TYPES = {"deposit", "withdrawal"}
 
@@ -40,7 +28,9 @@ EXTERNAL_EVENT_TYPES = {"deposit", "withdrawal"}
 def _return_text(value: Decimal | None) -> str | None:
     if value is None:
         return None
-    rounded = value.quantize(RETURN_QUANTUM, rounding=ROUND_HALF_UP)
+    with localcontext() as context:
+        context.prec = 80
+        rounded = value.quantize(RETURN_QUANTUM, rounding=ROUND_HALF_UP)
     if rounded == 0:
         rounded = Decimal(0).quantize(RETURN_QUANTUM)
     return format(rounded, "f")
@@ -211,14 +201,14 @@ def _selected_snapshots(
     session: Session, account_id: UUID, start_date: date, end_date: date
 ) -> list[PositionSnapshot]:
     start_at = datetime.combine(start_date, time.min, tzinfo=UTC)
-    end_at = datetime.combine(end_date + timedelta(days=1), time.min, tzinfo=UTC)
+    end_at = datetime.combine(end_date, time.max, tzinfo=UTC)
     snapshots = list(
         session.scalars(
             select(PositionSnapshot)
             .where(
                 PositionSnapshot.account_id == account_id,
                 PositionSnapshot.snapshot_at >= start_at,
-                PositionSnapshot.snapshot_at < end_at,
+                PositionSnapshot.snapshot_at <= end_at,
                 PositionSnapshot.status.in_(("accepted", "superseded")),
             )
             .order_by(
@@ -233,12 +223,12 @@ def _selected_snapshots(
         raise HistoryError("Narrow the date range; at most 1,000 snapshots are read.")
     by_date: dict[date, PositionSnapshot] = {}
     for snapshot in snapshots:
-        current = by_date.get(snapshot.snapshot_at.date())
+        current = by_date.get(observation_time(snapshot.snapshot_at).date())
         if current is None or (snapshot.revision, snapshot.id) > (
             current.revision,
             current.id,
         ):
-            by_date[snapshot.snapshot_at.date()] = snapshot
+            by_date[observation_time(snapshot.snapshot_at).date()] = snapshot
     return [by_date[key] for key in sorted(by_date)]
 
 
@@ -256,22 +246,26 @@ def read_history(
         start_date=start_date,
         end_date=end_date,
     )
+    line_counts = dict(
+        session.execute(
+            select(
+                PositionSnapshotLine.snapshot_id, func.count(PositionSnapshotLine.id)
+            )
+            .where(PositionSnapshotLine.snapshot_id.in_([row.id for row in snapshots]))
+            .group_by(PositionSnapshotLine.snapshot_id)
+        ).all()
+    )
     snapshot_rows: list[dict[str, Any]] = []
     for snapshot in snapshots:
-        line_count = session.scalar(
-            select(func.count(PositionSnapshotLine.id)).where(
-                PositionSnapshotLine.snapshot_id == snapshot.id
-            )
-        )
         snapshot_rows.append(
             {
                 "id": snapshot.id,
-                "effective_date": snapshot.snapshot_at.date(),
+                "effective_date": observation_time(snapshot.snapshot_at).date(),
                 "revision": snapshot.revision,
                 "source": snapshot.source,
                 "status": snapshot.status,
                 "accepted_at": snapshot.accepted_at,
-                "line_count": int(line_count or 0),
+                "line_count": int(line_counts.get(snapshot.id, 0)),
             }
         )
     return {
@@ -339,7 +333,7 @@ def read_performance(
             "This calculation currently supports USD account valuations only.",
         )
     snapshots = _performance_dates(session, account_id, start_date, end_date)
-    dates = [row.snapshot_at.date() for row in snapshots]
+    dates = [observation_time(row.snapshot_at).date() for row in snapshots]
     if not dates or dates[0] != start_date or dates[-1] != end_date:
         return _unavailable_performance(
             account_id,
@@ -351,7 +345,7 @@ def read_performance(
     points: list[performance.ValuationPoint] = []
     for snapshot in snapshots:
         valuation = portfolio.read_owned_valuation(
-            session, account_id, snapshot.snapshot_at.date()
+            session, account_id, observation_time(snapshot.snapshot_at).date()
         )
         if valuation["total_usd"] is None or valuation["completeness"] != "complete":
             return _unavailable_performance(
@@ -363,7 +357,8 @@ def read_performance(
             )
         points.append(
             performance.ValuationPoint(
-                snapshot.snapshot_at.date(), Decimal(str(valuation["total_usd"]))
+                observation_time(snapshot.snapshot_at).date(),
+                Decimal(str(valuation["total_usd"])),
             )
         )
     event_rows = list_investment_events(
@@ -498,137 +493,143 @@ def reconcile_history(
     start_date: date,
     end_date: date,
 ) -> dict[str, Any]:
-    if start_date >= end_date:
-        raise HistoryError("Reconciliation end date must follow start date.")
-    account = session.get(Account, account_id)
-    if account is None:
-        raise HistoryError("Account not found.")
-    start_positions = portfolio.read_positions(session, account_id, start_date)
-    end_positions = portfolio.read_positions(session, account_id, end_date)
-    if (
-        start_positions.snapshot is None
-        or end_positions.snapshot is None
-        or start_positions.snapshot.effective_date != start_date
-        or end_positions.snapshot.effective_date != end_date
-    ):
-        return {
-            "status": "unavailable",
-            "account_id": account_id,
-            "start_date": start_date,
-            "end_date": end_date,
-            "differences": [],
-            "gaps": ["Accepted position snapshots are required at both dates."],
-        }
-    quantities: dict[UUID, Decimal] = {}
-    start_cash: dict[str, list[UUID]] = {}
-    for position in start_positions.snapshot.positions:
-        quantities[position.security.id] = Decimal(position.quantity)
-        security = position.security
-        if security.security_type == "cash":
-            start_cash.setdefault(position.currency, []).append(security.id)
-    events = list_investment_events(
-        session,
-        account_id=account_id,
-        start_date=start_date + timedelta(days=1),
-        end_date=end_date,
-    )
-    gaps: list[str] = []
-    for event in events:
-        if event.review_status != "reviewed":
-            gaps.append(f"Event {event.id} has not been reviewed.")
-            continue
-        if event.event_type in EXTERNAL_EVENT_TYPES and event.security_id is None:
-            gaps.append(
-                f"External flow {event.id} is not linked to a cash position; "
-                "cash reconciliation is unavailable for that event."
-            )
-        if event.event_type in {
-            "buy",
-            "sell",
-            "deposit",
-            "withdrawal",
-            "transfer_in",
-            "transfer_out",
-            "split",
-        }:
-            if event.security_id is None or event.quantity_delta is None:
-                gaps.append(
-                    f"{event.event_type} event {event.id} lacks a security or quantity."
-                )
+    with localcontext() as context:
+        context.prec = 80
+        if start_date >= end_date:
+            raise HistoryError("Reconciliation end date must follow start date.")
+        account = session.get(Account, account_id)
+        if account is None:
+            raise HistoryError("Account not found.")
+        start_positions = portfolio.read_positions(session, account_id, start_date)
+        end_positions = portfolio.read_positions(session, account_id, end_date)
+        if (
+            start_positions.snapshot is None
+            or end_positions.snapshot is None
+            or start_positions.snapshot.effective_date != start_date
+            or end_positions.snapshot.effective_date != end_date
+        ):
+            return {
+                "status": "unavailable",
+                "account_id": account_id,
+                "start_date": start_date,
+                "end_date": end_date,
+                "differences": [],
+                "gaps": ["Accepted position snapshots are required at both dates."],
+            }
+        quantities: dict[UUID, Decimal] = {}
+        start_cash: dict[str, list[UUID]] = {}
+        for position in start_positions.snapshot.positions:
+            quantities[position.security.id] = Decimal(position.quantity)
+            security = position.security
+            if security.security_type == "cash":
+                start_cash.setdefault(position.currency, []).append(security.id)
+        events = list_investment_events(
+            session,
+            account_id=account_id,
+            start_date=start_date + timedelta(days=1),
+            end_date=end_date,
+        )
+        gaps: list[str] = []
+        for event in events:
+            if event.review_status != "reviewed":
+                gaps.append(f"Event {event.id} has not been reviewed.")
                 continue
-            quantities[event.security_id] = (
-                quantities.get(event.security_id, Decimal(0)) + event.quantity_delta
-            )
-        elif event.event_type == "adjustment":
-            if event.security_id is not None and event.quantity_delta is not None:
+            if event.event_type in EXTERNAL_EVENT_TYPES and event.security_id is None:
+                gaps.append(
+                    f"External flow {event.id} is not linked to a cash position; "
+                    "cash reconciliation is unavailable for that event."
+                )
+            if event.event_type in {
+                "buy",
+                "sell",
+                "deposit",
+                "withdrawal",
+                "transfer_in",
+                "transfer_out",
+                "split",
+            }:
+                if event.security_id is None or event.quantity_delta is None:
+                    gaps.append(
+                        f"{event.event_type} event {event.id} lacks a security "
+                        "or quantity."
+                    )
+                    continue
                 quantities[event.security_id] = (
                     quantities.get(event.security_id, Decimal(0)) + event.quantity_delta
                 )
+            elif event.event_type == "adjustment":
+                if event.security_id is not None and event.quantity_delta is not None:
+                    quantities[event.security_id] = (
+                        quantities.get(event.security_id, Decimal(0))
+                        + event.quantity_delta
+                    )
+                else:
+                    gaps.append(
+                        f"Adjustment event {event.id} lacks a security or quantity."
+                    )
+            elif event.event_type in {"dividend", "fee"}:
+                pass
+            elif event.event_type == "other":
+                gaps.append(
+                    f"Event {event.id} may affect quantities but is not applied "
+                    "automatically."
+                )
             else:
                 gaps.append(
-                    f"Adjustment event {event.id} lacks a security or quantity."
+                    f"Event {event.id} ({event.event_type}) has unsupported quantity "
+                    "effects."
                 )
-        elif event.event_type in {"dividend", "fee"}:
-            pass
-        elif event.event_type == "other":
-            gaps.append(
-                f"Event {event.id} may affect quantities but is not applied "
-                "automatically."
+            if event.event_type in {"buy", "sell", "dividend", "fee"}:
+                cash_ids = start_cash.get(event.currency, [])
+                if event.cash_amount is None:
+                    gaps.append(
+                        f"{event.event_type.title()} event {event.id} has no cash "
+                        "amount; cash reconciliation is unavailable."
+                    )
+                elif len(cash_ids) != 1:
+                    gaps.append(
+                        f"{event.event_type.title()} event {event.id} cannot be "
+                        "matched to one actual currency cash security."
+                    )
+                else:
+                    cash_id = cash_ids[0]
+                    quantities[cash_id] = (
+                        quantities.get(cash_id, Decimal(0)) + event.cash_amount
+                    )
+        expected = quantities
+        actual: dict[UUID, Decimal] = {}
+        for position in end_positions.snapshot.positions:
+            actual[position.security.id] = Decimal(position.quantity)
+        differences = []
+        for security_id in sorted(set(expected) | set(actual), key=str):
+            catalog_security = session.get(Security, security_id)
+            expected_quantity = expected.get(security_id, Decimal(0))
+            actual_quantity = actual.get(security_id, Decimal(0))
+            differences.append(
+                {
+                    "security_id": security_id,
+                    "ticker": catalog_security.display_ticker
+                    if catalog_security
+                    else None,
+                    "expected_quantity": str(expected_quantity),
+                    "snapshot_quantity": str(actual_quantity),
+                    "difference": str(actual_quantity - expected_quantity),
+                }
             )
-        else:
-            gaps.append(
-                f"Event {event.id} ({event.event_type}) has unsupported quantity "
-                "effects."
-            )
-        if event.event_type in {"buy", "sell", "dividend", "fee"}:
-            cash_ids = start_cash.get(event.currency, [])
-            if event.cash_amount is None:
-                gaps.append(
-                    f"{event.event_type.title()} event {event.id} has no cash amount; "
-                    "cash reconciliation is unavailable."
-                )
-            elif len(cash_ids) != 1:
-                gaps.append(
-                    f"{event.event_type.title()} event {event.id} cannot be matched "
-                    "to one actual currency cash security."
-                )
-            else:
-                cash_id = cash_ids[0]
-                quantities[cash_id] = (
-                    quantities.get(cash_id, Decimal(0)) + event.cash_amount
-                )
-    expected = quantities
-    actual: dict[UUID, Decimal] = {}
-    for position in end_positions.snapshot.positions:
-        actual[position.security.id] = Decimal(position.quantity)
-    differences = []
-    for security_id in sorted(set(expected) | set(actual), key=str):
-        catalog_security = session.get(Security, security_id)
-        expected_quantity = expected.get(security_id, Decimal(0))
-        actual_quantity = actual.get(security_id, Decimal(0))
-        differences.append(
-            {
-                "security_id": security_id,
-                "ticker": catalog_security.display_ticker if catalog_security else None,
-                "expected_quantity": str(expected_quantity),
-                "snapshot_quantity": str(actual_quantity),
-                "difference": str(actual_quantity - expected_quantity),
-            }
+        matched = all(
+            actual.get(security_id, Decimal(0)) == expected.get(security_id, Decimal(0))
+            for security_id in set(expected) | set(actual)
         )
-    matched = all(
-        actual.get(security_id, Decimal(0)) == expected.get(security_id, Decimal(0))
-        for security_id in set(expected) | set(actual)
-    )
-    return {
-        "status": "matched" if matched and not gaps else "discrepancy",
-        "account_id": account_id,
-        "start_date": start_date,
-        "end_date": end_date,
-        "differences": differences,
-        "gaps": gaps,
-        "methodology": (
-            "Starting quantities plus explicit reviewed security quantity deltas "
-            "are compared with the ending accepted snapshot. No balancing events "
-            "are inferred or inserted."
-        ),
-    }
+        return {
+            "status": "matched" if matched and not gaps else "discrepancy",
+            "account_id": account_id,
+            "start_date": start_date,
+            "end_date": end_date,
+            "differences": differences,
+            "gaps": gaps,
+            "methodology": (
+                "Starting quantities plus explicit reviewed security quantity deltas "
+                "are compared with the ending accepted snapshot. No balancing events "
+                "are inferred or inserted."
+            ),
+        }

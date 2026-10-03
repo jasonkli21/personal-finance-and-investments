@@ -22,6 +22,32 @@ type FiscalPeriod = 'Q1' | 'Q2' | 'Q3' | 'Q4' | 'H1' | 'H2' | 'FY'
 const inputClass =
   'w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100'
 
+const EMPTY_DOCUMENT_DRAFT = {
+  cik: '',
+  accession_number: '',
+  form_type: '10-K',
+  title: '',
+  source_url: '',
+  filing_date: '',
+  period_start: '',
+  period_end: '',
+}
+const EMPTY_FACT_DRAFT = {
+  document_id: '',
+  taxonomy: 'us-gaap',
+  concept: '',
+  raw_value: '',
+  normalized_value: '',
+  unit: 'USD',
+  currency: 'USD',
+  period_kind: 'duration' as FactPeriod,
+  period_start: '',
+  period_end: '',
+  instant: '',
+  fiscal_year: '',
+  fiscal_period: '' as FiscalPeriod | '',
+}
+
 function message(error: unknown, fallback: string) {
   if (error instanceof ApiError) return error.message
   return fallback
@@ -38,31 +64,8 @@ export default function ResearchWorkspace() {
   })
   const documents = company.data?.documents ?? []
   const observations = company.data?.facts ?? []
-  const [documentDraft, setDocumentDraft] = useState({
-    cik: '',
-    accession_number: '',
-    form_type: '10-K',
-    title: '',
-    source_url: '',
-    filing_date: '',
-    period_start: '',
-    period_end: '',
-  })
-  const [factDraft, setFactDraft] = useState({
-    document_id: '',
-    taxonomy: 'us-gaap',
-    concept: '',
-    raw_value: '',
-    normalized_value: '',
-    unit: 'USD',
-    currency: 'USD',
-    period_kind: 'duration' as FactPeriod,
-    period_start: '',
-    period_end: '',
-    instant: '',
-    fiscal_year: '',
-    fiscal_period: '' as FiscalPeriod | '',
-  })
+  const [documentDraft, setDocumentDraft] = useState(EMPTY_DOCUMENT_DRAFT)
+  const [factDraft, setFactDraft] = useState(EMPTY_FACT_DRAFT)
   const [priorFactId, setPriorFactId] = useState('')
   const [currentFactId, setCurrentFactId] = useState('')
   const [selectedFactIds, setSelectedFactIds] = useState<string[]>([])
@@ -245,8 +248,25 @@ export default function ResearchWorkspace() {
           id="research-issuer"
           className={inputClass}
           value={issuerId}
+          disabled={
+            registerDocument.isPending ||
+            registerFact.isPending ||
+            saveThesis.isPending ||
+            changeWatchlist.isPending ||
+            run.isPending ||
+            comparison.isPending
+          }
           onChange={(event) => {
             setIssuerId(event.target.value)
+            setDocumentDraft(EMPTY_DOCUMENT_DRAFT)
+            setFactDraft(EMPTY_FACT_DRAFT)
+            setPriorFactId('')
+            setCurrentFactId('')
+            setThesisDraft('')
+            registerDocument.reset()
+            registerFact.reset()
+            saveThesis.reset()
+            changeWatchlist.reset()
             setSelectedFactIds([])
             setSelectedThesisNoteId('')
             run.reset()

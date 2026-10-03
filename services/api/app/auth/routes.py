@@ -5,6 +5,7 @@ from typing import cast
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
+from starlette.concurrency import run_in_threadpool
 
 from app.auth.oidc import (
     OIDC_CALLBACK_PATH,
@@ -80,7 +81,10 @@ async def callback(request: Request) -> Response:
             status_code=401, detail="Identity could not be verified"
         ) from exc
 
-    result = create_session(
+    # Session persistence is synchronous and may wait for a connection or OCC
+    # retry. Keep it off the event loop just like per-request session lookups.
+    result = await run_in_threadpool(
+        create_session,
         request.app.state.session_factory,
         settings,
         issuer=identity.issuer,
@@ -90,7 +94,7 @@ async def callback(request: Request) -> Response:
     )
     if result is None:
         raise HTTPException(status_code=401, detail="Identity is not authorized")
-    session_token, principal = result
+    session_token, _principal = result
     response = RedirectResponse(settings.app_public_origin, status_code=303)
     response.set_cookie(
         SESSION_COOKIE,

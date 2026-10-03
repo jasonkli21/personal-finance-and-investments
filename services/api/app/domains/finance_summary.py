@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from typing import Any, cast
 from uuid import UUID, uuid4
 
@@ -269,7 +269,9 @@ def read_finance_summary(
         if session.get(Account, account_id) is None:
             raise ValueError("Account not found.")
         accounts_query = accounts_query.where(Account.id == account_id)
-    accounts = list(session.scalars(accounts_query.limit(500)))
+    accounts = list(session.scalars(accounts_query.limit(501)))
+    if len(accounts) > 500:
+        raise ValueError("Finance summary exceeds 500 accounts; select one account.")
     balances: list[dict[str, Any]] = []
     coverage_gaps: list[str] = []
     currency_incomplete: dict[str, bool] = defaultdict(bool)
@@ -448,9 +450,11 @@ def read_finance_summary(
         )
 
     net_worth_values: dict[str, Decimal] = defaultdict(Decimal)
-    for line in balances:
-        if line["included"] and line["amount"] is not None and line["currency"]:
-            net_worth_values[line["currency"]] += Decimal(line["amount"])
+    with localcontext() as context:
+        context.prec = 80
+        for line in balances:
+            if line["included"] and line["amount"] is not None and line["currency"]:
+                net_worth_values[line["currency"]] += Decimal(line["amount"])
     net_worth = [
         {
             "currency": currency,

@@ -1,17 +1,18 @@
 """Synthetic reviewed tax-lot imports and append-only adjustments."""
 
 from collections.abc import Iterator
+from csv import field_size_limit
 from pathlib import Path
 from typing import Any, cast
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from app.db.models import Base, Security
+from app.db.models import Base, PrivateFile, Security, TaxLotImport
 from app.main import create_app
 
 
@@ -487,3 +488,89 @@ def test_publication_honors_lower_configured_safe_batch(
     assert response.status_code == 422
     assert "configured safe publication limit" in response.json()["detail"]
     assert client.get("/v1/tax-lots", params={"account_id": account_id}).json() == []
+
+
+@pytest.mark.parametrize(
+    ("source_value", "field", "diagnostic"),
+    [
+        ("not-a-date", "acquired_at", "invalid_date"),
+        ("not-a-number", "remaining_basis", "invalid_nonnegative_amount"),
+    ],
+)
+def test_unrelated_correction_does_not_accept_malformed_source_fields(
+    tax_client: tuple[TestClient, UUID, UUID],
+    source_value: str,
+    field: str,
+    diagnostic: str,
+) -> None:
+    client, equity_id, _cash_id = tax_client
+    account_id = _account(client)
+    acquired = source_value if field == "acquired_at" else "2020-02-03"
+    basis = source_value if field == "remaining_basis" else "50"
+    content = (
+        "Symbol,Lot ID,Acquired,Original Shares,Shares,Original Basis,Basis,Currency\n"
+        f"UNKNOWN,LOT-A,{acquired},1,1,50,{basis},USD\n"
+    ).encode()
+    staged = _upload(client, account_id, content, key="malformed-source")
+    assert staged.status_code == 201, staged.text
+    review = client.get(f"/v1/tax-lot-imports/{staged.json()['id']}").json()
+    row = review["rows"][0]
+
+    resolved_security = client.patch(
+        f"/v1/tax-lot-imports/{review['id']}/rows/{row['id']}",
+        json={
+            "expected_revision": review["review_revision"],
+            "reason": "Resolve only the supplied security identifier",
+            "security_id": str(equity_id),
+        },
+    )
+    assert resolved_security.status_code == 200, resolved_security.text
+    corrected = resolved_security.json()
+    assert corrected["rows"][0]["row_status"] == "needs_review"
+    assert corrected["rows"][0]["diagnostics"][field] == diagnostic
+    rejected = client.post(
+        f"/v1/tax-lot-imports/{review['id']}/publish",
+        json={
+            "expected_revision": corrected["review_revision"],
+            "acknowledge_quantity_differences": True,
+            "reason": "Acknowledgment cannot bypass malformed fields",
+        },
+    )
+    assert rejected.status_code == 422
+    assert client.get("/v1/tax-lots", params={"account_id": account_id}).json() == []
+
+    explicitly_unknown = client.patch(
+        f"/v1/tax-lot-imports/{review['id']}/rows/{row['id']}",
+        json={
+            "expected_revision": corrected["review_revision"],
+            "reason": "Reviewed source does not supply a usable value",
+            field: None,
+        },
+    )
+    assert explicitly_unknown.status_code == 200, explicitly_unknown.text
+    assert explicitly_unknown.json()["rows"][0]["row_status"] == "ready"
+    assert explicitly_unknown.json()["rows"][0]["raw_payload"] == row["raw_payload"]
+
+
+@pytest.mark.parametrize("malformation", ["unclosed_quote", "oversized_field"])
+def test_invalid_csv_is_rejected_without_creating_an_import_or_private_file(
+    tax_client: tuple[TestClient, UUID, UUID], malformation: str
+) -> None:
+    client, _equity_id, _cash_id = tax_client
+    account_id = _account(client)
+    header = (
+        b"Symbol,Lot ID,Acquired,Original Shares,Shares,Original Basis,Basis,Currency\n"
+    )
+    row = (
+        b'ACME,"unclosed lot identifier\n'
+        if malformation == "unclosed_quote"
+        else b"A" * (field_size_limit() + 1) + b",LOT-A,2020-02-03,1,1,50,50,USD\n"
+    )
+    response = _upload(client, account_id, header + row, key="invalid-csv")
+    assert response.status_code == 422, response.text
+    assert "malformed quoting or an oversized field" in response.json()["detail"]
+    assert client.get("/v1/tax-lots", params={"account_id": account_id}).json() == []
+    factory = cast(Any, client.app).state.session_factory
+    with factory() as session:
+        assert session.scalar(select(func.count()).select_from(TaxLotImport)) == 0
+        assert session.scalar(select(func.count()).select_from(PrivateFile)) == 0

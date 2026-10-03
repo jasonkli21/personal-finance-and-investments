@@ -1,3 +1,5 @@
+import { moneyDisplay as displayMoney } from './decimal-display'
+import { localDate } from './local-date'
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQueries, useQuery } from '@tanstack/react-query'
 import {
@@ -43,22 +45,6 @@ const CATEGORIES: { key: Category; label: string }[] = [
   { key: 'missing_weight', label: 'Missing fund weights' },
   { key: 'unknown_other', label: 'Unknown / other' },
 ]
-
-function today(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-}
-
-function displayMoney(value: string | null | undefined): string {
-  if (value === null || value === undefined) return 'Unavailable'
-  const numeric = Number(value)
-  if (!Number.isFinite(numeric)) return value
-  return numeric.toLocaleString(undefined, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 2,
-  })
-}
 
 function displayPercent(value: string | null | undefined): string {
   return value === null || value === undefined ? 'Unavailable' : `${value}%`
@@ -516,7 +502,7 @@ export default function PortfolioScenarioWorkspace() {
     queryKey: ['securities'],
     queryFn: fetchSecurities,
   })
-  const [asOfDate, setAsOfDate] = useState(today())
+  const [asOfDate, setAsOfDate] = useState(localDate)
   const [accountIds, setAccountIds] = useState<string[] | null>(null)
   const [trades, setTrades] = useState<TradeDraft[]>([])
   const [cashChanges, setCashChanges] = useState<CashDraft[]>([])
@@ -597,7 +583,7 @@ export default function PortfolioScenarioWorkspace() {
       return
     }
     const now = new Date()
-    const localToday = today()
+    const localToday = localDate()
     const asOf =
       asOfDate === localToday ? now.toISOString() : `${asOfDate}T23:59:59.999Z`
     const body: ScenarioRequest = {
@@ -670,7 +656,7 @@ export default function PortfolioScenarioWorkspace() {
                 id="portfolio-scenario-date"
                 className="mt-1 rounded-lg border border-slate-300 px-3 py-2"
                 type="date"
-                max={today()}
+                max={localDate()}
                 value={asOfDate}
                 onChange={(event) => setAsOfDate(event.target.value)}
                 required

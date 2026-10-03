@@ -1,6 +1,10 @@
 # Stage 2 implementation status
 
-Status: in progress. Local S2.1 text-PDF preview, S2.3 transaction review, S2.4 summary/balance views, and S2.6 PDF jobs are partial; Stage 2 is not complete. Live DSQL, private cloud access control, OCR, personal-AI transport, optional account sync, and release evaluation remain unimplemented or gated.
+Status: in progress. Local S2.1 text-PDF preview, S2.3 transaction review, S2.4 summary/balance views, and S2.6 PDF jobs are partial; Stage 2 is not complete. Stage 4 authentication/private storage tooling is prepared, but deployed cloud access control and live DSQL remain unverified. OCR, personal-AI transport, optional account sync and the full Stage 2 release evaluation remain unimplemented or gated.
+
+## 2026-10-03 review update
+
+The [repository review](maintainability-review.md) supersedes earlier lint/format limitations and adds migrated PostgreSQL regressions for source validation, interpretation/idempotency, retry isolation, expired leases and cancellation fences. Transaction CSVs retain a 500-row bound and now reject normalized/raw JSON exceeding 2,000,000 serialized bytes before persistence; source values are never truncated. Published transaction reads accept `offset` and the UI paginates beyond 200 rows. Browser regressions exercise stale transaction drafts, tax drafts, pagination and session races. Root quality checks include infrastructure contracts and encrypted PostgreSQL recovery. These checks do not complete OCR/sync, recurring-charge/month coverage, parsed-output reuse/cleanup, full worker restart/benchmark acceptance or real DSQL gates.
 
 ## S2.1 local slice
 

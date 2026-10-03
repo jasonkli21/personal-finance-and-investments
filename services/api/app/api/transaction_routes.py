@@ -127,17 +127,23 @@ async def post_transaction_import_preview(
         )
     except transactions.TransactionError as exc:
         raise _raise(exc) from exc
-    with request.app.state.session_factory() as session:
-        record = session.get(TransactionImport, import_id)
-        if record is None:
-            raise HTTPException(status_code=404, detail="Transaction import not found.")
-        return TransactionImportCreated(
-            id=record.id,
-            status=record.status,
-            row_count=record.row_count,
-            review_revision=record.review_revision,
-            duplicate=duplicate,
-        )
+
+    def read_result() -> TransactionImportCreated:
+        with request.app.state.session_factory() as session:
+            record = session.get(TransactionImport, import_id)
+            if record is None:
+                raise HTTPException(
+                    status_code=404, detail="Transaction import not found."
+                )
+            return TransactionImportCreated(
+                id=record.id,
+                status=record.status,
+                row_count=record.row_count,
+                review_revision=record.review_revision,
+                duplicate=duplicate,
+            )
+
+    return await asyncio.to_thread(read_result)
 
 
 @router.get(
@@ -241,6 +247,7 @@ def get_transactions(
     start_date: Annotated[date | None, Query()] = None,
     end_date: Annotated[date | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 200,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[TransactionRead]:
     if start_date and end_date and start_date > end_date:
         raise HTTPException(
@@ -254,6 +261,7 @@ def get_transactions(
             start_date=start_date,
             end_date=end_date,
             limit=limit,
+            offset=offset,
         )
     ]
 

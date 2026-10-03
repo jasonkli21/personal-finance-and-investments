@@ -1,15 +1,14 @@
 """Reviewed source-backed tax-lot import and adjustment routes."""
 
 import json
-from collections.abc import Iterator
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
+from fastapi import APIRouter, Header, HTTPException, Query, Request
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, sessionmaker
+from starlette.concurrency import run_in_threadpool
 
-from app.api.routes import _read_bounded_request
+from app.api.routes import SessionDependency, _read_bounded_request
 from app.api.stage3_contracts import (
     TaxLotAdjustmentCreate,
     TaxLotAdjustmentRead,
@@ -24,15 +23,6 @@ from app.db.transactions import run_database_unit
 from app.domains import tax
 
 router = APIRouter(prefix="/v1")
-
-
-def get_session(request: Request) -> Iterator[Session]:
-    session_factory: sessionmaker[Session] = request.app.state.session_factory
-    with session_factory() as session:
-        yield session
-
-
-SessionDependency = Annotated[Session, Depends(get_session)]
 
 
 def _raise_tax(exc: tax.TaxError) -> HTTPException:
@@ -76,7 +66,8 @@ async def preview_tax_lots(
             for key, value in mapping.items()
         ):
             raise tax.TaxError("Column mapping must map field names to CSV headers.")
-        identifier, duplicate = tax.create_csv_import(
+        identifier, duplicate = await run_in_threadpool(
+            tax.create_csv_import,
             request.app.state.session_factory,
             request.app.state.file_store,
             content=content,

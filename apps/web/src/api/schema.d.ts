@@ -8071,6 +8071,7 @@ export interface operations {
         start_date?: string | null
         end_date?: string | null
         limit?: number
+        offset?: number
       }
       header?: never
       path?: never

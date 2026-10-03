@@ -5,6 +5,10 @@
 
 Stage 3 implementation and local evaluation meet the [implementation plan](stage-3-implementation-plan.md). These notes record implemented behavior and verification. Production promotion remains blocked until the live Aurora DSQL gate described below passes.
 
+## 2026-10-03 review update
+
+The [repository review](maintainability-review.md) adds real PostgreSQL route workflows for deposit-neutral history/performance, lot publication/adjustment idempotency, read-only sale comparisons and liquidity planning. Those fixtures explicitly use a non-UTC database session to prevent effective-date regressions. The review fixes ordered scenario cash settlement, malformed tax CSV handling, field-specific review diagnostics, finite metadata and Decimal precision/serialization. Tax draft refetch/publication browser regressions pass, and the aggregate lint/format/type/test/build gate is now green. Historical checks below describe their original runs; the linked review records current counts and the remaining dated-lot evidence and DSQL limitations.
+
 ## S3.1 — Historical evidence and performance
 
 Implemented explicit source-backed investment events, dated history reads, snapshot-to-event quantity reconciliation, and account-scoped performance reads. The API exposes event entry, history, reconciliation, and performance; the web UI shows snapshot/event history, comparison results, and diagnostics. Accepted position revisions remain the valuation source. Snapshot differences are reported as discrepancies; the application does not turn them into purchases, sales, contributions, or gains.

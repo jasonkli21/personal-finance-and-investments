@@ -26,7 +26,11 @@ from app.db.models import (
 )
 from app.db.transactions import run_database_unit
 from app.domains.exposure import VERSION, calculate
-from app.providers.quotes import CachedQuoteProvider, QuoteProvider
+from app.providers.quotes import (
+    CachedQuoteProvider,
+    QuoteProvider,
+    select_observation,
+)
 from app.storage.file_store import FileStore
 
 
@@ -137,28 +141,15 @@ def capture(
             quote_source = line.source if price is not None else None
             quality = line.quality_status
             if s and s.security_type != "cash":
-                candidates = provider.observations(s.id, line.currency, time)
-                q = (
-                    min(
-                        candidates,
-                        key=lambda q: (
-                            -aware(q.as_of).timestamp(),
-                            -bool(q.provider_metadata.get("reviewed_override")),
-                            rank(q.source, quote_priority),
-                            str(q.id),
-                        ),
-                    )
-                    if candidates
-                    else None
+                q = select_observation(
+                    provider,
+                    s.id,
+                    line.currency,
+                    time,
+                    reported_as_of=quote_date,
+                    source_priority=quote_priority,
                 )
-                if q and (
-                    quote_date is None
-                    or aware(q.as_of) > quote_date
-                    or (
-                        aware(q.as_of) == quote_date
-                        and q.provider_metadata.get("reviewed_override")
-                    )
-                ):
+                if q is not None:
                     price = q.price
                     quote_id = str(q.id)
                     quote_date = aware(q.as_of)
@@ -183,6 +174,8 @@ def capture(
             )
             if stale:
                 quality = "stale"
+                label = (s.display_ticker or s.name) if s else "Unresolved"
+                warnings.append(f"{account.name}: {label} uses a stale value")
             owned.append(
                 {
                     "account_id": str(account.id),

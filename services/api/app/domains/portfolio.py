@@ -1,10 +1,11 @@
 """Manual position snapshot reads and revision checked replacements."""
 
+import os
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation, localcontext
 from uuid import UUID, uuid4
 
-from sqlalchemy import case, select, update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.api.contracts import (
@@ -19,11 +20,15 @@ from app.db.models import (
     Account,
     PositionSnapshot,
     PositionSnapshotLine,
-    Quote,
     Security,
     utc_now,
 )
 from app.domains.accounts import AccountNotFound
+from app.providers.quotes import (
+    CachedQuoteProvider,
+    observation_time,
+    select_observation,
+)
 
 MANUAL_SOURCE = "manual"
 VALUATION_QUANTUM = Decimal("0.0000000001")
@@ -65,7 +70,7 @@ def _as_read(
     snapshot: PositionSnapshot,
     rows: list[tuple[PositionSnapshotLine, Security]],
 ) -> PositionSnapshotRead:
-    effective_date = snapshot.snapshot_at.date()
+    effective_date = observation_time(snapshot.snapshot_at).date()
     positions = [
         PositionLineRead(
             id=line.id,
@@ -154,7 +159,7 @@ def read_positions(
 def read_owned_valuation(
     session: Session, account_id: UUID, as_of: date | None = None
 ) -> dict[str, object]:
-    """Value actual owned rows in USD using line prices before cached quotes."""
+    """Value owned rows with the report quote policy and retain currency exclusions."""
     envelope = read_positions(session, account_id, as_of)
     account = session.get(Account, account_id)
     if account is None:
@@ -179,6 +184,12 @@ def read_owned_valuation(
         }
 
     pairs = _snapshot_lines(session, snapshot.id)
+    valuation_at = datetime.combine(as_of, time.max, tzinfo=UTC) if as_of else utc_now()
+    quote_stale_days = int(os.environ.get("QUOTE_STALE_DAYS", "7"))
+    if quote_stale_days < 0:
+        raise ValueError("Freshness days must be nonnegative")
+    quote_priority = os.environ.get("QUOTE_SOURCE_PRIORITY", "manual,cached").split(",")
+    provider = CachedQuoteProvider(session)
     raw_lines: list[dict[str, object]] = []
     incomplete = False
     has_signed_value = False
@@ -206,35 +217,24 @@ def read_owned_valuation(
                 status_value = (
                     "valued" if line.currency == "USD" else "foreign_currency"
                 )
-            elif price is None:
-                selected = session.scalar(
-                    select(Quote)
-                    .where(
-                        Quote.security_id == security.id,
-                        Quote.currency == security.currency,
-                        Quote.as_of <= snapshot.snapshot_at,
-                    )
-                    .order_by(
-                        Quote.as_of.desc(),
-                        case((Quote.quality_status == "reviewed", 1), else_=0).desc(),
-                        Quote.source.asc(),
-                        Quote.id.asc(),
-                    )
-                    .limit(1)
+            else:
+                selected = select_observation(
+                    provider,
+                    security.id,
+                    line.currency,
+                    valuation_at,
+                    reported_as_of=price_as_of,
+                    source_priority=quote_priority,
                 )
                 if selected is not None:
                     price = selected.price
                     price_as_of = selected.as_of
                     price_source = selected.source
                     quality = selected.quality_status
-                    snapshot_time = snapshot.snapshot_at
-                    quote_time = selected.as_of
-                    if snapshot_time.tzinfo is None:
-                        snapshot_time = snapshot_time.replace(tzinfo=UTC)
-                    if quote_time.tzinfo is None:
-                        quote_time = quote_time.replace(tzinfo=UTC)
-                    if snapshot_time - quote_time > timedelta(days=7):
-                        quality = "stale"
+            if price_as_of is not None and valuation_at - observation_time(
+                price_as_of
+            ) > timedelta(days=quote_stale_days):
+                quality = "stale"
             if security.security_type != "cash" and price is not None:
                 value = (line.quantity * price).quantize(
                     VALUATION_QUANTUM, rounding=ROUND_HALF_UP
@@ -287,7 +287,7 @@ def read_owned_valuation(
     return {
         "account_id": account_id,
         "snapshot_id": snapshot.id,
-        "effective_date": snapshot.snapshot_at.date(),
+        "effective_date": observation_time(snapshot.snapshot_at).date(),
         "as_of": as_of,
         "current_revision": account.current_position_revision,
         "completeness": "incomplete" if incomplete else "complete",
@@ -372,6 +372,7 @@ def replace_positions(
         .where(
             Account.id == account_id,
             Account.current_position_revision == expected_revision,
+            Account.active.is_(True),
         )
         .values(current_position_revision=next_revision, updated_at=now)
         .execution_options(synchronize_session=False)

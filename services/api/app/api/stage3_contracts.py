@@ -61,7 +61,7 @@ class InvestmentEventCreate(BaseModel):
     @classmethod
     def bound_raw_values(cls, value: dict[str, Any]) -> dict[str, Any]:
         try:
-            encoded = json.dumps(value, separators=(",", ":")).encode()
+            encoded = json.dumps(value, separators=(",", ":"), allow_nan=False).encode()
         except (TypeError, ValueError) as exc:
             raise ValueError("Raw event values must be JSON-compatible") from exc
         if len(encoded) > 16_384:
@@ -282,7 +282,7 @@ class TaxLotAdjustmentCreate(BaseModel):
     @classmethod
     def bound_adjustment_raw_values(cls, value: dict[str, Any]) -> dict[str, Any]:
         try:
-            encoded = json.dumps(value, separators=(",", ":")).encode()
+            encoded = json.dumps(value, separators=(",", ":"), allow_nan=False).encode()
         except (TypeError, ValueError) as exc:
             raise ValueError("Raw adjustment values must be JSON-compatible") from exc
         if len(encoded) > 16_384:

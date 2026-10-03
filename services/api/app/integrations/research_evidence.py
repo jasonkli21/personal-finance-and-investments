@@ -7,7 +7,7 @@ retrieval transport, indexing, model routing, or provider implementation.
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Literal
 from uuid import UUID
 
@@ -22,6 +22,7 @@ type EvidenceRejectionReason = Literal[
     "source_url_mismatch",
     "accession_mismatch",
     "publication_date_mismatch",
+    "publication_date_in_future",
     "retrieval_date_unavailable",
     "retrieval_date_in_future",
     "stale",
@@ -204,19 +205,25 @@ def validate_research_evidence(
                 reason = "accession_mismatch"
             elif item.published_at != document.filing_date:
                 reason = "publication_date_mismatch"
+        if (
+            reason is None
+            and item.published_at is not None
+            and item.published_at > eligibility.as_of.date()
+        ):
+            reason = "publication_date_in_future"
         if reason is None and item.retrieved_at is None:
             reason = "retrieval_date_unavailable"
         if reason is None and item.retrieved_at is not None:
             if item.retrieved_at > eligibility.as_of:
                 reason = "retrieval_date_in_future"
-            elif (
-                eligibility.as_of - item.retrieved_at
-            ).days > eligibility.max_age_days:
+            elif eligibility.as_of - item.retrieved_at > timedelta(
+                days=eligibility.max_age_days
+            ):
                 reason = "stale"
         if reason is None and item.source_content_sha256 is None:
             reason = "content_hash_unavailable"
         excerpt_bytes = len(item.excerpt.encode("utf-8")) if item.excerpt else 0
-        if reason is None and not item.excerpt:
+        if reason is None and (not item.excerpt or not item.excerpt.strip()):
             reason = "excerpt_unavailable"
         if reason is None and excerpt_bytes > eligibility.max_excerpt_bytes:
             reason = "excerpt_too_large"
@@ -243,7 +250,7 @@ def validate_research_evidence(
         for hash_groups in hashes_by_document.values()
         if len(hash_groups) > 1
     ]
-    if len(eligible) < eligibility.minimum_evidence:
+    if not eligible or len(eligible) < eligibility.minimum_evidence:
         state: Literal["available", "insufficient", "conflict_present", "oversized"] = (
             "insufficient"
         )
