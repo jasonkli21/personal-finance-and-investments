@@ -1,6 +1,6 @@
 # Stage 4 release evidence
 
-**Status:** S4.1–S4.4 production configuration, infrastructure, real-DSQL evidence machinery, cost controls and dated register prepared locally; no AWS resources provisioned and live DSQL remains unverified
+**Status:** S4.1–S4.5 production configuration, infrastructure, real-DSQL evidence machinery, cost controls and encrypted portable recovery prepared locally; no AWS resources provisioned and live DSQL/cloud recovery remain unverified
 **Updated:** 2026-10-03
 
 This record distinguishes locally implemented release machinery from credentialed launch evidence. A passed SQLite/PostgreSQL test or skipped AWS suite does not satisfy the real Aurora DSQL, bucket-policy, cost-approval, recovery, or HTTPS launch gates.
@@ -46,8 +46,8 @@ The synthetic auth tests cover RSA-signed ID-token acceptance, invalid-signature
 | S4.2 | Terraform lockfile, provider schema validation, static policy guardrails, and fake-input no-network plans prepared | Explicit account/region/domain/certificate/image/identity/budget inputs, target-specific reviewed plan, runtime smoke/benchmark, and approved apply |
 | S4.3 | Nine-case real-DSQL suite and fail-closed evidence runner prepared; all nine cases skip without explicit opt-in | Execute against an approved isolated DSQL cluster and pass with zero skipped tests; separately close the populated-upgrade, interrupted-migration, token-expiry, and real DSQL OCC-gap evidence |
 | S4.4 | Bounded production workload settings, optional post-credit account budget alerts, and dated public-price register prepared on 2026-10-03; fake-input disabled/enabled plans succeeded and missing-recipient plan failed closed | Target account/Region and credit eligibility, region-specific whole-stack forecast, selected monthly threshold, verified recipients, and alert delivery test |
-| S4.5 | Pending | Encrypted portable export and isolated restore with tamper/interruption negatives |
-| S4.6 | Pending | Approved gated release, synthetic launch, rollback/pause/teardown rehearsal and retained-resource inventory |
+| S4.5 | Versioned AES-GCM portable archive, scope-confirmed CLI, isolated loopback PostgreSQL restore, and synthetic interruption/tamper/idempotency drill | Approved isolated DSQL + private S3 export/restore drill, security/IAM/bucket audit, and explicit retention/RTO/RPO/budget approval |
+| S4.6 | Pending | Evidence-bound promotion gate, approved gated release, synthetic HTTPS launch, rollback/pause/teardown rehearsal, and retained-resource inventory |
 
 The current published DSQL free tier is 100,000 DPUs plus 1 GB-month of storage per month, with billable overages; it is not a whole-stack cap. AWS account, target region, identity, alert recipient, monthly exposure, and deployment approval have not been supplied. No infrastructure apply, cloud test, data transfer, push, or deployment is authorized by this release record.
 
@@ -202,3 +202,46 @@ parser/job limits and over-bound configuration rejection. Five Terraform
 contract tests pass. Terraform `1.16.5` formatting/schema validation passes.
 The fake `.invalid` recipient was used only to validate a no-refresh local plan;
 it is not an alert routing or recipient confirmation test.
+
+## S4.5 — Encrypted portable export and validated local recovery
+
+`app.recovery.cli` exports the current finance schema, immutable originals, and
+frozen report artifacts into a versioned `.pfarc` archive. It uses chunked
+AES-256-GCM with a per-archive random salt/nonce prefix and Scrypt; the
+passphrase is prompted interactively and is not written to the archive or
+reports. The encrypted manifest records schema identity, source snapshot time,
+Decimal/string and time encodings, counts, row/object hashes, and finance
+lineage. Source records are read in one read-only Repeatable Read transaction;
+objects are size/hash checked. Archive, record, table, row-count, and object
+sizes are bounded. The archive omits sessions, principal mappings, security
+audit identities, and leased jobs so authentication and runtime authority are
+deliberately rebound at the destination.
+
+Restore requires a migrated, empty, specifically prefixed loopback PostgreSQL
+database, a distinct private directory named for that database, explicit
+source/target scope mapping, and a matching acknowledgement. It inserts bounded
+batches in one transaction, keeps selected account snapshot pointers unpublished
+until all related rows are restored, and uses a private restore marker for
+safe retry. It refuses remote, nonempty, app, mismatched-schema, and
+application-file-directory targets. It never creates a database, deletes user
+data, switches app configuration, or uploads data to cloud.
+
+Synthetic PostgreSQL verification uses a temporary `pf_source_*` database and
+a separate `pf_restore_*` database. It covers correct-key round trip, wrong
+key, archive tampering, missing/tampered objects, incompatible schema,
+interruption before commit, successful retry, Decimal NAV/reconciliation,
+source lineage/original/report bytes, and repeated restore idempotency. The
+latest focused run passed all six tests against the disposable local PostgreSQL
+16 server. Run it with:
+
+```sh
+STAGE4_RECOVERY_TEST_ADMIN_URL='postgresql+psycopg://<local-role>@127.0.0.1:<port>/postgres' \
+  services/api/.venv/bin/pytest -q services/api/tests/test_recovery_archive.py
+```
+
+This is synthetic PostgreSQL evidence, not a DSQL/S3 backup test. DSQL export,
+private S3 object access, AWS Backup, cross-service consistency under concurrent
+production writes, retention, passphrase recovery, RTO/RPO, and a real
+DSQL-to-local restore remain unverified. There is no automated schedule,
+retention deletion, server export endpoint, or automatic local/cloud sync.
+Operational instructions and gates are in the [Stage 4 recovery runbook](stage-4-recovery-runbook.md).

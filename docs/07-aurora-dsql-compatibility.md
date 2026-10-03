@@ -1,6 +1,6 @@
 # Aurora DSQL compatibility contract
 
-**Status:** DSQL boundary implemented; Stage 4 auth tables added to migration plan; live cluster remains unverified | **Verified against AWS/PyPI official documentation:** 2026-10-02
+**Status:** DSQL boundary implemented; Stage 4 auth schema and encrypted-export source adapter prepared; live cluster and DSQL recovery remain unverified | **Verified against AWS/PyPI official documentation:** 2026-10-02
 **Architecture:** PostgreSQL 16 locally and for personal/offline operation; **single-Region Amazon Aurora DSQL in production**. The same FastAPI domain logic must support both. No claim is made that a live DSQL cluster has been tested yet.
 
 This file is the authoritative DSQL-specific companion to [`02-architecture.md`](02-architecture.md), [`05-roadmap.md`](05-roadmap.md), and [`06-security-and-deployment.md`](06-security-and-deployment.md). Recheck the official links before implementing: Aurora DSQL is adding PostgreSQL features frequently.
@@ -121,6 +121,7 @@ SQS, Lambda, schedules, VPC interface endpoints and log ingestion can incur thei
 - Use an application-specific IAM role + DSQL `dsql:DbConnect` mapped to a least-privilege DB role; use admin connections only for tightly scoped schema management.
 - Enforce TLS with certificate and hostname verification. Choose public service endpoint with strict IAM+TLS and tight app-network egress, or a [DSQL PrivateLink connection endpoint](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/privatelink-managing-clusters.html) if private networking is required and recurring endpoint charges are acceptable. **Do not describe DSQL as a conventional RDS instance in a private subnet.**
 - [AWS Backup supports DSQL backup/restore](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/disaster-recovery-resiliency.html), but has a separately priced service. Also provide encrypted portable exports of the app's structured records plus S3 source files, test restoring into a new cluster/local PostgreSQL, and document non-portable vendor metadata.
+- The Stage 4 recovery CLI validates the complete local versioned DSQL migration ledger and reads a consistent read-only database snapshot through the configured application connection before exporting portable rows and immutable files. This exercises the DSQL adapter and ledger checks structurally only. It has not connected to DSQL, verified the cloud connector's snapshot duration, read private S3 objects, or demonstrated DSQL-to-PostgreSQL recovery; only the synthetic PostgreSQL source/restore drill is verified locally. See the [recovery runbook](stage-4-recovery-runbook.md).
 - Cloud deployment requires user authentication on app routes, private S3, no raw statement logs, scoped secrets, and teardown/usage checks. A budget alert is not a cap.
 
 ## 8. DSQL readiness test matrix (required before any production deployment)
