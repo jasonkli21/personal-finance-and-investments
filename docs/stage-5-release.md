@@ -1,6 +1,6 @@
 # Stage 5 implementation status
 
-**Status:** S5.1.1 offline source/fact contracts and manual reference storage implemented; shared SEC/IR retrieval, research synthesis, monitoring, live DSQL, and hosted promotion remain gated  
+**Status:** S5.1.1 and the safe offline portion of S5.2.1 implemented; shared SEC/IR retrieval, AI synthesis, portfolio context, monitoring, live DSQL, and hosted promotion remain gated
 **Updated:** 2026-10-03
 
 This record separates finance-owned offline research workflow evidence from shared-service and provider capabilities that have not been integrated. No SEC data, personal portfolio context, or personal-AI service was requested or called during this implementation.
@@ -17,10 +17,18 @@ Added portable `research_documents` and `reported_facts` records with PostgreSQL
 
 The SEC access/source check was reverified against official pages on 2026-10-03 and recorded in [the source register](03-data-sources.md#5-company-financials-and-regulatory-research--stage-5). `data.sec.gov` public JSON is documented as keyless and unavailable to browser CORS; SEC access guidance requires an identifying `User-Agent` and sets a 10 requests/second aggregate cap. This run made no SEC request. The fixture `fixtures/stage-5/synthetic-company-research.json` contains invented, non-resolving SEC-shaped identifiers and values only.
 
+## S5.2 — Deterministic company view and research baseline
+
+Added a bounded issuer view, manual filing/fact entry, sourced fact table, and explicit prior/current comparison. Comparison requires matching issuer, taxonomy, concept, unit, currency, period kind and fiscal period, consecutive fiscal years, and compatible date windows. Calculations use `Decimal`; missing values and non-positive denominators are explicit. Every source observation remains visible, including records that could be duplicate contexts or amendments; no observations are silently consolidated. The view shows filing dates, local registration dates, context references, original values, unverified quality, accession/form and original source link.
+
+`research_runs` and `research_results` (revision `0017_stage5_research_runs`) freeze a deterministic, source-linked selection with a bounded result hash and idempotency key. This path contains no model-generated inferences and does not modify canonical positions, prices, transactions, or lots. Finance uses the upstream API inspection described above as a contract gate: no SEC/IR retrieval, shared evidence, private portfolio context, personal-AI request, or AI synthesis occurs. The UI remains available when all such services are disabled.
+
+This completes only the safe manual/offline part of S5.2.1. Automated taxonomy normalization, amended-filing relationships, upstream search, and stale-cache behavior depend on source/retrieval contracts and remain unimplemented. S5.2.2 cited model synthesis remains gated on S5.3 privacy/context boundaries, S5.4 evidence contract/authorization, and explicit inference/data-handling approval.
+
 ### Remaining gates
 
 - **S5.1.2 shared public observations:** not implemented. Requires an agreed service request/response contract with issuer and filing eligibility, retrievable provenance/excerpts, size/freshness limits, and service authorization. Upstream's current session/SSE API does not establish that contract.
-- **S5.2 synthesized cited research:** not implemented yet. The only enabled path is the deterministic, user-entered source/fact baseline. No model output is emitted or treated as evidence.
+- **S5.2.2 synthesized cited research:** not implemented. The only enabled path is the deterministic, user-entered source/fact baseline. No model output is emitted or treated as evidence.
 - **S5.3 portfolio context and thesis/watchlists:** not implemented yet. No portfolio values or thesis text are transmitted to personal-AI.
 - **S5.4 shared evidence retrieval:** not implemented yet. No finance index/search/database is added.
 - **S5.5 monitoring:** not implemented. Stage 2 job delivery, restart, cleanup, and live DSQL lease acceptance remain partial/unverified; adding a second scheduler or notification path would bypass the dependency gate.
@@ -33,3 +41,9 @@ The SEC access/source check was reverified against official pages on 2026-10-03 
 - `pnpm api:generate` exported OpenAPI and regenerated `apps/web/src/api/schema.d.ts`; `pnpm api:check` passed. The bundled Node runtime and `/private/tmp` uv cache were needed in this shell.
 - Local PostgreSQL was unavailable on port 55432, so Alembic migration runtime was not exercised on PostgreSQL. The migration is structurally represented in DSQL tests only; live Aurora DSQL remains unverified.
 - No SEC, personal-AI, real-data, browser-hosted, or cloud call was made.
+
+## S5.2 verification
+
+- `UV_CACHE_DIR=/private/tmp/codex-finance-stage5-uv-cache uv run --directory services/api --locked pytest -q tests/test_stage5_research.py tests/test_dsql_migrations.py` — **16 passed**. Synthetic coverage includes fiscal-period/unit incompatibility, missing/zero baseline behavior, source linkage, idempotency, frozen result integrity, and DSQL migration structure.
+- Changed research modules passed mypy and Ruff. The frontend passed `pnpm --dir apps/web typecheck`, `pnpm api:check`, and `pnpm --dir apps/web build`; the build reports the existing large-chunk advisory.
+- Migration 0017 is represented in the DSQL migration plan, but PostgreSQL runtime and real Aurora DSQL remain unverified because no local database/cluster is available.

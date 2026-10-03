@@ -1248,3 +1248,53 @@ class ReportedFact(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
+
+
+class ResearchRun(Base):
+    """Immutable request identity for a local deterministic research baseline."""
+
+    __tablename__ = "research_runs"
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_research_run_idempotency"),
+        Index("ix_research_runs_issuer_created", "issuer_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    issuer_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("issuers.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    question: Mapped[str] = mapped_column(String(500), nullable=False)
+    selected_fact_ids: Mapped[list[str]] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=False
+    )
+    state: Mapped[str] = mapped_column(String(24), nullable=False, default="completed")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class ResearchResult(Base):
+    """Frozen, source-linked deterministic baseline; never canonical finance data."""
+
+    __tablename__ = "research_results"
+    __table_args__ = (UniqueConstraint("run_id", name="uq_research_result_run"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    run_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("research_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    schema_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    validation_status: Mapped[str] = mapped_column(String(32), nullable=False)
+    result_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    result_snapshot: Mapped[dict[str, Any]] = mapped_column(
+        JSON().with_variant(JSONB, "postgresql"), nullable=False
+    )
+    generated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )

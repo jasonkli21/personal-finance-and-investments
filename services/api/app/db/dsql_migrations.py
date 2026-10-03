@@ -2448,6 +2448,43 @@ TABLE_CONSTRAINTS["reported_facts"] = (
         ("foreignkey(document_id)referencesresearch_documents(id)ondeleterestrict",),
     ),
 )
+TABLE_COLUMNS["research_runs"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("issuer_id", "uuid", "NO", None, None, None),
+    ("idempotency_key", "character varying", "NO", 128, None, None),
+    ("request_fingerprint", "character varying", "NO", 64, None, None),
+    ("question", "character varying", "NO", 500, None, None),
+    ("selected_fact_ids", "jsonb", "NO", None, None, None),
+    ("state", "character varying", "NO", 24, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["research_runs"] = (
+    ("research_runs_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    ("uq_research_run_idempotency", "UNIQUE", ("unique(idempotency_key)",)),
+    (
+        "research_runs_issuer_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(issuer_id)referencesissuers(id)ondeleterestrict",),
+    ),
+)
+TABLE_COLUMNS["research_results"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("run_id", "uuid", "NO", None, None, None),
+    ("schema_version", "character varying", "NO", 40, None, None),
+    ("validation_status", "character varying", "NO", 32, None, None),
+    ("result_hash", "character varying", "NO", 64, None, None),
+    ("result_snapshot", "jsonb", "NO", None, None, None),
+    ("generated_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["research_results"] = (
+    ("research_results_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    ("uq_research_result_run", "UNIQUE", ("unique(run_id)",)),
+    (
+        "research_results_run_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(run_id)referencesresearch_runs(id)ondeletecascade",),
+    ),
+)
 
 
 DSQL_MIGRATIONS = (
@@ -3013,6 +3050,62 @@ DSQL_MIGRATIONS = (
                 "SELECT true",
                 expected_index_table="reported_facts",
                 expected_index_columns=("document_id", "taxonomy", "concept"),
+            ),
+        ),
+    ),
+    DsqlMigration(
+        "0017_stage5_research_runs",
+        (
+            DsqlMigrationStep(
+                "create_research_runs",
+                "table",
+                """CREATE TABLE research_runs (
+                    id uuid NOT NULL,
+                    issuer_id uuid NOT NULL,
+                    idempotency_key varchar(128) NOT NULL,
+                    request_fingerprint varchar(64) NOT NULL,
+                    question varchar(500) NOT NULL,
+                    selected_fact_ids jsonb NOT NULL,
+                    state varchar(24) NOT NULL,
+                    created_at timestamptz NOT NULL,
+                    CONSTRAINT research_runs_pkey PRIMARY KEY (id),
+                    CONSTRAINT uq_research_run_idempotency UNIQUE (idempotency_key),
+                    CONSTRAINT research_runs_issuer_id_fkey FOREIGN KEY
+                        (issuer_id) REFERENCES issuers(id) ON DELETE RESTRICT
+                )""",
+                "research_runs",
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = current_schema() AND table_name = :object_name)",
+            ),
+            DsqlMigrationStep(
+                "index_research_runs_issuer_created",
+                "index",
+                "CREATE INDEX ASYNC ix_research_runs_issuer_created "
+                "ON research_runs (issuer_id, created_at)",
+                "ix_research_runs_issuer_created",
+                "SELECT true",
+                expected_index_table="research_runs",
+                expected_index_columns=("issuer_id", "created_at"),
+            ),
+            DsqlMigrationStep(
+                "create_research_results",
+                "table",
+                """CREATE TABLE research_results (
+                    id uuid NOT NULL,
+                    run_id uuid NOT NULL,
+                    schema_version varchar(40) NOT NULL,
+                    validation_status varchar(32) NOT NULL,
+                    result_hash varchar(64) NOT NULL,
+                    result_snapshot jsonb NOT NULL,
+                    generated_at timestamptz NOT NULL,
+                    CONSTRAINT research_results_pkey PRIMARY KEY (id),
+                    CONSTRAINT uq_research_result_run UNIQUE (run_id),
+                    CONSTRAINT research_results_run_id_fkey FOREIGN KEY
+                        (run_id) REFERENCES research_runs(id) ON DELETE CASCADE
+                )""",
+                "research_results",
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = current_schema() AND table_name = :object_name)",
             ),
         ),
     ),

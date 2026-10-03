@@ -8,6 +8,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.api.contracts import IssuerRead
+
 
 class ResearchDocumentCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -193,3 +195,95 @@ class ReportedFactRead(BaseModel):
             return None
         parsed = Decimal(str(value))
         return format(parsed.normalize(), "f") if parsed else "0"
+
+
+class ResearchFactObservation(BaseModel):
+    fact: ReportedFactRead
+    document: ResearchDocumentRead
+
+
+class ResearchCompanyRead(BaseModel):
+    issuer: IssuerRead
+    documents: list[ResearchDocumentRead]
+    facts: list[ResearchFactObservation]
+
+
+class FactComparisonCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    prior_fact_id: UUID
+    current_fact_id: UUID
+
+
+class FactComparisonRead(BaseModel):
+    status: Literal["comparable", "unavailable"]
+    methodology_version: Literal["same-fiscal-period-yoy-v1"]
+    prior: ResearchFactObservation
+    current: ResearchFactObservation
+    absolute_change: str | None
+    percent_change: str | None
+    diagnostics: list[str]
+
+
+class ResearchRunCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    issuer_id: UUID
+    question: str = Field(min_length=1, max_length=500)
+    fact_ids: list[UUID] = Field(min_length=1, max_length=50)
+    idempotency_key: str = Field(min_length=1, max_length=128)
+
+    @field_validator("question", "idempotency_key")
+    @classmethod
+    def clean_text(cls, value: str) -> str:
+        value = " ".join(value.split())
+        if not value:
+            raise ValueError("Value cannot be blank")
+        return value
+
+    @field_validator("fact_ids")
+    @classmethod
+    def unique_fact_ids(cls, value: list[UUID]) -> list[UUID]:
+        if len(value) != len(set(value)):
+            raise ValueError("Fact selection contains duplicates")
+        return value
+
+
+class ResearchCitationRead(BaseModel):
+    fact_id: UUID
+    document_id: UUID
+    accession_number: str
+    form_type: str
+    source_url: str
+    title: str
+    filing_date: date | None
+    quality_status: Literal["user_supplied_unverified"]
+
+
+class ResearchBaselineSnapshot(BaseModel):
+    schema_version: Literal["finance-research-baseline-v1"]
+    issuer_id: UUID
+    issuer_name: str
+    question: str
+    generated_at: datetime
+    mode: Literal["offline_deterministic"]
+    facts: list[ResearchFactObservation]
+    citations: list[ResearchCitationRead]
+    inferences: list[str]
+    unknowns: list[str]
+
+
+class ResearchRunRead(BaseModel):
+    id: UUID
+    issuer_id: UUID
+    idempotency_key: str
+    request_fingerprint: str
+    question: str
+    selected_fact_ids: list[UUID]
+    state: Literal["completed"]
+    created_at: datetime
+    schema_version: Literal["finance-research-baseline-v1"]
+    validation_status: Literal["source_links_checked_unverified_values"]
+    result_hash: str
+    result: ResearchBaselineSnapshot
+    duplicate: bool = False

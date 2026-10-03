@@ -471,6 +471,90 @@
         "title": "ExposureRowRead",
         "type": "object"
       },
+      "FactComparisonCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "current_fact_id": {
+            "format": "uuid",
+            "title": "Current Fact Id",
+            "type": "string"
+          },
+          "prior_fact_id": {
+            "format": "uuid",
+            "title": "Prior Fact Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prior_fact_id",
+          "current_fact_id"
+        ],
+        "title": "FactComparisonCreate",
+        "type": "object"
+      },
+      "FactComparisonRead": {
+        "properties": {
+          "absolute_change": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Absolute Change"
+          },
+          "current": {
+            "$ref": "#/components/schemas/ResearchFactObservation"
+          },
+          "diagnostics": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Diagnostics",
+            "type": "array"
+          },
+          "methodology_version": {
+            "const": "same-fiscal-period-yoy-v1",
+            "title": "Methodology Version",
+            "type": "string"
+          },
+          "percent_change": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent Change"
+          },
+          "prior": {
+            "$ref": "#/components/schemas/ResearchFactObservation"
+          },
+          "status": {
+            "enum": [
+              "comparable",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "methodology_version",
+          "prior",
+          "current",
+          "absolute_change",
+          "percent_change",
+          "diagnostics"
+        ],
+        "title": "FactComparisonRead",
+        "type": "object"
+      },
       "FinanceCategoryTotal": {
         "properties": {
           "category_id": {
@@ -5619,6 +5703,167 @@
         "title": "ReportedFactRead",
         "type": "object"
       },
+      "ResearchBaselineSnapshot": {
+        "properties": {
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchCitationRead"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchFactObservation"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "generated_at": {
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "inferences": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Inferences",
+            "type": "array"
+          },
+          "issuer_id": {
+            "format": "uuid",
+            "title": "Issuer Id",
+            "type": "string"
+          },
+          "issuer_name": {
+            "title": "Issuer Name",
+            "type": "string"
+          },
+          "mode": {
+            "const": "offline_deterministic",
+            "title": "Mode",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "finance-research-baseline-v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "unknowns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unknowns",
+            "type": "array"
+          }
+        },
+        "required": [
+          "schema_version",
+          "issuer_id",
+          "issuer_name",
+          "question",
+          "generated_at",
+          "mode",
+          "facts",
+          "citations",
+          "inferences",
+          "unknowns"
+        ],
+        "title": "ResearchBaselineSnapshot",
+        "type": "object"
+      },
+      "ResearchCitationRead": {
+        "properties": {
+          "accession_number": {
+            "title": "Accession Number",
+            "type": "string"
+          },
+          "document_id": {
+            "format": "uuid",
+            "title": "Document Id",
+            "type": "string"
+          },
+          "fact_id": {
+            "format": "uuid",
+            "title": "Fact Id",
+            "type": "string"
+          },
+          "filing_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filing Date"
+          },
+          "form_type": {
+            "title": "Form Type",
+            "type": "string"
+          },
+          "quality_status": {
+            "const": "user_supplied_unverified",
+            "title": "Quality Status",
+            "type": "string"
+          },
+          "source_url": {
+            "title": "Source Url",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "fact_id",
+          "document_id",
+          "accession_number",
+          "form_type",
+          "source_url",
+          "title",
+          "filing_date",
+          "quality_status"
+        ],
+        "title": "ResearchCitationRead",
+        "type": "object"
+      },
+      "ResearchCompanyRead": {
+        "properties": {
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchDocumentRead"
+            },
+            "title": "Documents",
+            "type": "array"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchFactObservation"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "issuer": {
+            "$ref": "#/components/schemas/IssuerRead"
+          }
+        },
+        "required": [
+          "issuer",
+          "documents",
+          "facts"
+        ],
+        "title": "ResearchCompanyRead",
+        "type": "object"
+      },
       "ResearchDocumentCreate": {
         "additionalProperties": false,
         "properties": {
@@ -5900,6 +6145,144 @@
           "source_status"
         ],
         "title": "ResearchDocumentRead",
+        "type": "object"
+      },
+      "ResearchFactObservation": {
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/ResearchDocumentRead"
+          },
+          "fact": {
+            "$ref": "#/components/schemas/ReportedFactRead"
+          }
+        },
+        "required": [
+          "fact",
+          "document"
+        ],
+        "title": "ResearchFactObservation",
+        "type": "object"
+      },
+      "ResearchRunCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "fact_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Fact Ids",
+            "type": "array"
+          },
+          "idempotency_key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "issuer_id": {
+            "format": "uuid",
+            "title": "Issuer Id",
+            "type": "string"
+          },
+          "question": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "issuer_id",
+          "question",
+          "fact_ids",
+          "idempotency_key"
+        ],
+        "title": "ResearchRunCreate",
+        "type": "object"
+      },
+      "ResearchRunRead": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "duplicate": {
+            "default": false,
+            "title": "Duplicate",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "issuer_id": {
+            "format": "uuid",
+            "title": "Issuer Id",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "request_fingerprint": {
+            "title": "Request Fingerprint",
+            "type": "string"
+          },
+          "result": {
+            "$ref": "#/components/schemas/ResearchBaselineSnapshot"
+          },
+          "result_hash": {
+            "title": "Result Hash",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "finance-research-baseline-v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "selected_fact_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Selected Fact Ids",
+            "type": "array"
+          },
+          "state": {
+            "const": "completed",
+            "title": "State",
+            "type": "string"
+          },
+          "validation_status": {
+            "const": "source_links_checked_unverified_values",
+            "title": "Validation Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "issuer_id",
+          "idempotency_key",
+          "request_fingerprint",
+          "question",
+          "selected_fact_ids",
+          "state",
+          "created_at",
+          "schema_version",
+          "validation_status",
+          "result_hash",
+          "result"
+        ],
+        "title": "ResearchRunRead",
         "type": "object"
       },
       "SaleLotResultRead": {
@@ -11709,6 +12092,47 @@
         "summary": "Rows"
       }
     },
+    "/v1/research/comparisons": {
+      "post": {
+        "operationId": "compare_research_facts_v1_research_comparisons_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FactComparisonCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FactComparisonRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Compare Research Facts",
+        "tags": [
+          "research"
+        ]
+      }
+    },
     "/v1/research/documents": {
       "post": {
         "operationId": "register_document_v1_research_documents_post",
@@ -11838,6 +12262,49 @@
         ]
       }
     },
+    "/v1/research/issuers/{issuer_id}": {
+      "get": {
+        "operationId": "get_company_research_v1_research_issuers__issuer_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "issuer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Issuer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchCompanyRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Company Research",
+        "tags": [
+          "research"
+        ]
+      }
+    },
     "/v1/research/issuers/{issuer_id}/documents": {
       "get": {
         "operationId": "get_documents_v1_research_issuers__issuer_id__documents_get",
@@ -11880,6 +12347,90 @@
           }
         },
         "summary": "Get Documents",
+        "tags": [
+          "research"
+        ]
+      }
+    },
+    "/v1/research/runs": {
+      "post": {
+        "operationId": "create_research_run_v1_research_runs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResearchRunCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchRunRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Research Run",
+        "tags": [
+          "research"
+        ]
+      }
+    },
+    "/v1/research/runs/{run_id}": {
+      "get": {
+        "operationId": "get_research_run_v1_research_runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchRunRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Research Run",
         "tags": [
           "research"
         ]

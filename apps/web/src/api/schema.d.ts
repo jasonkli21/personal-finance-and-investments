@@ -706,6 +706,23 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/research/comparisons': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Compare Research Facts */
+    post: operations['compare_research_facts_v1_research_comparisons_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/research/documents': {
     parameters: {
       query?: never
@@ -757,6 +774,23 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/research/issuers/{issuer_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Company Research */
+    get: operations['get_company_research_v1_research_issuers__issuer_id__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/research/issuers/{issuer_id}/documents': {
     parameters: {
       query?: never
@@ -766,6 +800,40 @@ export interface paths {
     }
     /** Get Documents */
     get: operations['get_documents_v1_research_issuers__issuer_id__documents_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/research/runs': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Create Research Run */
+    post: operations['create_research_run_v1_research_runs_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/research/runs/{run_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Research Run */
+    get: operations['get_research_run_v1_research_runs__run_id__get']
     put?: never
     post?: never
     delete?: never
@@ -1346,6 +1414,40 @@ export interface components {
       percentage: string | null
       /** Total */
       total: string
+    }
+    /** FactComparisonCreate */
+    FactComparisonCreate: {
+      /**
+       * Current Fact Id
+       * Format: uuid
+       */
+      current_fact_id: string
+      /**
+       * Prior Fact Id
+       * Format: uuid
+       */
+      prior_fact_id: string
+    }
+    /** FactComparisonRead */
+    FactComparisonRead: {
+      /** Absolute Change */
+      absolute_change: string | null
+      current: components['schemas']['ResearchFactObservation']
+      /** Diagnostics */
+      diagnostics: string[]
+      /**
+       * Methodology Version
+       * @constant
+       */
+      methodology_version: 'same-fiscal-period-yoy-v1'
+      /** Percent Change */
+      percent_change: string | null
+      prior: components['schemas']['ResearchFactObservation']
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'comparable' | 'unavailable'
     }
     /** FinanceCategoryTotal */
     FinanceCategoryTotal: {
@@ -3203,6 +3305,77 @@ export interface components {
       /** Unit */
       unit: string
     }
+    /** ResearchBaselineSnapshot */
+    ResearchBaselineSnapshot: {
+      /** Citations */
+      citations: components['schemas']['ResearchCitationRead'][]
+      /** Facts */
+      facts: components['schemas']['ResearchFactObservation'][]
+      /**
+       * Generated At
+       * Format: date-time
+       */
+      generated_at: string
+      /** Inferences */
+      inferences: string[]
+      /**
+       * Issuer Id
+       * Format: uuid
+       */
+      issuer_id: string
+      /** Issuer Name */
+      issuer_name: string
+      /**
+       * Mode
+       * @constant
+       */
+      mode: 'offline_deterministic'
+      /** Question */
+      question: string
+      /**
+       * Schema Version
+       * @constant
+       */
+      schema_version: 'finance-research-baseline-v1'
+      /** Unknowns */
+      unknowns: string[]
+    }
+    /** ResearchCitationRead */
+    ResearchCitationRead: {
+      /** Accession Number */
+      accession_number: string
+      /**
+       * Document Id
+       * Format: uuid
+       */
+      document_id: string
+      /**
+       * Fact Id
+       * Format: uuid
+       */
+      fact_id: string
+      /** Filing Date */
+      filing_date: string | null
+      /** Form Type */
+      form_type: string
+      /**
+       * Quality Status
+       * @constant
+       */
+      quality_status: 'user_supplied_unverified'
+      /** Source Url */
+      source_url: string
+      /** Title */
+      title: string
+    }
+    /** ResearchCompanyRead */
+    ResearchCompanyRead: {
+      /** Documents */
+      documents: components['schemas']['ResearchDocumentRead'][]
+      /** Facts */
+      facts: components['schemas']['ResearchFactObservation'][]
+      issuer: components['schemas']['IssuerRead']
+    }
     /** ResearchDocumentCreate */
     ResearchDocumentCreate: {
       /** Accession Number */
@@ -3306,6 +3479,74 @@ export interface components {
       source_url: string
       /** Title */
       title: string
+    }
+    /** ResearchFactObservation */
+    ResearchFactObservation: {
+      document: components['schemas']['ResearchDocumentRead']
+      fact: components['schemas']['ReportedFactRead']
+    }
+    /** ResearchRunCreate */
+    ResearchRunCreate: {
+      /** Fact Ids */
+      fact_ids: string[]
+      /** Idempotency Key */
+      idempotency_key: string
+      /**
+       * Issuer Id
+       * Format: uuid
+       */
+      issuer_id: string
+      /** Question */
+      question: string
+    }
+    /** ResearchRunRead */
+    ResearchRunRead: {
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /**
+       * Duplicate
+       * @default false
+       */
+      duplicate: boolean
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Idempotency Key */
+      idempotency_key: string
+      /**
+       * Issuer Id
+       * Format: uuid
+       */
+      issuer_id: string
+      /** Question */
+      question: string
+      /** Request Fingerprint */
+      request_fingerprint: string
+      result: components['schemas']['ResearchBaselineSnapshot']
+      /** Result Hash */
+      result_hash: string
+      /**
+       * Schema Version
+       * @constant
+       */
+      schema_version: 'finance-research-baseline-v1'
+      /** Selected Fact Ids */
+      selected_fact_ids: string[]
+      /**
+       * State
+       * @constant
+       */
+      state: 'completed'
+      /**
+       * Validation Status
+       * @constant
+       */
+      validation_status: 'source_links_checked_unverified_values'
     }
     /** SaleLotResultRead */
     SaleLotResultRead: {
@@ -6383,6 +6624,39 @@ export interface operations {
       }
     }
   }
+  compare_research_facts_v1_research_comparisons_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['FactComparisonCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['FactComparisonRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   register_document_v1_research_documents_post: {
     parameters: {
       query?: never
@@ -6480,6 +6754,37 @@ export interface operations {
       }
     }
   }
+  get_company_research_v1_research_issuers__issuer_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        issuer_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ResearchCompanyRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   get_documents_v1_research_issuers__issuer_id__documents_get: {
     parameters: {
       query?: never
@@ -6498,6 +6803,70 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ResearchDocumentRead'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  create_research_run_v1_research_runs_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ResearchRunCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ResearchRunRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_research_run_v1_research_runs__run_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        run_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ResearchRunRead']
         }
       }
       /** @description Validation Error */

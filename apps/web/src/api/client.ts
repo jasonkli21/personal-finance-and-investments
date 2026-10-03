@@ -102,6 +102,46 @@ export async function fetchIssuers() {
   return unwrap(await api.GET('/v1/issuers'))
 }
 
+export async function fetchResearchCompany(issuerId: string) {
+  return unwrap(
+    await api.GET('/v1/research/issuers/{issuer_id}', {
+      params: { path: { issuer_id: issuerId } },
+    }),
+  )
+}
+
+export async function registerResearchDocument(
+  input: components['schemas']['ResearchDocumentCreate'],
+) {
+  return unwrap(await api.POST('/v1/research/documents', { body: input }))
+}
+
+export async function createReportedResearchFact(
+  input: components['schemas']['ReportedFactCreate'],
+) {
+  return unwrap(await api.POST('/v1/research/facts', { body: input }))
+}
+
+export async function compareResearchFacts(
+  input: components['schemas']['FactComparisonCreate'],
+) {
+  return unwrap(await api.POST('/v1/research/comparisons', { body: input }))
+}
+
+export async function createResearchRun(
+  input: components['schemas']['ResearchRunCreate'],
+) {
+  return unwrap(await api.POST('/v1/research/runs', { body: input }))
+}
+
+export async function fetchResearchRun(runId: string) {
+  return unwrap(
+    await api.GET('/v1/research/runs/{run_id}', {
+      params: { path: { run_id: runId } },
+    }),
+  )
+}
+
 export async function fetchSecurities() {
   return unwrap(await api.GET('/v1/securities'))
 }
