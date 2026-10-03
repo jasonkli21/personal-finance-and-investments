@@ -485,6 +485,23 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/planning/scenarios': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Create Planning Scenario */
+    post: operations['create_planning_scenario_v1_planning_scenarios_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/portfolio/history': {
     parameters: {
       query?: never
@@ -1866,6 +1883,334 @@ export interface components {
       value: string | null
       /** Value Currency */
       value_currency: string | null
+    }
+    /** PlanningAccountLineRead */
+    PlanningAccountLineRead: {
+      /** Account Balance Id */
+      account_balance_id?: string | null
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Account Name */
+      account_name: string
+      /** Account Type */
+      account_type: string
+      /** Amount */
+      amount: string | null
+      /** As Of */
+      as_of: string | null
+      /** Balance Revision */
+      balance_revision?: number | null
+      /**
+       * Bucket
+       * @enum {string}
+       */
+      bucket:
+        | 'liquid_cash'
+        | 'investment'
+        | 'restricted_asset'
+        | 'other_asset'
+        | 'liability'
+        | 'foreign_asset'
+        | 'unavailable'
+        | 'excluded'
+      /** Currency */
+      currency: string | null
+      /** Detail */
+      detail: string | null
+      /** Included In Starting Cash */
+      included_in_starting_cash: boolean
+      /** Position Revision */
+      position_revision?: number | null
+      /** Position Snapshot Id */
+      position_snapshot_id?: string | null
+      /** Price As Of */
+      price_as_of?: string | null
+      /** Quality Status */
+      quality_status: string
+      /** Source */
+      source: string | null
+      /** Status */
+      status: string
+    }
+    /** PlanningCurrencyBalanceRead */
+    PlanningCurrencyBalanceRead: {
+      /**
+       * Completeness
+       * @enum {string}
+       */
+      completeness: 'complete' | 'incomplete'
+      /** Currency */
+      currency: string
+      /** Investment Assets */
+      investment_assets: string
+      /** Known Net Worth */
+      known_net_worth: string
+      /** Liabilities */
+      liabilities: string
+      /** Liquid Cash */
+      liquid_cash: string
+      /** Other Assets */
+      other_assets: string
+      /** Restricted Assets */
+      restricted_assets: string
+    }
+    /** PlanningDividendHistoryRead */
+    PlanningDividendHistoryRead: {
+      /** Currency */
+      currency: string
+      /** Event Count */
+      event_count: number
+      /** Monthly Average */
+      monthly_average: string
+      /** Source Labels */
+      source_labels: string[]
+      /** Total */
+      total: string
+    }
+    /** PlanningOneTimeChangeInput */
+    PlanningOneTimeChangeInput: {
+      /** Amount */
+      amount: string
+      /**
+       * Change Type
+       * @enum {string}
+       */
+      change_type: 'purchase' | 'liability_payment' | 'other'
+      /** Label */
+      label: string
+      /** Month Offset */
+      month_offset: number
+    }
+    /** PlanningProjectionCaseRead */
+    PlanningProjectionCaseRead: {
+      /**
+       * Case
+       * @enum {string}
+       */
+      case: 'conservative' | 'base' | 'optimistic'
+      /** Ending Cash */
+      ending_cash: string
+      /** Months */
+      months: components['schemas']['PlanningProjectionMonthRead'][]
+      /**
+       * Runway Status
+       * @enum {string}
+       */
+      runway_status:
+        'shortfall_within_horizon' | 'beyond_horizon' | 'coverage_incomplete'
+      /** Shortfall Month */
+      shortfall_month: number | null
+      /** Starting Cash */
+      starting_cash: string
+    }
+    /** PlanningProjectionMonthRead */
+    PlanningProjectionMonthRead: {
+      /** Dividends */
+      dividends: string
+      /** Ending Cash */
+      ending_cash: string
+      /** Expenses */
+      expenses: string
+      /** Income */
+      income: string
+      /** Month Index */
+      month_index: number
+      /**
+       * Month Start
+       * Format: date
+       */
+      month_start: string
+      /** One Time Changes */
+      one_time_changes: string
+      /** Recurring Changes */
+      recurring_changes: string
+      /** Starting Cash */
+      starting_cash: string
+    }
+    /** PlanningRecurringChangeInput */
+    PlanningRecurringChangeInput: {
+      /** Amount */
+      amount: string
+      /** Label */
+      label: string
+    }
+    /** PlanningScenarioRead */
+    PlanningScenarioRead: {
+      /** Account Balance Ids */
+      account_balance_ids: {
+        [key: string]: string
+      }
+      /** Account Balance Revisions */
+      account_balance_revisions: {
+        [key: string]: number
+      }
+      /** Account Ids */
+      account_ids: string[]
+      /** Account Names */
+      account_names: string[]
+      /** Account Position Revisions */
+      account_position_revisions: {
+        [key: string]: number
+      }
+      /**
+       * As Of
+       * Format: date
+       */
+      as_of: string
+      /** Balance Sheet Complete */
+      balance_sheet_complete: boolean
+      /** Balances */
+      balances: components['schemas']['PlanningAccountLineRead'][]
+      /**
+       * Canonical Records Mutated
+       * @constant
+       */
+      canonical_records_mutated: false
+      /** Cases */
+      cases: components['schemas']['PlanningProjectionCaseRead'][]
+      /** Currency Balances */
+      currency_balances: components['schemas']['PlanningCurrencyBalanceRead'][]
+      /** Dividend History */
+      dividend_history: components['schemas']['PlanningDividendHistoryRead'][]
+      /**
+       * History End
+       * Format: date
+       */
+      history_end: string
+      /** History Gaps */
+      history_gaps: string[]
+      /**
+       * History Start
+       * Format: date
+       */
+      history_start: string
+      /** Horizon Months */
+      horizon_months: number
+      /** Liquid Cash Observed Usd */
+      liquid_cash_observed_usd: string
+      /** Methodology Version */
+      methodology_version: string
+      /** Monthly Dividend Assumption */
+      monthly_dividend_assumption: string
+      /** Monthly Dividends Source */
+      monthly_dividends_source: string
+      /** Monthly Expense Assumption */
+      monthly_expense_assumption: string
+      /** Monthly Expenses Source */
+      monthly_expenses_source: string
+      /** Monthly Income Assumption */
+      monthly_income_assumption: string
+      /** Monthly Income Source */
+      monthly_income_source: string
+      /** One Time Changes */
+      one_time_changes: components['schemas']['PlanningOneTimeChangeInput'][]
+      /**
+       * Persisted
+       * @constant
+       */
+      persisted: false
+      /** Position Snapshot Ids */
+      position_snapshot_ids: {
+        [key: string]: string
+      }
+      /**
+       * Projection Start
+       * Format: date
+       */
+      projection_start: string
+      /**
+       * Projection Status
+       * @enum {string}
+       */
+      projection_status: 'available' | 'incomplete'
+      /** Recurring Changes */
+      recurring_changes: components['schemas']['PlanningRecurringChangeInput'][]
+      /** Scenario Fingerprint */
+      scenario_fingerprint: string
+      /** Scenario Label */
+      scenario_label: string
+      /** Sensitivity Percent */
+      sensitivity_percent: string
+      /**
+       * Starting Cash Coverage
+       * @enum {string}
+       */
+      starting_cash_coverage: 'complete' | 'incomplete' | 'user_assumed'
+      /**
+       * Starting Cash Source
+       * @enum {string}
+       */
+      starting_cash_source: 'observed_usd_cash' | 'user_override'
+      /** Starting Cash Usd */
+      starting_cash_usd: string
+      /** Transaction History */
+      transaction_history: components['schemas']['PlanningTransactionHistoryRead'][]
+      /** Warnings */
+      warnings: string[]
+    }
+    /** PlanningScenarioRequest */
+    PlanningScenarioRequest: {
+      /** Account Ids */
+      account_ids?: string[]
+      /**
+       * As Of
+       * Format: date
+       */
+      as_of: string
+      /** History Months */
+      history_months: number
+      /** Horizon Months */
+      horizon_months: number
+      /** Monthly Dividends */
+      monthly_dividends: string
+      /** Monthly Dividends Source */
+      monthly_dividends_source: string
+      /** Monthly Expenses */
+      monthly_expenses: string
+      /** Monthly Expenses Source */
+      monthly_expenses_source: string
+      /** Monthly Income */
+      monthly_income: string
+      /** Monthly Income Source */
+      monthly_income_source: string
+      /** One Time Changes */
+      one_time_changes?: components['schemas']['PlanningOneTimeChangeInput'][]
+      /** Recurring Changes */
+      recurring_changes?: components['schemas']['PlanningRecurringChangeInput'][]
+      /** Scenario Label */
+      scenario_label: string
+      /** Sensitivity Percent */
+      sensitivity_percent: string
+      /** Starting Cash Override */
+      starting_cash_override?: string | null
+    }
+    /** PlanningTransactionHistoryRead */
+    PlanningTransactionHistoryRead: {
+      /** Classified Transaction Count */
+      classified_transaction_count: number
+      /** Currency */
+      currency: string
+      /** Expenses Monthly Average */
+      expenses_monthly_average: string | null
+      /** Expenses Total */
+      expenses_total: string
+      /** Income Monthly Average */
+      income_monthly_average: string | null
+      /** Income Total */
+      income_total: string
+      /** Net Cash Flow */
+      net_cash_flow: string
+      /** Published Transaction Count */
+      published_transaction_count: number
+      /** Source Labels */
+      source_labels: string[]
+      /** Unclassified Count */
+      unclassified_count: number
+      /** Unclassified Signed Amount */
+      unclassified_signed_amount: string
     }
     /** PortfolioCategoryTargetInput */
     PortfolioCategoryTargetInput: {
@@ -5233,6 +5578,39 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  create_planning_scenario_v1_planning_scenarios_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PlanningScenarioRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PlanningScenarioRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
         }
       }
     }

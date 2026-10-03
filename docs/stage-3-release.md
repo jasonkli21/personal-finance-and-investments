@@ -1,6 +1,6 @@
 # Stage 3 implementation status
 
-**Status:** In progress; S3.1–S3.4 delivered locally
+**Status:** In progress; S3.1–S3.5 delivered locally; S3.R evaluation remains
 **Updated:** 2026-10-02
 
 Stage 3 remains incomplete until S3.1–S3.5 and S3.R meet the [implementation plan](stage-3-implementation-plan.md). These notes record implemented behavior and verification, not the remaining planned scope. Local PostgreSQL and live Aurora DSQL evidence are tracked separately.
@@ -78,3 +78,19 @@ UV_CACHE_DIR=/private/tmp/codex-personal-finance-uv-cache uv run --directory ser
 ```
 
 This command passed 23 tests. Scenario cases cover fee/cash reconciliation, category drift, an ETF buy using dated look-through, an ETF sale that removes indirect exposure and adds proceeds to cash, shared-membership overlap without NAV double counting, an opaque fund with foreign cash/no FX conversion, insufficient cash, overselling, explicit cash assumptions, rejected foreign-currency trades, and unchanged accepted position records/revisions. Focused Ruff and mypy passed; web tests (9), TypeScript, changed-file ESLint, production build, and regenerated OpenAPI checks passed. The scenario route adds no schema or migration and has not been exercised against live PostgreSQL 16 or Aurora DSQL. Both live database gates remain outstanding.
+
+## S3.5 — Income, runway, and purchase planning
+
+Added the read-only `POST /v1/planning/scenarios` API and planning workspace. A request selects active accounts and an as-of date, a 1–120 month projection horizon, and a 1–60 month completed-calendar-month history window. It requires explicit monthly USD income, expense and dividend assumptions with source labels. History is displayed as evidence and context only; it never fills or generates the projection. Transactions are grouped by source currency, transfers/card payments are excluded, unclassified rows and missing coverage remain visible, and reviewed dividend events remain separate from transaction income because the two may overlap.
+
+The baseline selects the latest eligible dated account balance or position snapshot per account. It groups known values by currency into liquid cash, investments, restricted assets, other assets and liabilities without FX conversion. Retirement-account positions remain restricted; liabilities are signed separately and are not automatically paid. A position snapshot's balance observation is excluded to avoid double counting. Position snapshot and valuation-price dates, sources, quality, and revisions are returned separately. Missing cash lines, stale/estimated/unpriced values, overlapping balance observations and missing account evidence produce explicit completeness warnings. An optional starting-cash override replaces observed USD cash only for the projection and is marked as a user assumption; it does not change the balance sheet.
+
+The monthly cash projection uses Decimal arithmetic and three bounded sensitivity cases. Recurring signed changes and dated one-time purchases, liability payments or other changes apply in their selected months. A purchase is a cash outflow only; the scenario does not liquidate assets, borrow, model taxes or change account balances. The UI reports base-case month-by-month cash, ending cash and first nonpositive month, historical cash-flow context, assumptions/source labels, warnings, input revisions and a deterministic fingerprint. Results are not saved; JSON export is client-side.
+
+Focused S3.5 verification:
+
+```sh
+UV_CACHE_DIR=/private/tmp/codex-personal-finance-uv-cache uv run --directory services/api --locked pytest -q tests/test_stage3_performance.py tests/test_stage3_planning.py tests/test_stage3_portfolio_scenarios.py tests/test_stage3_sales.py tests/test_stage3_tax_lots.py tests/test_stage3_history.py
+```
+
+This command passed 27 tests, including explicit income/expense/dividend assumptions, a scheduled purchase, sensitivity calculations, retirement and unknown-cash handling, liability separation, missing history, validation bounds, and unchanged canonical record counts. Focused Ruff, formatting, mypy, web TypeScript, changed-file ESLint, web tests (9), production build, and generated OpenAPI validation passed. The planning endpoint adds no persistent schema or migration. It was exercised with synthetic SQLite fixtures only; live PostgreSQL 16 and Aurora DSQL runtime checks remain outstanding.

@@ -696,3 +696,249 @@ class PortfolioScenarioRead(BaseModel):
     canonical_records_mutated: Literal[False]
     persisted: Literal[False]
     assumptions: list[str]
+
+
+class PlanningRecurringChangeInput(BaseModel):
+    amount: str = Field(max_length=40, pattern=r"^-?\d+(?:\.\d{1,10})?$")
+    label: str = Field(min_length=1, max_length=100)
+
+    @field_validator("amount")
+    @classmethod
+    def recurring_precision(cls, value: str) -> str:
+        if len(value.lstrip("-").split(".")[0]) > 18:
+            raise ValueError("Recurring change exceeds NUMERIC(28, 10) precision")
+        if Decimal(value) == 0:
+            raise ValueError("Recurring changes must be nonzero")
+        return value
+
+    @field_validator("label")
+    @classmethod
+    def trim_recurring_label(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Recurring change label cannot be blank")
+        return normalized
+
+
+class PlanningOneTimeChangeInput(BaseModel):
+    month_offset: int = Field(ge=1, le=120)
+    change_type: Literal["purchase", "liability_payment", "other"]
+    amount: str = Field(max_length=40, pattern=r"^-?\d+(?:\.\d{1,10})?$")
+    label: str = Field(min_length=1, max_length=100)
+
+    @field_validator("amount")
+    @classmethod
+    def one_time_precision(cls, value: str) -> str:
+        if len(value.lstrip("-").split(".")[0]) > 18:
+            raise ValueError("One-time change exceeds NUMERIC(28, 10) precision")
+        if Decimal(value) == 0:
+            raise ValueError("One-time changes must be nonzero")
+        return value
+
+    @field_validator("label")
+    @classmethod
+    def trim_one_time_label(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("One-time change label cannot be blank")
+        return normalized
+
+    @model_validator(mode="after")
+    def enforce_outflow_sign(self) -> "PlanningOneTimeChangeInput":
+        if (
+            self.change_type in {"purchase", "liability_payment"}
+            and Decimal(self.amount) > 0
+        ):
+            raise ValueError("Purchases and liability payments must reduce cash")
+        return self
+
+
+class PlanningScenarioRequest(BaseModel):
+    account_ids: list[UUID] = Field(default_factory=list, max_length=100)
+    as_of: date
+    horizon_months: int = Field(ge=1, le=120)
+    history_months: int = Field(ge=1, le=60)
+    monthly_income: str = Field(max_length=40, pattern=r"^\d+(?:\.\d{1,10})?$")
+    monthly_income_source: str = Field(min_length=1, max_length=100)
+    monthly_expenses: str = Field(max_length=40, pattern=r"^\d+(?:\.\d{1,10})?$")
+    monthly_expenses_source: str = Field(min_length=1, max_length=100)
+    monthly_dividends: str = Field(max_length=40, pattern=r"^\d+(?:\.\d{1,10})?$")
+    monthly_dividends_source: str = Field(min_length=1, max_length=100)
+    sensitivity_percent: str = Field(max_length=40, pattern=r"^\d+(?:\.\d{1,10})?$")
+    starting_cash_override: str | None = Field(
+        default=None, max_length=40, pattern=r"^\d+(?:\.\d{1,10})?$"
+    )
+    recurring_changes: list[PlanningRecurringChangeInput] = Field(
+        default_factory=list, max_length=20
+    )
+    one_time_changes: list[PlanningOneTimeChangeInput] = Field(
+        default_factory=list, max_length=100
+    )
+    scenario_label: str = Field(min_length=1, max_length=100)
+
+    @field_validator(
+        "monthly_income",
+        "monthly_expenses",
+        "monthly_dividends",
+        "starting_cash_override",
+    )
+    @classmethod
+    def planning_amount_precision(cls, value: str | None) -> str | None:
+        if value is not None and len(value.split(".")[0]) > 18:
+            raise ValueError("Planning amount exceeds NUMERIC(28, 10) precision")
+        return value
+
+    @field_validator("sensitivity_percent")
+    @classmethod
+    def bounded_sensitivity(cls, value: str) -> str:
+        amount = Decimal(value)
+        if amount > 50:
+            raise ValueError("Sensitivity must be between 0 and 50 percent")
+        return value
+
+    @field_validator(
+        "monthly_income_source",
+        "monthly_expenses_source",
+        "monthly_dividends_source",
+        "scenario_label",
+    )
+    @classmethod
+    def trim_assumption_labels(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Planning labels cannot be blank")
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_scope(self) -> "PlanningScenarioRequest":
+        if len(self.account_ids) != len(set(self.account_ids)):
+            raise ValueError("Selected accounts must be unique")
+        if any(row.month_offset > self.horizon_months for row in self.one_time_changes):
+            raise ValueError("One-time changes must fall within the projection horizon")
+        return self
+
+
+class PlanningAccountLineRead(BaseModel):
+    account_id: UUID
+    account_name: str
+    account_type: str
+    position_snapshot_id: UUID | None = None
+    position_revision: int | None = None
+    account_balance_id: UUID | None = None
+    balance_revision: int | None = None
+    as_of: date | None
+    price_as_of: datetime | None = None
+    currency: str | None
+    amount: str | None
+    bucket: Literal[
+        "liquid_cash",
+        "investment",
+        "restricted_asset",
+        "other_asset",
+        "liability",
+        "foreign_asset",
+        "unavailable",
+        "excluded",
+    ]
+    source: str | None
+    quality_status: str
+    status: str
+    detail: str | None
+    included_in_starting_cash: bool
+
+
+class PlanningCurrencyBalanceRead(BaseModel):
+    currency: str
+    liquid_cash: str
+    investment_assets: str
+    restricted_assets: str
+    other_assets: str
+    liabilities: str
+    known_net_worth: str
+    completeness: Literal["complete", "incomplete"]
+
+
+class PlanningTransactionHistoryRead(BaseModel):
+    currency: str
+    source_labels: list[str]
+    income_total: str
+    expenses_total: str
+    net_cash_flow: str
+    income_monthly_average: str | None
+    expenses_monthly_average: str | None
+    published_transaction_count: int
+    classified_transaction_count: int
+    unclassified_count: int
+    unclassified_signed_amount: str
+
+
+class PlanningDividendHistoryRead(BaseModel):
+    currency: str
+    total: str
+    monthly_average: str
+    event_count: int
+    source_labels: list[str]
+
+
+class PlanningProjectionMonthRead(BaseModel):
+    month_index: int
+    month_start: date
+    starting_cash: str
+    income: str
+    expenses: str
+    dividends: str
+    recurring_changes: str
+    one_time_changes: str
+    ending_cash: str
+
+
+class PlanningProjectionCaseRead(BaseModel):
+    case: Literal["conservative", "base", "optimistic"]
+    starting_cash: str
+    ending_cash: str
+    shortfall_month: int | None
+    runway_status: Literal[
+        "shortfall_within_horizon", "beyond_horizon", "coverage_incomplete"
+    ]
+    months: list[PlanningProjectionMonthRead]
+
+
+class PlanningScenarioRead(BaseModel):
+    methodology_version: str
+    scenario_label: str
+    as_of: date
+    projection_start: date
+    horizon_months: int
+    history_start: date
+    history_end: date
+    account_ids: list[UUID]
+    account_names: list[str]
+    account_position_revisions: dict[str, int]
+    position_snapshot_ids: dict[str, UUID]
+    account_balance_revisions: dict[str, int]
+    account_balance_ids: dict[str, UUID]
+    balances: list[PlanningAccountLineRead]
+    currency_balances: list[PlanningCurrencyBalanceRead]
+    balance_sheet_complete: bool
+    liquid_cash_observed_usd: str
+    starting_cash_usd: str
+    starting_cash_source: Literal["observed_usd_cash", "user_override"]
+    starting_cash_coverage: Literal["complete", "incomplete", "user_assumed"]
+    transaction_history: list[PlanningTransactionHistoryRead]
+    dividend_history: list[PlanningDividendHistoryRead]
+    history_gaps: list[str]
+    monthly_income_assumption: str
+    monthly_income_source: str
+    monthly_expense_assumption: str
+    monthly_expenses_source: str
+    monthly_dividend_assumption: str
+    monthly_dividends_source: str
+    sensitivity_percent: str
+    recurring_changes: list[PlanningRecurringChangeInput]
+    one_time_changes: list[PlanningOneTimeChangeInput]
+    projection_status: Literal["available", "incomplete"]
+    cases: list[PlanningProjectionCaseRead]
+    warnings: list[str]
+    scenario_fingerprint: str
+    canonical_records_mutated: Literal[False]
+    persisted: Literal[False]

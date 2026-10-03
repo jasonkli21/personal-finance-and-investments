@@ -2345,6 +2345,907 @@
         "title": "OwnedValuationLine",
         "type": "object"
       },
+      "PlanningAccountLineRead": {
+        "properties": {
+          "account_balance_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Account Balance Id"
+          },
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "account_name": {
+            "title": "Account Name",
+            "type": "string"
+          },
+          "account_type": {
+            "title": "Account Type",
+            "type": "string"
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "balance_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Balance Revision"
+          },
+          "bucket": {
+            "enum": [
+              "liquid_cash",
+              "investment",
+              "restricted_asset",
+              "other_asset",
+              "liability",
+              "foreign_asset",
+              "unavailable",
+              "excluded"
+            ],
+            "title": "Bucket",
+            "type": "string"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "included_in_starting_cash": {
+            "title": "Included In Starting Cash",
+            "type": "boolean"
+          },
+          "position_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position Revision"
+          },
+          "position_snapshot_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position Snapshot Id"
+          },
+          "price_as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price As Of"
+          },
+          "quality_status": {
+            "title": "Quality Status",
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "account_name",
+          "account_type",
+          "as_of",
+          "currency",
+          "amount",
+          "bucket",
+          "source",
+          "quality_status",
+          "status",
+          "detail",
+          "included_in_starting_cash"
+        ],
+        "title": "PlanningAccountLineRead",
+        "type": "object"
+      },
+      "PlanningCurrencyBalanceRead": {
+        "properties": {
+          "completeness": {
+            "enum": [
+              "complete",
+              "incomplete"
+            ],
+            "title": "Completeness",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "investment_assets": {
+            "title": "Investment Assets",
+            "type": "string"
+          },
+          "known_net_worth": {
+            "title": "Known Net Worth",
+            "type": "string"
+          },
+          "liabilities": {
+            "title": "Liabilities",
+            "type": "string"
+          },
+          "liquid_cash": {
+            "title": "Liquid Cash",
+            "type": "string"
+          },
+          "other_assets": {
+            "title": "Other Assets",
+            "type": "string"
+          },
+          "restricted_assets": {
+            "title": "Restricted Assets",
+            "type": "string"
+          }
+        },
+        "required": [
+          "currency",
+          "liquid_cash",
+          "investment_assets",
+          "restricted_assets",
+          "other_assets",
+          "liabilities",
+          "known_net_worth",
+          "completeness"
+        ],
+        "title": "PlanningCurrencyBalanceRead",
+        "type": "object"
+      },
+      "PlanningDividendHistoryRead": {
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "event_count": {
+            "title": "Event Count",
+            "type": "integer"
+          },
+          "monthly_average": {
+            "title": "Monthly Average",
+            "type": "string"
+          },
+          "source_labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Labels",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "string"
+          }
+        },
+        "required": [
+          "currency",
+          "total",
+          "monthly_average",
+          "event_count",
+          "source_labels"
+        ],
+        "title": "PlanningDividendHistoryRead",
+        "type": "object"
+      },
+      "PlanningOneTimeChangeInput": {
+        "properties": {
+          "amount": {
+            "maxLength": 40,
+            "pattern": "^-?\\d+(?:\\.\\d{1,10})?$",
+            "title": "Amount",
+            "type": "string"
+          },
+          "change_type": {
+            "enum": [
+              "purchase",
+              "liability_payment",
+              "other"
+            ],
+            "title": "Change Type",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "month_offset": {
+            "maximum": 120.0,
+            "minimum": 1.0,
+            "title": "Month Offset",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "month_offset",
+          "change_type",
+          "amount",
+          "label"
+        ],
+        "title": "PlanningOneTimeChangeInput",
+        "type": "object"
+      },
+      "PlanningProjectionCaseRead": {
+        "properties": {
+          "case": {
+            "enum": [
+              "conservative",
+              "base",
+              "optimistic"
+            ],
+            "title": "Case",
+            "type": "string"
+          },
+          "ending_cash": {
+            "title": "Ending Cash",
+            "type": "string"
+          },
+          "months": {
+            "items": {
+              "$ref": "#/components/schemas/PlanningProjectionMonthRead"
+            },
+            "title": "Months",
+            "type": "array"
+          },
+          "runway_status": {
+            "enum": [
+              "shortfall_within_horizon",
+              "beyond_horizon",
+              "coverage_incomplete"
+            ],
+            "title": "Runway Status",
+            "type": "string"
+          },
+          "shortfall_month": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shortfall Month"
+          },
+          "starting_cash": {
+            "title": "Starting Cash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "case",
+          "starting_cash",
+          "ending_cash",
+          "shortfall_month",
+          "runway_status",
+          "months"
+        ],
+        "title": "PlanningProjectionCaseRead",
+        "type": "object"
+      },
+      "PlanningProjectionMonthRead": {
+        "properties": {
+          "dividends": {
+            "title": "Dividends",
+            "type": "string"
+          },
+          "ending_cash": {
+            "title": "Ending Cash",
+            "type": "string"
+          },
+          "expenses": {
+            "title": "Expenses",
+            "type": "string"
+          },
+          "income": {
+            "title": "Income",
+            "type": "string"
+          },
+          "month_index": {
+            "title": "Month Index",
+            "type": "integer"
+          },
+          "month_start": {
+            "format": "date",
+            "title": "Month Start",
+            "type": "string"
+          },
+          "one_time_changes": {
+            "title": "One Time Changes",
+            "type": "string"
+          },
+          "recurring_changes": {
+            "title": "Recurring Changes",
+            "type": "string"
+          },
+          "starting_cash": {
+            "title": "Starting Cash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "month_index",
+          "month_start",
+          "starting_cash",
+          "income",
+          "expenses",
+          "dividends",
+          "recurring_changes",
+          "one_time_changes",
+          "ending_cash"
+        ],
+        "title": "PlanningProjectionMonthRead",
+        "type": "object"
+      },
+      "PlanningRecurringChangeInput": {
+        "properties": {
+          "amount": {
+            "maxLength": 40,
+            "pattern": "^-?\\d+(?:\\.\\d{1,10})?$",
+            "title": "Amount",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "label"
+        ],
+        "title": "PlanningRecurringChangeInput",
+        "type": "object"
+      },
+      "PlanningScenarioRead": {
+        "properties": {
+          "account_balance_ids": {
+            "additionalProperties": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Account Balance Ids",
+            "type": "object"
+          },
+          "account_balance_revisions": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Account Balance Revisions",
+            "type": "object"
+          },
+          "account_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Account Ids",
+            "type": "array"
+          },
+          "account_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Account Names",
+            "type": "array"
+          },
+          "account_position_revisions": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Account Position Revisions",
+            "type": "object"
+          },
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "balance_sheet_complete": {
+            "title": "Balance Sheet Complete",
+            "type": "boolean"
+          },
+          "balances": {
+            "items": {
+              "$ref": "#/components/schemas/PlanningAccountLineRead"
+            },
+            "title": "Balances",
+            "type": "array"
+          },
+          "canonical_records_mutated": {
+            "const": false,
+            "title": "Canonical Records Mutated",
+            "type": "boolean"
+          },
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/PlanningProjectionCaseRead"
+            },
+            "title": "Cases",
+            "type": "array"
+          },
+          "currency_balances": {
+            "items": {
+              "$ref": "#/components/schemas/PlanningCurrencyBalanceRead"
+            },
+            "title": "Currency Balances",
+            "type": "array"
+          },
+          "dividend_history": {
+            "items": {
+              "$ref": "#/components/schemas/PlanningDividendHistoryRead"
+            },
+            "title": "Dividend History",
+            "type": "array"
+          },
+          "history_end": {
+            "format": "date",
+            "title": "History End",
+            "type": "string"
+          },
+          "history_gaps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "History Gaps",
+            "type": "array"
+          },
+          "history_start": {
+            "format": "date",
+            "title": "History Start",
+            "type": "string"
+          },
+          "horizon_months": {
+            "title": "Horizon Months",
+            "type": "integer"
+          },
+          "liquid_cash_observed_usd": {
+            "title": "Liquid Cash Observed Usd",
+            "type": "string"
+          },
+          "methodology_version": {
+            "title": "Methodology Version",
+            "type": "string"
+          },
+          "monthly_dividend_assumption": {
+            "title": "Monthly Dividend Assumption",
+            "type": "string"
+          },
+          "monthly_dividends_source": {
+            "title": "Monthly Dividends Source",
+            "type": "string"
+          },
+          "monthly_expense_assumption": {
+            "title": "Monthly Expense Assumption",
+            "type": "string"
+          },
+          "monthly_expenses_source": {
+            "title": "Monthly Expenses Source",
+            "type": "string"
+          },
+          "monthly_income_assumption": {
+            "title": "Monthly Income Assumption",
+            "type": "string"
+          },
+          "monthly_income_source": {
+            "title": "Monthly Income Source",
+            "type": "string"
+          },
+          "one_time_changes": {
+            "items": {
+              "$ref": "#/components/schemas/PlanningOneTimeChangeInput"
+            },
+            "title": "One Time Changes",
+            "type": "array"
+          },
+          "persisted": {
+            "const": false,
+            "title": "Persisted",
+            "type": "boolean"
+          },
+          "position_snapshot_ids": {
+            "additionalProperties": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Position Snapshot Ids",
+            "type": "object"
+          },
+          "projection_start": {
+            "format": "date",
+            "title": "Projection Start",
+            "type": "string"
+          },
+          "projection_status": {
+            "enum": [
+              "available",
+              "incomplete"
+            ],
+            "title": "Projection Status",
+            "type": "string"
+          },
+          "recurring_changes": {
+            "items": {
+              "$ref": "#/components/schemas/PlanningRecurringChangeInput"
+            },
+            "title": "Recurring Changes",
+            "type": "array"
+          },
+          "scenario_fingerprint": {
+            "title": "Scenario Fingerprint",
+            "type": "string"
+          },
+          "scenario_label": {
+            "title": "Scenario Label",
+            "type": "string"
+          },
+          "sensitivity_percent": {
+            "title": "Sensitivity Percent",
+            "type": "string"
+          },
+          "starting_cash_coverage": {
+            "enum": [
+              "complete",
+              "incomplete",
+              "user_assumed"
+            ],
+            "title": "Starting Cash Coverage",
+            "type": "string"
+          },
+          "starting_cash_source": {
+            "enum": [
+              "observed_usd_cash",
+              "user_override"
+            ],
+            "title": "Starting Cash Source",
+            "type": "string"
+          },
+          "starting_cash_usd": {
+            "title": "Starting Cash Usd",
+            "type": "string"
+          },
+          "transaction_history": {
+            "items": {
+              "$ref": "#/components/schemas/PlanningTransactionHistoryRead"
+            },
+            "title": "Transaction History",
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "methodology_version",
+          "scenario_label",
+          "as_of",
+          "projection_start",
+          "horizon_months",
+          "history_start",
+          "history_end",
+          "account_ids",
+          "account_names",
+          "account_position_revisions",
+          "position_snapshot_ids",
+          "account_balance_revisions",
+          "account_balance_ids",
+          "balances",
+          "currency_balances",
+          "balance_sheet_complete",
+          "liquid_cash_observed_usd",
+          "starting_cash_usd",
+          "starting_cash_source",
+          "starting_cash_coverage",
+          "transaction_history",
+          "dividend_history",
+          "history_gaps",
+          "monthly_income_assumption",
+          "monthly_income_source",
+          "monthly_expense_assumption",
+          "monthly_expenses_source",
+          "monthly_dividend_assumption",
+          "monthly_dividends_source",
+          "sensitivity_percent",
+          "recurring_changes",
+          "one_time_changes",
+          "projection_status",
+          "cases",
+          "warnings",
+          "scenario_fingerprint",
+          "canonical_records_mutated",
+          "persisted"
+        ],
+        "title": "PlanningScenarioRead",
+        "type": "object"
+      },
+      "PlanningScenarioRequest": {
+        "properties": {
+          "account_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 100,
+            "title": "Account Ids",
+            "type": "array"
+          },
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "history_months": {
+            "maximum": 60.0,
+            "minimum": 1.0,
+            "title": "History Months",
+            "type": "integer"
+          },
+          "horizon_months": {
+            "maximum": 120.0,
+            "minimum": 1.0,
+            "title": "Horizon Months",
+            "type": "integer"
+          },
+          "monthly_dividends": {
+            "maxLength": 40,
+            "pattern": "^\\d+(?:\\.\\d{1,10})?$",
+            "title": "Monthly Dividends",
+            "type": "string"
+          },
+          "monthly_dividends_source": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Monthly Dividends Source",
+            "type": "string"
+          },
+          "monthly_expenses": {
+            "maxLength": 40,
+            "pattern": "^\\d+(?:\\.\\d{1,10})?$",
+            "title": "Monthly Expenses",
+            "type": "string"
+          },
+          "monthly_expenses_source": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Monthly Expenses Source",
+            "type": "string"
+          },
+          "monthly_income": {
+            "maxLength": 40,
+            "pattern": "^\\d+(?:\\.\\d{1,10})?$",
+            "title": "Monthly Income",
+            "type": "string"
+          },
+          "monthly_income_source": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Monthly Income Source",
+            "type": "string"
+          },
+          "one_time_changes": {
+            "items": {
+              "$ref": "#/components/schemas/PlanningOneTimeChangeInput"
+            },
+            "maxItems": 100,
+            "title": "One Time Changes",
+            "type": "array"
+          },
+          "recurring_changes": {
+            "items": {
+              "$ref": "#/components/schemas/PlanningRecurringChangeInput"
+            },
+            "maxItems": 20,
+            "title": "Recurring Changes",
+            "type": "array"
+          },
+          "scenario_label": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Scenario Label",
+            "type": "string"
+          },
+          "sensitivity_percent": {
+            "maxLength": 40,
+            "pattern": "^\\d+(?:\\.\\d{1,10})?$",
+            "title": "Sensitivity Percent",
+            "type": "string"
+          },
+          "starting_cash_override": {
+            "anyOf": [
+              {
+                "maxLength": 40,
+                "pattern": "^\\d+(?:\\.\\d{1,10})?$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Starting Cash Override"
+          }
+        },
+        "required": [
+          "as_of",
+          "horizon_months",
+          "history_months",
+          "monthly_income",
+          "monthly_income_source",
+          "monthly_expenses",
+          "monthly_expenses_source",
+          "monthly_dividends",
+          "monthly_dividends_source",
+          "sensitivity_percent",
+          "scenario_label"
+        ],
+        "title": "PlanningScenarioRequest",
+        "type": "object"
+      },
+      "PlanningTransactionHistoryRead": {
+        "properties": {
+          "classified_transaction_count": {
+            "title": "Classified Transaction Count",
+            "type": "integer"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "expenses_monthly_average": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expenses Monthly Average"
+          },
+          "expenses_total": {
+            "title": "Expenses Total",
+            "type": "string"
+          },
+          "income_monthly_average": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Income Monthly Average"
+          },
+          "income_total": {
+            "title": "Income Total",
+            "type": "string"
+          },
+          "net_cash_flow": {
+            "title": "Net Cash Flow",
+            "type": "string"
+          },
+          "published_transaction_count": {
+            "title": "Published Transaction Count",
+            "type": "integer"
+          },
+          "source_labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Labels",
+            "type": "array"
+          },
+          "unclassified_count": {
+            "title": "Unclassified Count",
+            "type": "integer"
+          },
+          "unclassified_signed_amount": {
+            "title": "Unclassified Signed Amount",
+            "type": "string"
+          }
+        },
+        "required": [
+          "currency",
+          "source_labels",
+          "income_total",
+          "expenses_total",
+          "net_cash_flow",
+          "income_monthly_average",
+          "expenses_monthly_average",
+          "published_transaction_count",
+          "classified_transaction_count",
+          "unclassified_count",
+          "unclassified_signed_amount"
+        ],
+        "title": "PlanningTransactionHistoryRead",
+        "type": "object"
+      },
       "PortfolioCategoryTargetInput": {
         "properties": {
           "category": {
@@ -9246,6 +10147,44 @@
           }
         },
         "summary": "Post Manual Quote"
+      }
+    },
+    "/v1/planning/scenarios": {
+      "post": {
+        "operationId": "create_planning_scenario_v1_planning_scenarios_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanningScenarioRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanningScenarioRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Planning Scenario"
       }
     },
     "/v1/portfolio/history": {

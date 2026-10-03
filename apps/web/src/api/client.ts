@@ -736,3 +736,9 @@ export async function simulatePortfolioScenario(
 ) {
   return unwrap(await api.POST('/v1/simulations/portfolio', { body: input }))
 }
+
+export async function simulatePlanningScenario(
+  input: components['schemas']['PlanningScenarioRequest'],
+) {
+  return unwrap(await api.POST('/v1/planning/scenarios', { body: input }))
+}
