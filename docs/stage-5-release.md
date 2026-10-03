@@ -39,13 +39,19 @@ Added `app/integrations/research_evidence.py` with a finance-side issuer/documen
 
 This schema is a **provisional finance validation envelope**, not an agreed personal-AI request/response contract. It does not provide HTTP transport, retrieval, caching, indexing, source parsing, or model routing. Its identity/hash/offset checks validate the service's metadata claims against the user's registered reference; they do not fetch SEC content or independently verify excerpts. The existing immutable finance research result and DSQL migration plan remain independent of generic upstream index storage. No evidence candidate from a service is currently persisted or rendered.
 
+## S5.5 — Public monitoring deferred at the job gate
+
+No scheduled monitor, public-source poller, notification sender, or monitoring schema was added. S5.3 watchlist entries remain user-edited local state and do not imply refreshes or alerts. The Stage 2 release record says the existing PDF worker is partial: worker restart/cancellation acceptance, output reuse, cleanup, benchmark, and live DSQL lease evidence remain outstanding. Its worker is a local in-process PDF-preview path, not an approved research scheduler or a production SQS/DSQL worker. Stage 2 itself is explicitly not complete.
+
+This blocks a safe S5.5 implementation because monitoring requires durable idempotent scheduling/retry/cancel semantics, deduplication across amended source content, restart recovery and cleanup, and delivery receipts independent from source/model work. The DSQL compatibility contract requires live concurrent-claim, lease-expiry, stale-completion, cancellation, and retry evidence before relying on a database lease. A source refresh/notification path also needs an approved source scope, cadence, retention, user notification preference/channel, and verified source rights. None of these gates were established here. No provider, personal data, DSQL cluster, or notification channel was contacted.
+
 ### Remaining gates
 
 - **S5.1.2 shared public observations:** not implemented. Requires an agreed service request/response contract with issuer and filing eligibility, retrievable provenance/excerpts, size/freshness limits, and service authorization. Upstream's current session/SSE API does not establish that contract.
 - **S5.2.2 synthesized cited research:** not implemented. The only enabled path is the deterministic, user-entered source/fact baseline. No model output is emitted or treated as evidence.
 - **S5.3 remote context/inference and automatic report history:** not implemented. Portfolio context and thesis notes remain local; only manually registered filings are available.
 - **S5.4 shared evidence retrieval:** not integrated. The upstream contract, authorization, evidence provenance, and owner propagation remain unresolved; no finance index/search/database is added.
-- **S5.5 monitoring:** not implemented. Stage 2 job delivery, restart, cleanup, and live DSQL lease acceptance remain partial/unverified; adding a second scheduler or notification path would bypass the dependency gate.
+- **S5.5 monitoring:** not implemented. Stage 2 job delivery, restart, cleanup, and live DSQL lease acceptance remain partial/unverified; source cadence/rights and notification policy are undecided.
 - **S5.6 evaluation/release:** pending. Real DSQL is unverified; hosted promotion remains blocked by Stage 4 evidence and authorization gates.
 
 ## S5.1 verification
@@ -72,3 +78,8 @@ This schema is a **provisional finance validation envelope**, not an agreed pers
 
 - `UV_CACHE_DIR=/private/tmp/codex-finance-stage5-uv-cache uv run --directory services/api --locked pytest -q tests/test_stage5_evidence.py` — **4 passed**. Fixtures cover scoped identity, missing attribution, stale dates, offset mismatch, source conflicts, insufficient evidence, and item/byte limits.
 - The validator module and synthetic test passed mypy and Ruff. No personal-AI/SEC/IR transport was called; upstream wire compatibility and evidence authenticity remain unverified by design.
+
+## S5.5 verification
+
+- Reviewed [`docs/stage-2-release.md`](stage-2-release.md) and [`docs/07-aurora-dsql-compatibility.md`](07-aurora-dsql-compatibility.md): Stage 2 S2.6 is partial; restart/cancellation acceptance, parsed-output reuse, cleanup, and real DSQL lease tests remain required. The Stage 2 local worker is in-process and handles PDF preview only.
+- No S5.5 code or tests were added because the durable scheduling and delivery gates are not met. Existing watchlists are manual and offline; they do not fetch or notify.
