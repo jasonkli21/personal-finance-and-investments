@@ -73,7 +73,9 @@ def _currency_bucket() -> dict[str, Decimal]:
     }
 
 
-def _baseline(session: Session, accounts: list[Account], as_of: date) -> dict[str, Any]:
+def _baseline_calculate(
+    session: Session, accounts: list[Account], as_of: date
+) -> dict[str, Any]:
     account_ids = [account.id for account in accounts]
     latest_balances: dict[UUID, AccountBalanceObservation] = {}
     for account_id in account_ids:
@@ -394,6 +396,12 @@ def _baseline(session: Session, accounts: list[Account], as_of: date) -> dict[st
         "warnings": warnings,
         "currency_incomplete": dict(per_currency_incomplete),
     }
+
+
+def _baseline(session: Session, accounts: list[Account], as_of: date) -> dict[str, Any]:
+    with localcontext() as context:
+        context.prec = 80
+        return _baseline_calculate(session, accounts, as_of)
 
 
 def _history(

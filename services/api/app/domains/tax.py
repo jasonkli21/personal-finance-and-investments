@@ -6,15 +6,16 @@ import csv
 import hashlib
 import io
 import json
+import os
 import re
 from collections import defaultdict
-from datetime import date
-from decimal import Decimal, InvalidOperation
+from datetime import UTC, date
+from decimal import Decimal, InvalidOperation, localcontext
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import UUID, uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.api.stage3_contracts import (
@@ -478,15 +479,37 @@ def _adjustments(
 def lot_state(
     lot: TaxLot, adjustments: list[TaxLotAdjustment]
 ) -> tuple[Decimal, Decimal | None]:
-    quantity = lot.remaining_quantity + sum(
-        (row.quantity_delta or Decimal(0) for row in adjustments), Decimal(0)
-    )
-    basis = None
-    if lot.remaining_basis is not None:
-        basis = lot.remaining_basis + sum(
-            (row.basis_delta or Decimal(0) for row in adjustments), Decimal(0)
+    with localcontext() as context:
+        context.prec = 80
+        quantity = lot.remaining_quantity + sum(
+            (row.quantity_delta or Decimal(0) for row in adjustments), Decimal(0)
         )
-    return quantity, basis
+        basis = None
+        if lot.remaining_basis is not None:
+            basis = lot.remaining_basis + sum(
+                (row.basis_delta or Decimal(0) for row in adjustments), Decimal(0)
+            )
+        return quantity, basis
+
+
+def _adjustments_keep_nonnegative(
+    quantity: Decimal,
+    basis: Decimal | None,
+    adjustments: list[TaxLotAdjustment],
+) -> bool:
+    with localcontext() as context:
+        context.prec = 80
+        current_quantity = quantity
+        current_basis = basis
+        for adjustment in adjustments:
+            current_quantity += adjustment.quantity_delta or Decimal(0)
+            if current_quantity < 0:
+                return False
+            if current_basis is not None:
+                current_basis += adjustment.basis_delta or Decimal(0)
+                if current_basis < 0:
+                    return False
+        return True
 
 
 def _quantity_reconciliation(
@@ -636,6 +659,22 @@ def correct_import_row(
         raise TaxError("Only an unpublished import can be corrected.")
     if record.review_revision != data.expected_revision:
         raise TaxError("Tax-lot review revision changed; reload before correcting.")
+    claimed_revision = data.expected_revision + 1
+    claim = cast(
+        Any,
+        session.execute(
+            update(TaxLotImport)
+            .where(
+                TaxLotImport.id == import_id,
+                TaxLotImport.status == "review",
+                TaxLotImport.review_revision == data.expected_revision,
+            )
+            .values(review_revision=claimed_revision, updated_at=utc_now())
+            .execution_options(synchronize_session=False)
+        ),
+    )
+    if claim.rowcount != 1:
+        raise TaxError("Tax-lot review revision changed; reload before correcting.")
     row = session.scalar(
         select(TaxLotImportRow).where(
             TaxLotImportRow.id == row_id, TaxLotImportRow.import_id == import_id
@@ -782,7 +821,7 @@ def correct_import_row(
                     break
     row.row_status = status
     row.diagnostics = diagnostics
-    record.review_revision += 1
+    record.review_revision = claimed_revision
     record.updated_at = utc_now()
     session.add(
         TaxLotReviewEvent(
@@ -807,6 +846,8 @@ def publish_import(
     record = session.get(TaxLotImport, import_id)
     if record is None:
         raise TaxError("Tax-lot import not found.")
+    if record.status == "published":
+        return record
     if record.status != "review":
         raise TaxError("Tax-lot import is not awaiting publication.")
     if record.review_revision != data.expected_revision:
@@ -818,6 +859,54 @@ def publish_import(
             .order_by(TaxLotImportRow.row_number)
         )
     )
+    try:
+        publication_limit = int(
+            os.environ.get("TAX_LOT_PUBLICATION_MAX_ROWS", str(MAX_TAX_LOT_ROWS))
+        )
+    except ValueError as exc:
+        raise TaxError("Tax-lot publication batch limit is invalid.") from exc
+    if not 1 <= publication_limit <= MAX_TAX_LOT_ROWS:
+        raise TaxError("Tax-lot publication batch limit must be between 1 and 500.")
+    if len(rows) > publication_limit:
+        raise TaxError(
+            f"This import has {len(rows)} rows, above the configured safe "
+            f"publication limit of {publication_limit}."
+        )
+    published_keys = set(
+        session.scalars(
+            select(TaxLot.identity_key).where(
+                TaxLot.account_id == record.account_id,
+                TaxLot.source_label == record.source_label,
+            )
+        )
+    )
+    seen_keys = set(published_keys)
+    for row in rows:
+        if (
+            row.row_status != "ready"
+            or row.security_id is None
+            or row.remaining_quantity is None
+        ):
+            continue
+        identity_key = _identity_key(
+            account_id=record.account_id,
+            source_label=record.source_label,
+            security_id=row.security_id,
+            source_lot_id=row.raw_source_lot_id,
+            acquired_at=row.acquired_at,
+            initial_quantity=row.initial_quantity,
+            remaining_quantity=row.remaining_quantity,
+            remaining_basis=row.remaining_basis,
+            basis_currency=row.basis_currency,
+        )
+        if identity_key in seen_keys:
+            row.row_status = "duplicate"
+            row.diagnostics = {
+                **row.diagnostics,
+                "duplicate_source_identity": True,
+            }
+        else:
+            seen_keys.add(identity_key)
     if any(row.row_status == "needs_review" for row in rows):
         raise TaxError("Correct or explicitly resolve every blocking row first.")
     differences, gaps = _quantity_reconciliation(session, record, rows)
@@ -827,6 +916,29 @@ def publish_import(
             "Review and acknowledge lot-to-position differences and coverage gaps "
             "before publication."
         )
+    claimed = cast(
+        Any,
+        session.execute(
+            update(TaxLotImport)
+            .where(
+                TaxLotImport.id == import_id,
+                TaxLotImport.status == "review",
+                TaxLotImport.review_revision == data.expected_revision,
+            )
+            .values(status="published", published_at=utc_now(), updated_at=utc_now())
+            .execution_options(synchronize_session=False)
+        ),
+    )
+    if claimed.rowcount != 1:
+        raise TaxError("Tax-lot review revision changed; reload before publication.")
+    existing_keys = set(
+        session.scalars(
+            select(TaxLot.identity_key).where(
+                TaxLot.account_id == record.account_id,
+                TaxLot.source_label == record.source_label,
+            )
+        )
+    )
     for row in rows:
         if row.row_status != "ready":
             continue
@@ -845,6 +957,13 @@ def publish_import(
             remaining_basis=row.remaining_basis,
             basis_currency=row.basis_currency,
         )
+        if identity_key in existing_keys:
+            row.row_status = "duplicate"
+            row.diagnostics = {
+                **row.diagnostics,
+                "duplicate_source_identity": True,
+            }
+            continue
         session.add(
             TaxLot(
                 id=uuid4(),
@@ -866,8 +985,9 @@ def publish_import(
             )
         )
         row.row_status = "published"
+        existing_keys.add(identity_key)
     record.status = "published"
-    record.published_at = utc_now()
+    record.published_at = record.published_at or utc_now()
     record.updated_at = record.published_at
     session.add(
         TaxLotReviewEvent(
@@ -1016,15 +1136,20 @@ def create_adjustment(
         return existing
     prior = list(
         session.scalars(
-            select(TaxLotAdjustment).where(TaxLotAdjustment.tax_lot_id == lot_id)
+            select(TaxLotAdjustment)
+            .where(TaxLotAdjustment.tax_lot_id == lot_id)
+            .order_by(
+                TaxLotAdjustment.effective_date,
+                TaxLotAdjustment.created_at,
+                TaxLotAdjustment.id,
+            )
+            .limit(10_001)
         )
     )
-    quantity, basis = lot_state(lot, prior)
-    if quantity_delta is not None and quantity + quantity_delta < 0:
-        raise TaxError("Adjustment cannot reduce the lot below zero shares.")
-    if basis_delta is not None and basis is not None and basis + basis_delta < 0:
-        raise TaxError("Adjustment cannot reduce remaining basis below zero.")
-    row = TaxLotAdjustment(
+    if len(prior) > 10_000:
+        raise TaxError("Lot adjustment history exceeds the 10,000-row write limit.")
+    all_adjustments = [*prior]
+    candidate = TaxLotAdjustment(
         id=uuid4(),
         tax_lot_id=lot_id,
         adjustment_type=data.adjustment_type,
@@ -1038,6 +1163,40 @@ def create_adjustment(
         idempotency_key=data.idempotency_key,
         raw_values=data.raw_values,
     )
-    session.add(row)
+    candidate.created_at = utc_now()
+    all_adjustments.append(candidate)
+    all_adjustments.sort(
+        key=lambda row: (
+            row.effective_date,
+            row.created_at.replace(tzinfo=UTC)
+            if row.created_at.tzinfo is None
+            else row.created_at.astimezone(UTC),
+            row.id,
+        )
+    )
+    if not _adjustments_keep_nonnegative(
+        lot.remaining_quantity, lot.remaining_basis, all_adjustments
+    ):
+        raise TaxError(
+            "Adjustment would make the lot quantity or basis negative at an "
+            "effective date."
+        )
+    fence = cast(
+        Any,
+        session.execute(
+            update(TaxLot)
+            .where(
+                TaxLot.id == lot_id,
+                TaxLot.state_revision == lot.state_revision,
+            )
+            .values(state_revision=TaxLot.state_revision + 1, updated_at=utc_now())
+            .execution_options(synchronize_session=False)
+        ),
+    )
+    if fence.rowcount != 1:
+        raise TaxError(
+            "Tax-lot state revision changed concurrently; retry the adjustment."
+        )
+    session.add(candidate)
     session.flush()
-    return row
+    return candidate

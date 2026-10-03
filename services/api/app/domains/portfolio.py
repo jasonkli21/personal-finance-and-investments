@@ -249,6 +249,8 @@ def read_owned_valuation(
                 incomplete = True
             if quality == "stale":
                 incomplete = True
+            if quality in {"estimated", "inferred", "unreviewed"}:
+                incomplete = True
             raw_lines.append(
                 {
                     "position_id": line.id,

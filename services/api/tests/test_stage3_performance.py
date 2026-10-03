@@ -48,6 +48,20 @@ def test_multiple_mwr_sign_changes_are_not_guessed() -> None:
     assert status == "ambiguous_multiple_roots"
 
 
+def test_same_day_flows_are_net_before_mwr_sign_change_analysis() -> None:
+    _result, status = money_weighted_return(
+        Decimal("100"),
+        Decimal("110"),
+        [
+            ExternalFlow(date(2026, 4, 1), Decimal("-200")),
+            ExternalFlow(date(2026, 4, 1), Decimal("50")),
+        ],
+        date(2026, 1, 1),
+        date(2027, 1, 1),
+    )
+    assert status != "ambiguous_multiple_roots"
+
+
 def test_modified_dietz_requires_positive_opening_value_and_period() -> None:
     assert (
         chained_modified_dietz(

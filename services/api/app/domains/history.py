@@ -91,6 +91,18 @@ def create_investment_event(
         quantity_delta is None or quantity_delta >= 0
     ):
         raise HistoryError("A transfer out must have a negative quantity change.")
+    if (
+        data.event_type == "transfer_in"
+        and cash_amount is not None
+        and cash_amount <= 0
+    ):
+        raise HistoryError("A transfer in cash value must be positive.")
+    if (
+        data.event_type == "transfer_out"
+        and cash_amount is not None
+        and cash_amount >= 0
+    ):
+        raise HistoryError("A transfer out cash value must be negative.")
     if data.event_type in {"split", "adjustment"} and (
         quantity_delta is None or quantity_delta == 0
     ):
@@ -130,6 +142,7 @@ def create_investment_event(
         same = same and prior.source_event_id == data.source_event_id
         same = same and prior.evidence_ref == data.evidence_ref
         same = same and prior.raw_values == data.raw_values
+        same = same and prior.quality_status == data.quality_status
         if not same:
             raise HistoryError("Idempotency key was used for a different event.")
         return prior
@@ -368,20 +381,53 @@ def read_performance(
             "Unreviewed investment events prevent a return calculation.",
             observed_dates=dates,
         )
-    external_rows = [row for row in event_rows if row.is_external_flow]
-    if any(row.currency != "USD" or row.cash_amount is None for row in external_rows):
+    unsupported = [row for row in event_rows if row.event_type == "other"]
+    if unsupported:
         return _unavailable_performance(
             account_id,
             start_date,
             end_date,
-            "External flows need dated USD cash amounts before returns can be "
-            "calculated.",
+            "Unsupported investment events prevent a complete return calculation.",
+            observed_dates=dates,
+        )
+    external_rows = [
+        row for row in event_rows if row.event_type in EXTERNAL_EVENT_TYPES
+    ]
+    transfer_rows = [
+        row for row in event_rows if row.event_type in {"transfer_in", "transfer_out"}
+    ]
+    transfer_values: dict[UUID, Decimal] = {}
+    for row in transfer_rows:
+        amount = row.cash_amount
+        if amount is None and row.security_id is not None:
+            transfer_security = session.get(Security, row.security_id)
+            if (
+                transfer_security is not None
+                and transfer_security.security_type == "cash"
+                and transfer_security.currency == "USD"
+            ):
+                amount = row.quantity_delta
+        if row.currency == "USD" and amount is not None:
+            transfer_values[row.id] = amount
+    if any(
+        row.currency != "USD" or row.cash_amount is None for row in external_rows
+    ) or len(transfer_values) != len(transfer_rows):
+        return _unavailable_performance(
+            account_id,
+            start_date,
+            end_date,
+            "External flows and account transfers need dated USD cash values "
+            "before per-account returns can be calculated.",
             observed_dates=dates,
         )
     flows = [
         performance.ExternalFlow(row.effective_date, row.cash_amount or Decimal(0))
         for row in external_rows
     ]
+    flows.extend(
+        performance.ExternalFlow(row.effective_date, transfer_values[row.id])
+        for row in transfer_rows
+    )
     twr = performance.chained_modified_dietz(points, flows)
     mwr, mwr_status = performance.money_weighted_return(
         points[0].value, points[-1].value, flows, start_date, end_date
@@ -400,7 +446,7 @@ def read_performance(
         "money_weighted_status": mwr_status,
         "methodology_version": performance.PERFORMANCE_VERSION,
         "observation_count": len(points),
-        "external_flow_count": len(flows),
+        "external_flow_count": len(external_rows),
         "observed_dates": dates,
         "diagnostics": [
             "Returns use accepted, complete USD position snapshots only.",
@@ -474,8 +520,12 @@ def reconcile_history(
             "gaps": ["Accepted position snapshots are required at both dates."],
         }
     quantities: dict[UUID, Decimal] = {}
+    start_cash: dict[str, list[UUID]] = {}
     for position in start_positions.snapshot.positions:
         quantities[position.security.id] = Decimal(position.quantity)
+        security = position.security
+        if security.security_type == "cash":
+            start_cash.setdefault(position.currency, []).append(security.id)
     events = list_investment_events(
         session,
         account_id=account_id,
@@ -486,7 +536,8 @@ def reconcile_history(
     for event in events:
         if event.review_status != "reviewed":
             gaps.append(f"Event {event.id} has not been reviewed.")
-        if event.is_external_flow and event.security_id is None:
+            continue
+        if event.event_type in EXTERNAL_EVENT_TYPES and event.security_id is None:
             gaps.append(
                 f"External flow {event.id} is not linked to a cash position; "
                 "cash reconciliation is unavailable for that event."
@@ -517,24 +568,48 @@ def reconcile_history(
                 gaps.append(
                     f"Adjustment event {event.id} lacks a security or quantity."
                 )
+        elif event.event_type in {"dividend", "fee"}:
+            pass
         elif event.event_type == "other":
             gaps.append(
                 f"Event {event.id} may affect quantities but is not applied "
                 "automatically."
             )
+        else:
+            gaps.append(
+                f"Event {event.id} ({event.event_type}) has unsupported quantity "
+                "effects."
+            )
+        if event.event_type in {"buy", "sell", "dividend", "fee"}:
+            cash_ids = start_cash.get(event.currency, [])
+            if event.cash_amount is None:
+                gaps.append(
+                    f"{event.event_type.title()} event {event.id} has no cash amount; "
+                    "cash reconciliation is unavailable."
+                )
+            elif len(cash_ids) != 1:
+                gaps.append(
+                    f"{event.event_type.title()} event {event.id} cannot be matched "
+                    "to one actual currency cash security."
+                )
+            else:
+                cash_id = cash_ids[0]
+                quantities[cash_id] = (
+                    quantities.get(cash_id, Decimal(0)) + event.cash_amount
+                )
     expected = quantities
     actual: dict[UUID, Decimal] = {}
     for position in end_positions.snapshot.positions:
         actual[position.security.id] = Decimal(position.quantity)
     differences = []
     for security_id in sorted(set(expected) | set(actual), key=str):
-        security = session.get(Security, security_id)
+        catalog_security = session.get(Security, security_id)
         expected_quantity = expected.get(security_id, Decimal(0))
         actual_quantity = actual.get(security_id, Decimal(0))
         differences.append(
             {
                 "security_id": security_id,
-                "ticker": security.display_ticker if security else None,
+                "ticker": catalog_security.display_ticker if catalog_security else None,
                 "expected_quantity": str(expected_quantity),
                 "snapshot_quantity": str(actual_quantity),
                 "difference": str(actual_quantity - expected_quantity),

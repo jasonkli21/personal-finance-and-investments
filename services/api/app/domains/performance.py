@@ -87,13 +87,13 @@ def money_weighted_return(
     if start >= end or beginning <= 0 or ending < 0:
         return None, "insufficient_inputs"
     # Investor-perspective cash flows: portfolio contributions are outflows.
-    dated = [(start, -beginning)]
-    dated.extend(
-        (flow.effective_date, -flow.amount)
-        for flow in flows
-        if start < flow.effective_date <= end
-    )
-    dated.append((end, ending))
+    by_date: dict[date, Decimal] = {start: -beginning, end: ending}
+    for flow in flows:
+        if start < flow.effective_date <= end:
+            by_date[flow.effective_date] = (
+                by_date.get(flow.effective_date, Decimal(0)) - flow.amount
+            )
+    dated = sorted(by_date.items())
     signs = [1 if amount > 0 else -1 for _, amount in dated if amount != 0]
     sign_changes = sum(
         left != right for left, right in zip(signs, signs[1:], strict=False)

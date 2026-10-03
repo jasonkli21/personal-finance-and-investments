@@ -148,6 +148,16 @@ def test_review_publish_is_idempotent_and_preserves_individual_lots(
     )
     assert published.status_code == 200, published.text
     assert published.json()["status"] == "published"
+    replay = client.post(
+        f"/v1/tax-lot-imports/{first['id']}/publish",
+        json={
+            "expected_revision": review["review_revision"],
+            "acknowledge_quantity_differences": False,
+            "reason": "Idempotent publication replay",
+        },
+    )
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["status"] == "published"
 
     lots_response = client.get("/v1/tax-lots", params={"account_id": account_id})
     assert lots_response.status_code == 200, lots_response.text
@@ -244,6 +254,16 @@ def test_missing_fields_stay_unavailable_and_review_revision_is_enforced(
     )
     assert stale.status_code == 409
 
+    stale_publish = client.post(
+        f"/v1/tax-lot-imports/{review['id']}/publish",
+        json={
+            "expected_revision": review["review_revision"],
+            "acknowledge_quantity_differences": True,
+            "reason": "Stale publication after correction",
+        },
+    )
+    assert stale_publish.status_code == 409
+
     published = client.post(
         f"/v1/tax-lot-imports/{review['id']}/publish",
         json={
@@ -299,6 +319,115 @@ def test_unsupported_cash_lots_and_unacknowledged_gaps_stay_blocked(
     assert client.get("/v1/tax-lots", params={"account_id": account_id}).json() == []
 
 
+def test_backdated_adjustment_cannot_make_a_later_lot_state_negative(
+    tax_client: tuple[TestClient, UUID, UUID],
+) -> None:
+    client, equity_id, _cash_id = tax_client
+    account_id = _account(client)
+    _accept_position(client, account_id, equity_id, "10")
+    csv_bytes = (
+        b"Symbol,Lot ID,Acquired,Original Shares,Shares,Original Basis,Basis,Currency\n"
+        b"ACME,CHRONO,2020-02-03,10,10,200,200,USD\n"
+    )
+    staged = _upload(client, account_id, csv_bytes, key="stage3-chrono-001")
+    review = client.get(f"/v1/tax-lot-imports/{staged.json()['id']}").json()
+    published = client.post(
+        f"/v1/tax-lot-imports/{review['id']}/publish",
+        json={
+            "expected_revision": review["review_revision"],
+            "acknowledge_quantity_differences": False,
+            "reason": "Publish source lot",
+        },
+    )
+    assert published.status_code == 200, published.text
+    lot_id = client.get("/v1/tax-lots", params={"account_id": account_id}).json()[0][
+        "id"
+    ]
+    common = {
+        "adjustment_type": "correction",
+        "basis_currency": "USD",
+        "source_label": "Synthetic corrections",
+        "reason": "Synthetic chronological-state regression",
+    }
+    later = client.post(
+        f"/v1/tax-lots/{lot_id}/adjustments",
+        json={
+            **common,
+            "quantity_delta": "-6",
+            "effective_date": "2026-09-20",
+            "idempotency_key": "chrono-later",
+        },
+    )
+    assert later.status_code == 201, later.text
+    same_day = client.post(
+        f"/v1/tax-lots/{lot_id}/adjustments",
+        json={
+            **common,
+            "quantity_delta": "1",
+            "effective_date": "2026-09-20",
+            "idempotency_key": "chrono-same-day",
+        },
+    )
+    assert same_day.status_code == 201, same_day.text
+    backdated = client.post(
+        f"/v1/tax-lots/{lot_id}/adjustments",
+        json={
+            **common,
+            "quantity_delta": "-6",
+            "effective_date": "2026-09-01",
+            "idempotency_key": "chrono-earlier",
+        },
+    )
+    assert backdated.status_code == 422
+    assert "negative" in backdated.json()["detail"]
+
+
+def test_import_reviewed_before_duplicate_publication_skips_new_duplicate_safely(
+    tax_client: tuple[TestClient, UUID, UUID],
+) -> None:
+    client, equity_id, _cash_id = tax_client
+    account_id = _account(client)
+    _accept_position(client, account_id, equity_id, "2")
+    first_csv = (
+        b"Symbol,Lot ID,Acquired,Original Shares,Shares,Original Basis,Basis,"
+        b"Currency,Note\n"
+        b"ACME,SHARED,2020-02-03,2,2,100,100,USD,first\n"
+    )
+    second_csv = first_csv.replace(b"first", b"second")
+    first = _upload(client, account_id, first_csv, key="stage3-identity-first")
+    second = _upload(client, account_id, second_csv, key="stage3-identity-second")
+    assert first.status_code == second.status_code == 201
+    first_review = client.get(f"/v1/tax-lot-imports/{first.json()['id']}").json()
+    second_review = client.get(f"/v1/tax-lot-imports/{second.json()['id']}").json()
+    assert first_review["rows"][0]["row_status"] == "ready"
+    assert second_review["rows"][0]["row_status"] == "ready"
+    for review in (first_review, second_review):
+        if review is first_review:
+            response = client.post(
+                f"/v1/tax-lot-imports/{review['id']}/publish",
+                json={
+                    "expected_revision": review["review_revision"],
+                    "acknowledge_quantity_differences": False,
+                    "reason": "Publish shared source lot once",
+                },
+            )
+            assert response.status_code == 200, response.text
+        else:
+            response = client.post(
+                f"/v1/tax-lot-imports/{review['id']}/publish",
+                json={
+                    "expected_revision": review["review_revision"],
+                    "acknowledge_quantity_differences": False,
+                    "reason": "Skip source identity already published",
+                },
+            )
+            assert response.status_code == 200, response.text
+            assert response.json()["rows"][0]["row_status"] == "duplicate"
+    assert (
+        len(client.get("/v1/tax-lots", params={"account_id": account_id}).json()) == 1
+    )
+
+
 def test_overlong_source_identifier_stays_raw_and_can_be_corrected(
     tax_client: tuple[TestClient, UUID, UUID],
 ) -> None:
@@ -331,3 +460,30 @@ def test_overlong_source_identifier_stays_raw_and_can_be_corrected(
     assert updated_row["row_status"] == "ready"
     assert updated_row["raw_source_lot_id"] == "LOT-VALID"
     assert updated_row["raw_payload"]["Lot ID"] == source_lot_id
+
+
+def test_publication_honors_lower_configured_safe_batch(
+    tax_client: tuple[TestClient, UUID, UUID], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, equity_id, _cash_id = tax_client
+    account_id = _account(client)
+    _accept_position(client, account_id, equity_id, "2")
+    content = (
+        b"Symbol,Lot ID,Acquired,Original Shares,Shares,Original Basis,Basis,Currency\n"
+        b"ACME,LIMIT-A,2020-02-03,1,1,50,50,USD\n"
+        b"ACME,LIMIT-B,2021-04-05,1,1,50,50,USD\n"
+    )
+    staged = _upload(client, account_id, content, key="stage3-safe-batch-001")
+    review = client.get(f"/v1/tax-lot-imports/{staged.json()['id']}").json()
+    monkeypatch.setenv("TAX_LOT_PUBLICATION_MAX_ROWS", "1")
+    response = client.post(
+        f"/v1/tax-lot-imports/{review['id']}/publish",
+        json={
+            "expected_revision": review["review_revision"],
+            "acknowledge_quantity_differences": False,
+            "reason": "Respect configured safe write batch",
+        },
+    )
+    assert response.status_code == 422
+    assert "configured safe publication limit" in response.json()["detail"]
+    assert client.get("/v1/tax-lots", params={"account_id": account_id}).json() == []

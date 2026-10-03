@@ -7,7 +7,7 @@ import json
 import os
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, DecimalException, localcontext
 from typing import Any
 from uuid import UUID
 
@@ -215,6 +215,12 @@ def _exposure_snapshot(
 ) -> dict[str, Any]:
     categories = {key: Decimal(value) for key, value in report["categories"].items()}
     nav = Decimal(report["included_valued_nav"])
+    if abs(nav) >= MAX_VALUE or any(
+        abs(value) >= MAX_VALUE for value in categories.values()
+    ):
+        raise PortfolioScenarioError(
+            "Scenario valuation exceeds NUMERIC(28, 10) precision."
+        )
     direct = categories.get("direct", Decimal(0))
     indirect = categories.get("indirect", Decimal(0))
     residual_categories = {
@@ -305,7 +311,7 @@ def _exposure_snapshot(
     }
 
 
-def simulate_portfolio(
+def _simulate_portfolio(
     session: Session, request: PortfolioScenarioRequest
 ) -> dict[str, Any]:
     """Calculate before/after portfolio exposures without updating actual rows."""
@@ -327,6 +333,13 @@ def simulate_portfolio(
         )
     except ValueError as exc:
         raise PortfolioScenarioError(str(exc)) from exc
+    if any(
+        line["value"] is not None and abs(Decimal(line["value"])) >= MAX_VALUE
+        for line in inputs["owned"]
+    ):
+        raise PortfolioScenarioError(
+            "Baseline valuation exceeds NUMERIC(28, 10) precision."
+        )
     selected_ids = [UUID(value) for value in inputs["account_ids"]]
     if not selected_ids:
         raise PortfolioScenarioError("Select at least one active account with history.")
@@ -749,3 +762,17 @@ def simulate_portfolio(
         "persisted": False,
         "assumptions": assumptions,
     }
+
+
+def simulate_portfolio(
+    session: Session, request: PortfolioScenarioRequest
+) -> dict[str, Any]:
+    """Run all authoritative scenario math with precision above NUMERIC inputs."""
+    try:
+        with localcontext() as context:
+            context.prec = 80
+            return _simulate_portfolio(session, request)
+    except DecimalException as exc:
+        raise PortfolioScenarioError(
+            "Scenario amounts exceed supported NUMERIC(28, 10) precision."
+        ) from exc

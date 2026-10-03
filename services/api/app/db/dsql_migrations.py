@@ -1939,6 +1939,7 @@ TABLE_COLUMNS["tax_lots"] = (
     ("basis_currency", "character varying", "YES", 3, None, None),
     ("evidence_ref", "character varying", "YES", 500, None, None),
     ("quality_status", "character varying", "NO", 24, None, None),
+    ("state_revision", "integer", "NO", None, None, None),
     ("created_at", "timestamp with time zone", "NO", None, None, None),
     ("updated_at", "timestamp with time zone", "NO", None, None, None),
 )
@@ -2727,6 +2728,20 @@ DSQL_MIGRATIONS = (
                 "SELECT true",
                 expected_index_table="tax_lot_review_events",
                 expected_index_columns=("import_id", "created_at"),
+            ),
+        ),
+    ),
+    DsqlMigration(
+        "0014_stage3_tax_lot_fences",
+        (
+            DsqlMigrationStep(
+                "add_tax_lot_state_revision",
+                "alter",
+                "ALTER TABLE tax_lots ADD COLUMN state_revision integer NOT NULL "
+                "DEFAULT 1",
+                "tax_lots.state_revision",
+                "SELECT true",
+                expected_column=("integer", "NO", "1"),
             ),
         ),
     ),

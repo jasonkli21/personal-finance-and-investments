@@ -2,7 +2,7 @@
 
 from collections.abc import Iterator
 from datetime import UTC, date, datetime
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from pathlib import Path
 from typing import Any, cast
 
@@ -179,6 +179,71 @@ def test_equity_buy_reconciles_fee_cash_and_category_targets(
     assert drift["direct"]["drift_percentage_points"] is not None
     assert result["cash"][0]["cash_after"] == "795.0000000000"
     assert _record_counts(client) == before_records
+
+
+def test_large_fractional_scenario_inputs_reconcile_without_decimal_context_loss(
+    scenario_client: TestClient,
+) -> None:
+    client = scenario_client
+    account_id = _account(client)
+    cash_id = _security(client, "CASH", "cash")
+    equity_id = _security(client, "FRAC")
+    _positions(client, account_id, [(cash_id, "999999999999999.9999999999", None)])
+    response = client.post(
+        "/v1/simulations/portfolio",
+        json=_payload(
+            account_id,
+            trades=[
+                {
+                    "account_id": account_id,
+                    "security_id": equity_id,
+                    "side": "buy",
+                    "quantity": "123456789.1234567890",
+                    "price": "0.1234567891",
+                    "fee_amount": "0.0000000001",
+                    "currency": "USD",
+                }
+            ],
+        ),
+    )
+    assert response.status_code == 200, response.text
+    result = response.json()
+    with localcontext() as context:
+        context.prec = 80
+        for key in ("before", "after"):
+            report = result[key]
+            assert Decimal(report["direct_assets"]) + Decimal(
+                report["indirect_lookthrough"]
+            ) + Decimal(report["residual"]) == Decimal(report["included_valued_nav"])
+
+
+def test_computed_scenario_value_outside_numeric_range_is_a_domain_error(
+    scenario_client: TestClient,
+) -> None:
+    client = scenario_client
+    account_id = _account(client)
+    equity_id = _security(client, "TOO-LARGE")
+    cash_id = _security(client, "CASH", "cash")
+    _positions(client, account_id, [(cash_id, "5000", None)])
+    response = client.post(
+        "/v1/simulations/portfolio",
+        json=_payload(
+            account_id,
+            trades=[
+                {
+                    "account_id": account_id,
+                    "security_id": equity_id,
+                    "side": "buy",
+                    "quantity": "999999999999999999",
+                    "price": "99999999999999",
+                    "fee_amount": "0",
+                    "currency": "USD",
+                }
+            ],
+        ),
+    )
+    assert response.status_code == 422
+    assert "NUMERIC(28, 10) precision" in response.json()["detail"]
 
 
 def test_cash_only_policy_rejects_insufficient_cash_and_short_sale(
