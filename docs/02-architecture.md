@@ -87,10 +87,10 @@ Finance remains a single deployable backend. The separately owned `personal-ai-s
 │       │   └── storage/
 │       └── tests/
 ├── fixtures/                      # Synthetic data only
-└── infra/                         # Added in Stage 4
+└── infra/                         # Stage 4 single-region Terraform (prepared; not applied)
 ```
 
-The current domain modules are files, not per-domain packages. Spending/ingestion, tax and research are future stage additions; jobs and infra are not implemented. This layout is not a mandate to precreate empty domains. Create directories as each feature is implemented; keep meaningful boundaries between API handlers, domain calculations, ORM mappings, and provider-specific code.
+The current domain modules are files, not per-domain packages. Spending/ingestion, tax and research are separate domain additions; the Stage 2 worker is disabled in production pending real DSQL lease evidence. Stage 4 Terraform is prepared locally and has not been applied. Keep meaningful boundaries between API handlers, domain calculations, ORM mappings, infrastructure, and provider-specific code.
 
 ## 4. Conceptual relational schema
 

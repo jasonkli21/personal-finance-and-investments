@@ -11,6 +11,13 @@ dist/
 .ruff_cache/
 .mypy_cache/
 coverage/
+infra/terraform/.terraform/
+infra/terraform/terraform.tfstate
+infra/terraform/terraform.tfstate.*
+infra/terraform/crash.log
+infra/terraform/*.tfplan
+infra/terraform/terraform.tfvars
+infra/terraform/*_override.tf
 
 .pnpm-store/
 playwright-report/

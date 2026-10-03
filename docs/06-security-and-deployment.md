@@ -78,8 +78,8 @@ Build portability around a shared logical schema, **distinct verified DSQL migra
 ```text
 Browser over HTTPS
   |-- CloudFront -> private S3 bucket for static Vite assets (OAC)
-  `-- HTTPS FastAPI endpoint (small EC2 instance or reviewed Lambda deployment)
-        |-- Same-codebase background jobs (local process or SQS-backed worker)
+  `-- HTTPS FastAPI endpoint (Stage 4 prepared: App Runner container)
+        |-- Same-codebase background jobs (disabled in production pending DSQL lease evidence)
         |-- Aurora DSQL single-Region cluster via IAM tokens + TLS
         `-- Private S3 bucket for statements, screenshots, source archives
 CloudWatch redacted metrics/logs; IAM role for compute; optional SSM config;
@@ -91,12 +91,14 @@ GitHub Actions + Terraform/CDK for approved deployments.
 Infrastructure details:
 
 1. Single AWS Region and one DSQL cluster. No multi-region replication initially. Ensure the chosen DSQL Region and compute Region are supported and close to each other; do not silently default to a costly region or multiple clusters.
-2. Static site: private bucket + CloudFront. API: authenticated HTTPS on a small EC2 instance or a measured Lambda deployment. Verify total idle compute, networking, public IPv4/ALB, endpoints and logging costs. A DSQL cluster's idle DPU scaling does **not** remove EC2/ALB costs.
+2. Static site: private bucket + CloudFront OAC. Stage 4 IaC selects the existing API OCI image on App Runner, with public HTTPS ingress and default public egress to the DSQL service endpoint. It avoids adding a VPC/NAT/PrivateLink/ALB solely for database connectivity. App Runner's direct service URL remains public and can bypass CloudFront; backend auth protects every financial route and file path at both origins. No runtime benchmark has been run. Initial capacity is one 0.25-vCPU/1-GB instance and 10 concurrent requests; measure a synthetic file/import journey and inspect real idle/active costs before release or resizing. Lambda's scale-to-zero possibility trades off against ASGI adaptation, cold-start, bounded document processing, and SQL pool/token lifecycle evidence; none is benchmarked here. CloudFront's global service and us-east-1 certificate requirement do not make the DSQL cluster multi-region.
 3. Files: **separate private S3 bucket** for statements and archive exports. Block public access; enable encryption, scoped IAM, sensible lifecycle, safe presigned URLs only through authenticated API, and verified recoverability.
 4. IAM/TLS: production uses instance/task roles and scoped DB permissions; admin IAM role only for migrations. Never embed AWS access keys, statement contents or IAM tokens in Git, browser bundles or logs.
 5. Backups: [AWS Backup supports DSQL](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/disaster-recovery-resiliency.html) but may be **billable**; choose a tested backup schedule plus separate encrypted, portable app exports (structured data + S3 originals) and rehearse importing back to local PostgreSQL.
 6. No production deployment until the DSQL readiness suite in `07-aurora-dsql-compatibility.md` passes on a real cluster and importer retries/partial staging are verified.
 7. Infrastructure-as-code should tag each resource and support teardown; make all optional chargeable services explicitly opt-in. Avoid NAT/PrivateLink/ALB solely because they appear in a generic AWS reference architecture.
+
+The current [`Terraform resource plan`](../infra/terraform/README.md) creates one protected DSQL cluster, two public-blocked S3 buckets, an immutable-digest ECR repository, scoped runtime/migration IAM, App Runner, and CloudFront. API/edge creation is opt-in after a separate ECR foundation step because the API must reference an already-pushed immutable image. DNS, certificate, identity-provider resources, budget recipient and Terraform state bucket remain operator-managed inputs. App Runner log groups contain generated service IDs; the checked script sets and verifies 30-day retention after creation. Nothing is applied, and the endpoint, identity, DNS/TLS, image, cost forecast, or real DSQL path is unverified. See the S4.2 evidence in [stage-4-release](stage-4-release.md).
 
 **Database allowance (AWS [official DSQL pricing](https://aws.amazon.com/rds/aurora/dsql/pricing/), checked 2026-10-02):** pricing states a recurring first **100,000 DPUs + 1 GB-month of Aurora DSQL storage per month**, with **billable overages**. This differs from time-limited new AWS account promotional credits and must not be confused with free hosting. AWS Compute, S3, CloudFront, data transfer, logging, AWS Backup, domain names and PrivateLink may still be charged. Eligibility and unit prices must be rechecked in the actual account; an allowance is not a spending cap. **Budgets/alerts are warnings, not hard spend caps.**
 

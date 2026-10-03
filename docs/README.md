@@ -1,6 +1,6 @@
 # Personal Finance & Portfolio Intelligence — Docs
 
-**Status:** Stage 0 local exit gate complete; Stage 1 local MVP complete; Stage 2 in progress; Stage 3 locally complete; Stage 4.1 prepared locally; cloud/DSQL release unverified
+**Status:** Stage 0 local exit gate complete; Stage 1 local MVP complete; Stage 2 in progress; Stage 3 locally complete; Stage 4.1–4.2 prepared locally; cloud/DSQL release unverified
 **Last reviewed:** 2026-10-02
 **Databases:** PostgreSQL 16 local/personal; Aurora DSQL required for production  
 **Deployment:** local indefinitely; AWS deployment optional until ready, with production targeting DSQL  
