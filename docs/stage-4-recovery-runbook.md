@@ -113,26 +113,36 @@ the command suppresses database-driver details from its output.
 Before publication the full encrypted payload, schema, all row hashes and
 counts, object hashes/sizes, references, and frozen revisions are validated.
 Objects are copied to immutable content-addressed local files first. Financial
-rows are then inserted in batches of 200 in one PostgreSQL transaction. The
-account's selected position-snapshot pointer is held null until snapshots and
-lines are present, then restored with its original revision/timestamp inside
-the same transaction. A failed transaction rolls back all rows and leaves the
-target isolated; any already staged objects are safe content-addressed
-orphans. A private 0600 restore marker records only archive hash, schema,
-database name, explicit scope mapping, and phase. Retrying with the same
-archive and mapping resumes safely; a second completed invocation verifies
-all rows and objects and returns idempotently. Changed rows, other files, or
-a different mapping are rejected.
+rows are inserted in batches of 200, each in its own committed transaction
+inside a deterministic, archive-specific PostgreSQL staging schema. Selected
+account snapshot pointers remain null until all snapshots and lines are staged;
+the original pointers are then restored in bounded batches. Every staged table
+is checked against the archive's row count and hash. Only after those checks pass
+does one short transaction rename the empty target's current `public` schema to
+an archive-specific retained backup name and rename the complete staging schema
+to `public`. The application cannot see partial restore rows. If a process stops
+between database batches, the target remains on its original empty schema and a
+retry uses conflict-safe inserts to continue staging. If it stops after schema
+publication but before updating the marker, retry verifies the published schema
+and completes idempotently. The previous empty schema remains in the isolated
+database for operator inspection; the recovery tool does not delete it.
+
+A private 0600 restore marker records the archive hash, schema, database name,
+explicit scope mapping, staging/backup schema names, and phase. Retrying with
+the same archive and mapping resumes safely; a second completed invocation
+verifies all rows and objects and returns idempotently. Changed rows, other
+files, or a different mapping are rejected.
 
 After restore, run the normal report and reconciliation checks against the
 isolated database, inspect original file previews, and compare the report
 artifact/hash and counts with the encrypted manifest before deliberately
 changing the local app configuration. The tool does not switch the app to the
 restore target. The synthetic drill validates $25,000 NAV and reconciled
-exposure, original statement bytes, frozen report bytes, injected interruption
-before commit, recovery retry, tamper/wrong-key rejection, schema mismatch,
-missing/tampered objects, and repeat idempotency. It is synthetic PostgreSQL
-evidence only; no DSQL source or S3 object was used.
+exposure, original statement bytes, frozen report bytes, interruption after a
+committed database batch, hidden partial staging, bounded recovery retry,
+tamper/wrong-key rejection, schema mismatch, missing/tampered objects, and
+repeat idempotency. It is synthetic PostgreSQL evidence only; no DSQL source or
+S3 object was used.
 
 ## Recovery objectives and remaining gates
 

@@ -25,9 +25,12 @@ from xml.etree import ElementTree
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 API_ROOT = REPOSITORY_ROOT / "services" / "api"
 EVIDENCE_VERSION = 1
-FIXTURE_VERSION = "stage4-release-suite-v1"
+FIXTURE_VERSION = "stage4-release-suite-v2"
 REQUIRED_CASES = frozenset(
     {
+        "test_real_dsql_populated_previous_schema_upgrade",
+        "test_real_dsql_mid_migration_interruption_resume",
+        "test_real_dsql_application_role_reconnects_after_iam_token_expiry",
         "test_real_dsql_migration_and_synthetic_persistence",
         "test_real_dsql_occ_conflict_uses_bounded_database_retry",
         "test_real_dsql_manual_replacement_history_and_scoped_identity",
@@ -37,14 +40,10 @@ REQUIRED_CASES = frozenset(
         "test_real_dsql_stage1_502_rows_duplicate_and_history",
         "test_real_dsql_stage1_partial_staging_recovery",
         "test_real_dsql_stage1_concurrent_publication",
+        "test_real_dsql_configured_safe_batch_limit_rejects_extra_row",
     }
 )
-UNVERIFIED_RELEASE_GATES = (
-    "populated_previous_schema_upgrade",
-    "mid_migration_interruption_resume",
-    "iam_token_expiry_reconnect_after_15_minutes",
-    "configured_safe_batch_limit_failure",
-)
+UNVERIFIED_RELEASE_GATES: tuple[str, ...] = ()
 CONFIG_KEYS = (
     "APP_ENV",
     "APP_PUBLIC_ORIGIN",
@@ -246,6 +245,10 @@ def _preflight() -> None:
         raise EvidenceError("The release suite must use the scoped application role")
     if os.environ["AURORA_DSQL_DB_USER"] == os.environ["AURORA_DSQL_MIGRATION_DB_USER"]:
         raise EvidenceError("Application and migration roles must be distinct")
+    if os.environ.get("RUN_DSQL_TOKEN_EXPIRY_TEST") != "1":
+        raise EvidenceError(
+            "Explicit 16-minute IAM token expiry reconnect test opt-in is required"
+        )
     if not re.fullmatch(
         r"sha256:[0-9a-f]{64}", os.environ.get("RELEASE_IMAGE_DIGEST", "")
     ):
@@ -272,7 +275,7 @@ def _parse_junit(path: Path) -> tuple[dict[str, int], set[str]]:
     counts["passed"] = (
         counts["tests"] - counts["failed"] - counts["errors"] - counts["skipped"]
     )
-    if counts["passed"] < 0:
+    if counts["passed"] < 0 or any(value < 0 for value in counts.values()):
         raise EvidenceError("JUnit test result counts are inconsistent")
     return counts, names
 
@@ -380,6 +383,8 @@ def validate_evidence(
         raise EvidenceError("DSQL evidence did not pass")
     if evidence.get("backend") != "aurora_dsql":
         raise EvidenceError("Evidence was not produced by Aurora DSQL")
+    if evidence.get("suite") != "aurora-dsql-stage4-release":
+        raise EvidenceError("Evidence was not produced by the required Stage 4 suite")
     if not isinstance(evidence.get("image_digest"), str) or not re.fullmatch(
         r"sha256:[0-9a-f]{64}", evidence["image_digest"]
     ):
@@ -387,18 +392,27 @@ def validate_evidence(
     if evidence.get("fixture_version") != FIXTURE_VERSION:
         raise EvidenceError("DSQL synthetic fixture version changed")
     tests = evidence.get("tests")
+    count_keys = ("tests", "passed", "failed", "errors", "skipped")
     if not isinstance(tests, dict) or any(
-        tests.get(key) != value
+        not isinstance(tests.get(key), int) or isinstance(tests.get(key), bool)
+        for key in count_keys
+    ):
+        raise EvidenceError("DSQL test counts are malformed")
+    if any(tests[key] < 0 for key in count_keys) or any(
+        tests[key] != value
         for key, value in {"failed": 0, "errors": 0, "skipped": 0}.items()
     ):
         raise EvidenceError("Failed, errored or skipped checks cannot pass the gate")
-    if tests.get("tests", 0) <= 0 or tests.get("passed") != tests.get("tests"):
+    if tests["tests"] <= 0 or tests["passed"] != tests["tests"]:
         raise EvidenceError("DSQL suite is incomplete")
     if evidence.get("missing_required_cases") != []:
         raise EvidenceError("Required release tests are missing")
     executed_cases = evidence.get("executed_cases")
-    if not isinstance(executed_cases, list) or not REQUIRED_CASES.issubset(
-        set(executed_cases)
+    if (
+        not isinstance(executed_cases, list)
+        or not all(isinstance(case, str) for case in executed_cases)
+        or len(executed_cases) != len(set(executed_cases))
+        or not REQUIRED_CASES.issubset(set(executed_cases))
     ):
         raise EvidenceError("Evidence does not list every required release test")
     if evidence.get("unverified_release_gates") != []:
@@ -411,7 +425,7 @@ def validate_evidence(
         raise EvidenceError("DSQL evidence belongs to a different source revision")
     for key in ("cluster_identity_sha256", "configuration_sha256"):
         value = evidence.get(key)
-        if not isinstance(value, str) or len(value) != 64:
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
             raise EvidenceError("DSQL evidence metadata is incomplete")
     if require_current_runtime:
         _preflight()

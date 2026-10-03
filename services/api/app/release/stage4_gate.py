@@ -276,6 +276,7 @@ def _validate_manual_evidence(
     gate_id: str,
     expected_kind: str,
     expected_context: str,
+    expected_context_configurations: dict[str, str],
     release: dict[str, str],
     context_configurations: dict[str, str],
 ) -> dict[str, Any]:
@@ -298,6 +299,11 @@ def _validate_manual_evidence(
     if previous is not None and previous != config_hash:
         raise GateError("Evidence configuration fingerprints do not match")
     context_configurations[expected_context] = config_hash
+    if expected_context_configurations.get(expected_context) != config_hash:
+        raise GateError(
+            "Evidence configuration does not match the independently supplied "
+            f"current {expected_context} configuration"
+        )
     _parse_timestamp(evidence.get("verified_at_utc"))
     if evidence.get("unverified_gates") != []:
         raise GateError("Evidence has outstanding required checks")
@@ -337,6 +343,7 @@ def _validate_dsql_evidence(
     *,
     expected_release: dict[str, str],
     context_configurations: dict[str, str],
+    expected_context_configurations: dict[str, str],
 ) -> dict[str, Any]:
     evidence = dsql_evidence.validate_evidence(path, require_current_runtime=True)
     _parse_timestamp(evidence.get("executed_at_utc"))
@@ -356,6 +363,11 @@ def _validate_dsql_evidence(
     config_hash = evidence.get("configuration_sha256")
     if not isinstance(config_hash, str) or not SHA256_RE.fullmatch(config_hash):
         raise GateError("DSQL environment configuration fingerprint is missing")
+    if expected_context_configurations.get("dsql_test") != config_hash:
+        raise GateError(
+            "DSQL configuration does not match the independent current test "
+            "target configuration"
+        )
     previous = context_configurations.get("dsql_test")
     if previous is not None and previous != config_hash:
         raise GateError("DSQL test configuration fingerprints do not match")
@@ -375,6 +387,7 @@ def evaluate_manifest(
     manifest_path: Path,
     *,
     current_release: dict[str, str] | None = None,
+    expected_context_configurations: dict[str, str] | None = None,
     validate_dsql_runtime: bool = True,
 ) -> dict[str, Any]:
     manifest = _read_json(manifest_path)
@@ -385,6 +398,21 @@ def evaluate_manifest(
     expected = _validate_release_record(expected)
     if release != expected:
         raise GateError("Evidence bundle does not match the current immutable release")
+    expected_configs = expected_context_configurations
+    if expected_configs is None:
+        raise GateError("Independent current target configuration hashes are required")
+    required_contexts = {context for _, context in REQUIRED_GATES.values()}
+    if (
+        not isinstance(expected_configs, dict)
+        or set(expected_configs) != required_contexts
+        or any(
+            not isinstance(value, str) or not SHA256_RE.fullmatch(value)
+            for value in expected_configs.values()
+        )
+    ):
+        raise GateError(
+            "Expected target configuration record is incomplete or malformed"
+        )
     gates = manifest.get("gates")
     if not isinstance(gates, dict) or set(gates) != set(REQUIRED_GATES):
         raise GateError("Required Stage 4 gate entries are missing or unknown")
@@ -403,12 +431,14 @@ def evaluate_manifest(
                         evidence_path,
                         expected_release=release,
                         context_configurations=contexts,
+                        expected_context_configurations=expected_configs,
                     )
                     if validate_dsql_runtime
                     else _validate_dsql_structure(
                         evidence_path,
                         expected_release=release,
                         context_configurations=contexts,
+                        expected_context_configurations=expected_configs,
                     )
                 )
             else:
@@ -418,6 +448,7 @@ def evaluate_manifest(
                     gate_id=gate_id,
                     expected_kind=kind,
                     expected_context=context,
+                    expected_context_configurations=expected_configs,
                     release=release,
                     context_configurations=contexts,
                 )
@@ -453,6 +484,7 @@ def _validate_dsql_structure(
     *,
     expected_release: dict[str, str],
     context_configurations: dict[str, str],
+    expected_context_configurations: dict[str, str],
 ) -> dict[str, Any]:
     """Validate the DSQL record structure in offline unit tests only."""
     evidence = _read_json(path)
@@ -481,6 +513,7 @@ def _validate_dsql_structure(
     if (
         not isinstance(cases, list)
         or not all(isinstance(case, str) for case in cases)
+        or len(cases) != len(set(cases))
         or not dsql_evidence.REQUIRED_CASES.issubset(set(cases))
     ):
         raise GateError("DSQL suite did not execute every required test")
@@ -496,6 +529,11 @@ def _validate_dsql_structure(
     config_hash = evidence.get("configuration_sha256")
     if not isinstance(config_hash, str) or not SHA256_RE.fullmatch(config_hash):
         raise GateError("DSQL test configuration fingerprint is missing")
+    if expected_context_configurations.get("dsql_test") != config_hash:
+        raise GateError(
+            "DSQL configuration does not match the independent current test "
+            "target configuration"
+        )
     previous = context_configurations.get("dsql_test")
     if previous is not None and previous != config_hash:
         raise GateError("DSQL test configuration fingerprints do not match")
@@ -523,13 +561,26 @@ def main() -> int:
     )
     check.add_argument("--manifest", type=Path, required=True)
     check.add_argument("--report", type=Path, required=True)
+    check.add_argument(
+        "--expected-configurations",
+        type=Path,
+        required=True,
+        help=(
+            "independently reviewed JSON mapping each target context to its "
+            "current canonical SHA-256"
+        ),
+    )
     args = parser.parse_args()
     try:
         if args.command == "template":
             create_template(args.output)
             print("Blocked Stage 4 evidence template written; no gate was verified")
             return 0
-        report = evaluate_manifest(args.manifest)
+        expected_configs = _read_json(args.expected_configurations)
+        report = evaluate_manifest(
+            args.manifest,
+            expected_context_configurations=expected_configs,
+        )
         _write_json(args.report, report, exclusive=False)
     except (
         GateError,

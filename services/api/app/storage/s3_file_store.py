@@ -94,8 +94,11 @@ class S3FileStore:
         if size < 0 or size > limit:
             response["Body"].close()
             raise ValueError("Private file exceeds the configured read limit")
-        content = cast(bytes, response["Body"].read(limit + 1))
-        response["Body"].close()
+        body = response["Body"]
+        try:
+            content = cast(bytes, body.read(limit + 1))
+        finally:
+            body.close()
         if len(content) != size or len(content) > limit:
             raise OSError("Private S3 object size mismatch")
         expected = key.removesuffix(".blob")

@@ -10,16 +10,22 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from os import environ
 from threading import Event, Thread
+from time import sleep
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import Engine, text
+from sqlalchemy import Engine, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.api.contracts import PositionInput, PositionReplace
 from app.config import load_settings
-from app.db.dsql_migrations import run_dsql_migrations
+from app.db import dsql_migrations
+from app.db.dsql_migrations import (
+    DsqlMigration,
+    DsqlMigrationStep,
+    run_dsql_migrations,
+)
 from app.db.engine import DatabaseEngineFactory
 from app.db.transactions import run_database_unit
 from app.domains import portfolio
@@ -38,6 +44,138 @@ def _open_engines() -> tuple[Engine, Engine]:
     migration_engine = DatabaseEngineFactory.create(settings, purpose="migration")
     app_engine = DatabaseEngineFactory.create(settings, purpose="application")
     return migration_engine, app_engine
+
+
+def test_real_dsql_populated_previous_schema_upgrade() -> None:
+    """Upgrade a populated core-only schema to head and retain its source row."""
+    migration_engine, app_engine = _open_engines()
+    issuer_id = uuid4()
+    now = datetime.now(UTC)
+    try:
+        with migration_engine.connect() as connection:
+            if inspect(connection).has_table("dsql_schema_migration_steps"):
+                revisions: set[str] = set(
+                    connection.execute(
+                        text(
+                            "SELECT DISTINCT revision FROM dsql_schema_migration_steps"
+                        )
+                    ).scalars()
+                )
+                if revisions - {dsql_migrations.CORE_SCHEMA.revision}:
+                    pytest.fail(
+                        "Use a fresh disposable DSQL cluster for the populated "
+                        "previous-schema upgrade case"
+                    )
+        run_dsql_migrations(migration_engine, (dsql_migrations.CORE_SCHEMA,))
+        with migration_engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO issuers "
+                    "(id, normalized_name, display_name, created_at, updated_at) "
+                    "VALUES (:id, :normalized, :display, :now, :now)"
+                ),
+                {
+                    "id": issuer_id,
+                    "normalized": f"synthetic-upgrade-{issuer_id.hex}",
+                    "display": "Synthetic prior-schema issuer",
+                    "now": now,
+                },
+            )
+        run_dsql_migrations(migration_engine)
+        with migration_engine.connect() as connection:
+            row: str = connection.execute(
+                text("SELECT display_name FROM issuers WHERE id = :id"),
+                {"id": issuer_id},
+            ).scalar_one()
+            assert row == "Synthetic prior-schema issuer"
+    finally:
+        with migration_engine.begin() as connection:
+            connection.execute(
+                text("DELETE FROM issuers WHERE id = :id"), {"id": issuer_id}
+            )
+        app_engine.dispose()
+        migration_engine.dispose()
+
+
+def test_real_dsql_mid_migration_interruption_resume(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Recover when DDL committed but its migration-ledger write did not."""
+    migration_engine, _app_engine = _open_engines()
+    suffix = uuid4().hex[:16]
+    table_name = f"stage4_resume_{suffix}"
+    revision = f"stage4_resume_{suffix}"
+    step = DsqlMigrationStep(
+        key="create_resume_table",
+        kind="table",
+        statement=(
+            f"CREATE TABLE {table_name} (id uuid NOT NULL, "
+            f"CONSTRAINT {table_name}_pkey PRIMARY KEY (id))"
+        ),
+        object_name=table_name,
+        ready_check="SELECT true",
+    )
+    migration = DsqlMigration(revision, (step,))
+    monkeypatch.setitem(
+        dsql_migrations.TABLE_COLUMNS,
+        table_name,
+        (("id", "uuid", "NO", None, None, None),),
+    )
+    monkeypatch.setitem(
+        dsql_migrations.TABLE_CONSTRAINTS,
+        table_name,
+        ((f"{table_name}_pkey", "PRIMARY KEY", ("primarykey(id)",)),),
+    )
+    original_record = dsql_migrations._record_complete
+    interrupted = False
+
+    def fail_once(
+        engine: Engine, migration_revision: str, migration_step: DsqlMigrationStep
+    ) -> None:
+        nonlocal interrupted
+        if not interrupted:
+            interrupted = True
+            raise RuntimeError("synthetic interruption after DDL commit")
+        original_record(engine, migration_revision, migration_step)
+
+    monkeypatch.setattr(dsql_migrations, "_record_complete", fail_once)
+    try:
+        with pytest.raises(RuntimeError, match="after DDL commit"):
+            run_dsql_migrations(migration_engine, (migration,))
+        monkeypatch.setattr(dsql_migrations, "_record_complete", original_record)
+        run_dsql_migrations(migration_engine, (migration,))
+        assert dsql_migrations._is_complete(migration_engine, step)
+    finally:
+        with migration_engine.begin() as connection:
+            connection.execute(text(f"DROP TABLE IF EXISTS {table_name}"))
+        with migration_engine.begin() as connection:
+            connection.execute(
+                text(
+                    "DELETE FROM dsql_schema_migration_steps WHERE revision = :revision"
+                ),
+                {"revision": revision},
+            )
+        migration_engine.dispose()
+
+
+@pytest.mark.skipif(
+    environ.get("RUN_DSQL_TOKEN_EXPIRY_TEST") != "1",
+    reason="requires explicit opt-in to wait beyond IAM token expiry",
+)
+def test_real_dsql_application_role_reconnects_after_iam_token_expiry() -> None:
+    """Reconnect with a newly generated IAM token after the prior token expires."""
+    migration_engine, app_engine = _open_engines()
+    try:
+        with app_engine.connect() as connection:
+            assert connection.execute(text("SELECT 1")).scalar_one() == 1
+        # Aurora DSQL IAM authentication tokens are valid for 15 minutes.
+        sleep(16 * 60)
+        app_engine.dispose()
+        with app_engine.connect() as connection:
+            assert connection.execute(text("SELECT 1")).scalar_one() == 1
+    finally:
+        app_engine.dispose()
+        migration_engine.dispose()
 
 
 def test_real_dsql_migration_and_synthetic_persistence() -> None:
@@ -728,7 +866,10 @@ def test_real_dsql_auth_schema_and_session_round_trip() -> None:
                         "now": now,
                     },
                 )
-        assert getattr(duplicate_principal.value.orig, "sqlstate", None) == "23505"
+        assert (
+            getattr(getattr(duplicate_principal.value, "orig", None), "sqlstate", None)
+            == "23505"
+        )
         with pytest.raises(SQLAlchemyError) as duplicate_session:
             with app_engine.begin() as connection:
                 connection.execute(
@@ -745,7 +886,10 @@ def test_real_dsql_auth_schema_and_session_round_trip() -> None:
                         "expires": now.replace(year=now.year + 1),
                     },
                 )
-        assert getattr(duplicate_session.value.orig, "sqlstate", None) == "23505"
+        assert (
+            getattr(getattr(duplicate_session.value, "orig", None), "sqlstate", None)
+            == "23505"
+        )
     finally:
         with app_engine.begin() as connection:
             connection.execute(

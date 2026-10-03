@@ -61,9 +61,10 @@ def test_promotion_gate_rejects_skipped_real_cluster_suite(tmp_path: Path) -> No
 
 
 def test_promotion_gate_rejects_incomplete_live_matrix(tmp_path: Path) -> None:
-    assert len(REQUIRED_CASES) == 9
+    assert len(REQUIRED_CASES) == 13
     evidence = {
         "evidence_version": 1,
+        "suite": "aurora-dsql-stage4-release",
         "result": "passed",
         "backend": "aurora_dsql",
         "fixture_version": FIXTURE_VERSION,
@@ -72,7 +73,7 @@ def test_promotion_gate_rejects_incomplete_live_matrix(tmp_path: Path) -> None:
         "image_digest": "sha256:" + "3" * 64,
         "cluster_identity_sha256": "1" * 64,
         "configuration_sha256": "2" * 64,
-        "tests": {"tests": 9, "passed": 9, "failed": 0, "errors": 0, "skipped": 0},
+        "tests": {"tests": 13, "passed": 13, "failed": 0, "errors": 0, "skipped": 0},
         "executed_cases": sorted(REQUIRED_CASES),
         "missing_required_cases": [],
         "unverified_release_gates": ["iam_token_expiry_reconnect_after_15_minutes"],
@@ -83,6 +84,20 @@ def test_promotion_gate_rejects_incomplete_live_matrix(tmp_path: Path) -> None:
     path.write_text(json.dumps(evidence))
 
     with pytest.raises(EvidenceError, match="matrix evidence is still outstanding"):
+        validate_evidence(path)
+
+
+def test_promotion_gate_rejects_unrecognized_suite_identity(tmp_path: Path) -> None:
+    evidence = {
+        "evidence_version": 1,
+        "suite": "operator-supplied-wrapper",
+        "result": "passed",
+        "backend": "aurora_dsql",
+        "fixture_version": FIXTURE_VERSION,
+    }
+    path = tmp_path / "evidence.json"
+    path.write_text(json.dumps(evidence))
+    with pytest.raises(EvidenceError, match="required Stage 4 suite"):
         validate_evidence(path)
 
 

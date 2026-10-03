@@ -83,6 +83,46 @@ def test_local_store_bounds_hashes_and_rejects_tampering(tmp_path: Path) -> None
         store.read("../outside")
 
 
+def test_local_store_bounds_existing_content_addressed_object_hash(
+    tmp_path: Path,
+) -> None:
+    store = PrivateFileStore(tmp_path / "private", max_object_bytes=4)
+    key, _ = store.put(b"safe")
+    (tmp_path / "private" / key).write_bytes(b"oversized existing object")
+    with pytest.raises(ValueError, match="write limit"):
+        store.put(b"safe")
+
+
+def test_s3_store_closes_streaming_body_when_read_raises() -> None:
+    class BrokenBody:
+        closed = False
+
+        def read(self, _size: int) -> bytes:
+            raise OSError("synthetic stream failure")
+
+        def close(self) -> None:
+            self.closed = True
+
+    class BrokenReadS3(MemoryS3):
+        def __init__(self) -> None:
+            super().__init__()
+            self.body = BrokenBody()
+
+        def get_object(self, *, Bucket: str, Key: str) -> dict[str, Any]:
+            return {
+                "Body": self.body,
+                "ContentLength": 1,
+                "Metadata": {"sha256": Key.removesuffix(".blob")},
+            }
+
+    client = BrokenReadS3()
+    store = S3FileStore("synthetic-private-bucket", "us-east-1", client=client)
+    key = f"{hashlib.sha256(b'x').hexdigest()}.blob"
+    with pytest.raises(OSError, match="synthetic stream failure"):
+        store.read(key)
+    assert client.body.closed is True
+
+
 def test_s3_store_uses_conditional_encrypted_content_addressed_objects() -> None:
     client = MemoryS3()
     store = S3FileStore(

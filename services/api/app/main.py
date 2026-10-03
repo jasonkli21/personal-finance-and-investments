@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import Response
@@ -151,7 +152,8 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
                 "/v1/auth/callback",
                 "/v1/auth/session",
             }:
-                principal: PrincipalContext | None = get_principal(
+                principal: PrincipalContext | None = await run_in_threadpool(
+                    get_principal,
                     session_factory,
                     settings,
                     request.cookies.get(SESSION_COOKIE),
@@ -163,7 +165,8 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
                     )
                 request.state.principal = principal
             elif response is None and path == "/v1/auth/session":
-                request.state.principal = get_principal(
+                request.state.principal = await run_in_threadpool(
+                    get_principal,
                     session_factory,
                     settings,
                     request.cookies.get(SESSION_COOKIE),

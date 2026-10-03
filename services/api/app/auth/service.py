@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import Settings
 from app.db.models import AuthPrincipal, AuthSession, SecurityAuditEvent, utc_now
+from app.db.transactions import run_database_unit
 
 SESSION_COOKIE = "pf_session"
 
@@ -40,7 +41,10 @@ def create_session(
 ) -> tuple[str, PrincipalContext] | None:
     token = secrets.token_urlsafe(32)
     now = utc_now()
-    with session_factory() as session, session.begin():
+    auth_session_id = uuid4()
+    audit_id = uuid4()
+
+    def create(session: Session) -> tuple[str, PrincipalContext] | None:
         principal = session.scalar(
             select(AuthPrincipal).where(
                 AuthPrincipal.issuer == issuer,
@@ -52,7 +56,7 @@ def create_session(
         if principal is None:
             session.add(
                 SecurityAuditEvent(
-                    id=uuid4(),
+                    id=audit_id,
                     actor_subject=None,
                     scope_id=None,
                     action="auth.login",
@@ -64,7 +68,7 @@ def create_session(
             )
             return None
         auth_session = AuthSession(
-            id=uuid4(),
+            id=auth_session_id,
             principal_id=principal.id,
             token_hash=token_digest(token),
             created_at=now,
@@ -73,7 +77,7 @@ def create_session(
         session.add(auth_session)
         session.add(
             SecurityAuditEvent(
-                id=uuid4(),
+                id=audit_id,
                 actor_subject=principal.subject,
                 scope_id=principal.scope_id,
                 action="auth.login",
@@ -86,6 +90,8 @@ def create_session(
         return token, PrincipalContext(
             principal.issuer, principal.subject, principal.scope_id, auth_session.id
         )
+
+    return run_database_unit(session_factory, create)
 
 
 def get_principal(
@@ -126,7 +132,9 @@ def revoke_session(
     correlation_id: str,
 ) -> None:
     now = utc_now()
-    with session_factory() as session, session.begin():
+    audit_id = uuid4()
+
+    def revoke(session: Session) -> None:
         session.execute(
             update(AuthSession)
             .where(
@@ -137,7 +145,7 @@ def revoke_session(
         )
         session.add(
             SecurityAuditEvent(
-                id=uuid4(),
+                id=audit_id,
                 actor_subject=context.subject,
                 scope_id=context.scope_id,
                 action="auth.logout",
@@ -147,3 +155,5 @@ def revoke_session(
                 correlation_id=correlation_id,
             )
         )
+
+    run_database_unit(session_factory, revoke)

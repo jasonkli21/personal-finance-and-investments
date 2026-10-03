@@ -9,12 +9,12 @@ from __future__ import annotations
 from os import environ
 from pathlib import Path
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 import test_reports as report_cases
 from fastapi.testclient import TestClient
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, insert, select, update
 from test_dsql_integration import _open_engines
 from test_funds import (
     test_bounded_fund_publication_duplicates_history_and_anomalies as bounded_fund,
@@ -27,7 +27,7 @@ from test_reports import (
 )
 
 from app.db.dsql_migrations import run_dsql_migrations
-from app.db.models import Base
+from app.db.models import Base, Security
 from app.main import create_app
 
 pytestmark = pytest.mark.skipif(
@@ -128,3 +128,41 @@ def test_real_dsql_stage1_concurrent_publication(cloud: Any) -> None:
     report_cases.test_concurrent_import_publication_and_old_duplicate_do_not_move_head(
         cloud
     )
+
+
+def test_real_dsql_configured_safe_batch_limit_rejects_extra_row(
+    cloud: Any,
+) -> None:
+    browser, engine = cloud
+    fund_id = uuid4()
+    with engine.begin() as connection:
+        connection.execute(
+            insert(Security).values(
+                id=fund_id,
+                security_type="etf",
+                display_ticker="SYNBATCH",
+                name="Synthetic safe-batch ETF",
+                currency="USD",
+            )
+        )
+    limit = browser.app.state.max_import_rows
+    content = "Ticker,Name,Weight\n" + "".join(
+        f"SYN{index},Synthetic {index},1\n" for index in range(limit + 1)
+    )
+    response = browser.post(
+        f"/v1/funds/{fund_id}/upload",
+        content=content.encode(),
+        headers={
+            "Content-Type": "text/csv",
+            "X-Effective-Date": "2026-10-03",
+            "Idempotency-Key": f"safe-batch-{fund_id.hex}",
+            "X-Source-Label": "Synthetic batch-boundary test",
+            "X-Fund-Format": "manual",
+            "X-Weight-Unit": "percent",
+            "X-Column-Mapping": (
+                '{"identifier":"Ticker","name":"Name","weight":"Weight"}'
+            ),
+        },
+    )
+    assert response.status_code == 422
+    assert "configured row limit" in response.json()["detail"]

@@ -54,7 +54,7 @@ operator inputs and are not a spending cap or an availability commitment.
 | Regional data | One deletion-protected Aurora DSQL cluster; separate private-files and static-assets S3 buckets | No multi-region DSQL, public bucket, user-data sync, or conventional RDS subnet topology |
 | API delivery | Immutable ECR repository; App Runner service and one-instance autoscaling config for eligible existing accounts | Image is pinned by SHA-256 digest; auto-deployment is disabled; worker stays off; deploy precondition requires an explicit existing-customer eligibility confirmation |
 | IAM | ECR image-pull role, scoped App Runner instance role, separate operator migration role | Runtime role has only DSQL `DbConnect`, private object reads/writes, configured secret reads, and bucket listing; migration role alone gets `DbConnectAdmin` on this cluster and trusts one exact supplied principal |
-| Web edge | CloudFront distribution, OAC, two small path functions, bounded cache/origin/response policies | Static origin is private; API behavior forwards cookies/OIDC query and CSRF headers and sets zero cache TTL |
+| Web edge | CloudFront distribution, OAC, two small path functions, bounded cache/origin/response policies | Static origin is private; API uses AWS managed `AllViewerExceptHostHeader` forwarding and zero cache TTL |
 | Operator-owned prerequisites | DNS record, validated ACM certificate in `us-east-1`, identity-provider registration and two Secrets Manager values | Kept outside this stack because the owner's DNS/provider/identity choices are not known |
 
 There is no queue or remote worker resource because the implemented worker is

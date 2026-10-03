@@ -59,6 +59,18 @@ Copy `.env.example` to `.env` for local settings. The API defaults to `127.0.0.1
 
 Stop the containers with `docker compose down`. The named PostgreSQL volume is retained. The `.env` file and future `.private/` data are excluded from version control.
 
+The API image prepares `/app/.private` as UID/GID 10001 with mode 0700, which
+new `private_files` volumes inherit. If an older local volume was created with
+root-owned files, repair only that named private-file volume before starting
+the API:
+
+```sh
+docker compose run --rm --user 0:0 --entrypoint chown api -R 10001:10001 /app/.private
+```
+
+This targets only `/app/.private`; do not apply recursive ownership changes to
+the repository, PostgreSQL volume, or other host paths.
+
 ## Quality checks
 
 ```sh

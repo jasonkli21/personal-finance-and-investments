@@ -97,10 +97,14 @@ class PrivateFileStore:
             raise OSError("Private file content hash mismatch")
         return content
 
-    @staticmethod
-    def _hash_file(path: Path) -> str:
+    def _hash_file(self, path: Path) -> str:
         digest = hashlib.sha256()
         with path.open("rb") as stream:
+            metadata = os.fstat(stream.fileno())
+            if not stat.S_ISREG(metadata.st_mode):
+                raise OSError("Private file path must be a regular file")
+            if metadata.st_size > self.max_object_bytes:
+                raise ValueError("Private file exceeds the configured write limit")
             for block in iter(lambda: stream.read(64 * 1024), b""):
                 digest.update(block)
         return digest.hexdigest()

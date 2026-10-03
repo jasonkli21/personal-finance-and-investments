@@ -64,7 +64,7 @@ class TerraformContractTests(unittest.TestCase):
             "aws_cloudfront_origin_access_control.static_assets[0].id",
             MAIN,
         )
-        self.assertIn('path_pattern               = "/api/*"', MAIN)
+        self.assertRegex(MAIN, r'path_pattern\s+=\s+"/api/\*"')
         self.assertIn('origin_protocol_policy = "https-only"', MAIN)
         api_cache = MAIN.split(
             'resource "aws_cloudfront_cache_policy" "api_no_cache"', 1

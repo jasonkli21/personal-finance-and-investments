@@ -43,12 +43,14 @@ from sqlalchemy import (
     String,
     Text,
     Uuid,
-    insert,
+    bindparam,
+    func,
     inspect,
     select,
     text,
     update,
 )
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Connection, Engine, make_url
 from sqlalchemy.sql.schema import Table
 
@@ -1271,6 +1273,47 @@ def _target_matches_archive(
         return False
 
 
+def _schema_matches_archive(
+    engine: Engine,
+    schema: str,
+    manifest: dict[str, Any],
+) -> bool:
+    """Verify bounded staging contents before they become the public schema."""
+    try:
+        with engine.connect() as raw_connection:
+            connection = raw_connection.execution_options(
+                schema_translate_map={None: schema}
+            )
+            for table in Base.metadata.sorted_tables:
+                if table.name in _EXCLUDED_TABLES:
+                    if connection.execute(select(table).limit(1)).first() is not None:
+                        return False
+                    continue
+                count = int(
+                    connection.execute(
+                        select(func.count()).select_from(table)
+                    ).scalar_one()
+                )
+                if count != manifest["tables"][table.name]["row_count"]:
+                    return False
+            for table_name, description in manifest["tables"].items():
+                table = Base.metadata.tables[table_name]
+                row_digest = hashlib.sha256()
+                for row in (
+                    connection.execute(
+                        select(table).order_by(*table.primary_key.columns)
+                    )
+                    .mappings()
+                    .yield_per(200)
+                ):
+                    row_digest.update(_encode_row(table, dict(row)) + b"\n")
+                if row_digest.hexdigest() != description["sha256"]:
+                    return False
+        return True
+    except Exception:
+        return False
+
+
 def restore_archive(
     archive_path: str | Path,
     passphrase: str,
@@ -1337,6 +1380,8 @@ def restore_archive(
                 "source_scope_id": source_scope_id,
                 "target_scope_id": target_scope_id,
                 "schema_fingerprint": _schema_fingerprint(),
+                "staging_schema": f"pf_stage_{_file_digest(archive_file)[:16]}",
+                "backup_schema": f"pf_previous_{_file_digest(archive_file)[:16]}",
                 "phase": "prepared",
             }
             current_marker = _read_restore_marker(marker_path)
@@ -1408,11 +1453,121 @@ def restore_archive(
                     raise RecoveryError("Restored object identity did not match")
             marker_value["phase"] = "objects_staged"
             _write_restore_marker(marker_path, marker_value)
+            staging_schema = f"pf_stage_{str(marker_value['archive_sha256'])[:16]}"
+            backup_schema = f"pf_previous_{str(marker_value['archive_sha256'])[:16]}"
+            marker_value["staging_schema"] = staging_schema
+            marker_value["backup_schema"] = backup_schema
             marker_value["phase"] = "publishing"
             _write_restore_marker(marker_path, marker_value)
+            with database_engine.connect() as connection:
+                if not _target_empty(connection):
+                    raise RecoveryError(
+                        "Restore target became non-empty before publication"
+                    )
+                current_schemas = set(inspect(connection).get_schema_names())
             with database_engine.begin() as connection:
-                # Lock the immutable migration row so two operators cannot
-                # concurrently populate the same explicitly selected target.
+                if staging_schema not in current_schemas:
+                    connection.execute(text(f'CREATE SCHEMA "{staging_schema}"'))
+            with database_engine.begin() as connection:
+                Base.metadata.create_all(
+                    connection.execution_options(
+                        schema_translate_map={None: staging_schema}
+                    )
+                )
+                if not inspect(connection).has_table(
+                    "alembic_version", schema=staging_schema
+                ):
+                    connection.execute(
+                        text(
+                            f'CREATE TABLE "{staging_schema}".alembic_version '
+                            "(version_num VARCHAR(64) NOT NULL)"
+                        )
+                    )
+                    connection.execute(
+                        text(
+                            f'INSERT INTO "{staging_schema}".alembic_version '
+                            "(version_num) VALUES (:head)"
+                        ),
+                        {"head": _alembic_head()},
+                    )
+
+            for table in _included_tables():
+                description = manifest["tables"][table.name]
+                batch: list[dict[str, Any]] = []
+                for row in _table_rows(archive, table, description):
+                    if table.name == "accounts":
+                        row["current_position_snapshot_id"] = None
+                    batch.append(row)
+                    if len(batch) == 200:
+                        with database_engine.begin() as raw_connection:
+                            connection = raw_connection.execution_options(
+                                schema_translate_map={None: staging_schema}
+                            )
+                            connection.execute(
+                                pg_insert(table).values(batch).on_conflict_do_nothing()
+                            )
+                        batch.clear()
+                        if checkpoint is not None:
+                            checkpoint("after_database_batch")
+                if batch:
+                    with database_engine.begin() as raw_connection:
+                        connection = raw_connection.execution_options(
+                            schema_translate_map={None: staging_schema}
+                        )
+                        connection.execute(
+                            pg_insert(table).values(batch).on_conflict_do_nothing()
+                        )
+                    if checkpoint is not None:
+                        checkpoint("after_database_batch")
+
+            # Restore selected-snapshot pointers after every referenced row exists.
+            accounts = Base.metadata.tables["accounts"]
+            pointer_batch: list[dict[str, Any]] = []
+            for row in _table_rows(archive, accounts, manifest["tables"]["accounts"]):
+                if row["current_position_snapshot_id"] is not None:
+                    pointer_batch.append(
+                        {
+                            "account_id": row["id"],
+                            "snapshot_id": row["current_position_snapshot_id"],
+                            "updated_at": row["updated_at"],
+                        }
+                    )
+                if len(pointer_batch) == 200:
+                    with database_engine.begin() as raw_connection:
+                        connection = raw_connection.execution_options(
+                            schema_translate_map={None: staging_schema}
+                        )
+                        connection.execute(
+                            update(accounts)
+                            .where(accounts.c.id == bindparam("account_id"))
+                            .values(
+                                current_position_snapshot_id=bindparam("snapshot_id"),
+                                updated_at=bindparam("updated_at"),
+                            ),
+                            pointer_batch,
+                        )
+                    pointer_batch.clear()
+            if pointer_batch:
+                with database_engine.begin() as raw_connection:
+                    connection = raw_connection.execution_options(
+                        schema_translate_map={None: staging_schema}
+                    )
+                    connection.execute(
+                        update(accounts)
+                        .where(accounts.c.id == bindparam("account_id"))
+                        .values(
+                            current_position_snapshot_id=bindparam("snapshot_id"),
+                            updated_at=bindparam("updated_at"),
+                        ),
+                        pointer_batch,
+                    )
+            if not _schema_matches_archive(database_engine, staging_schema, manifest):
+                raise RecoveryError(
+                    "Staged database content does not match the archive"
+                )
+            if checkpoint is not None:
+                checkpoint("before_publish")
+            with database_engine.begin() as connection:
                 connection.execute(
                     text("SELECT version_num FROM alembic_version FOR UPDATE")
                 ).all()
@@ -1420,42 +1575,19 @@ def restore_archive(
                     raise RecoveryError(
                         "Restore target became non-empty before publication"
                     )
-                pending_account_pointers: list[
-                    tuple[uuid.UUID, uuid.UUID | None, datetime]
-                ] = []
-                tables_by_name = {table.name: table for table in _included_tables()}
-                for table in _included_tables():
-                    description = manifest["tables"][table.name]
-                    batch: list[dict[str, Any]] = []
-                    for row in _table_rows(archive, table, description):
-                        if table.name == "accounts":
-                            pending_account_pointers.append(
-                                (
-                                    row["id"],
-                                    row["current_position_snapshot_id"],
-                                    row["updated_at"],
-                                )
-                            )
-                            row["current_position_snapshot_id"] = None
-                        batch.append(row)
-                        if len(batch) == 200:
-                            connection.execute(insert(table), batch)
-                            batch.clear()
-                    if batch:
-                        connection.execute(insert(table), batch)
-                accounts = tables_by_name["accounts"]
-                for account_id, snapshot_id, updated_at in pending_account_pointers:
-                    if snapshot_id is not None:
-                        connection.execute(
-                            update(accounts)
-                            .where(accounts.c.id == account_id)
-                            .values(
-                                current_position_snapshot_id=snapshot_id,
-                                updated_at=updated_at,
-                            )
-                        )
-                if checkpoint is not None:
-                    checkpoint("before_commit")
+                schemas = set(inspect(connection).get_schema_names())
+                if "public" not in schemas or staging_schema not in schemas:
+                    raise RecoveryError("Staged schema is missing before publication")
+                if backup_schema in schemas:
+                    raise RecoveryError(
+                        "A prior restore publication backup already exists"
+                    )
+                connection.execute(
+                    text(f'ALTER SCHEMA public RENAME TO "{backup_schema}"')
+                )
+                connection.execute(
+                    text(f'ALTER SCHEMA "{staging_schema}" RENAME TO public')
+                )
             marker_value["phase"] = "published"
             _write_restore_marker(marker_path, marker_value)
             return {

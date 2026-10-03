@@ -521,25 +521,6 @@ resource "aws_cloudfront_cache_policy" "api_no_cache" {
   }
 }
 
-resource "aws_cloudfront_origin_request_policy" "api" {
-  count   = var.deploy_api_service ? 1 : 0
-  name    = "${local.name}-api-origin-requests"
-  comment = "Forward session/transaction cookies, OIDC callback query values, and CSRF-relevant headers."
-
-  cookies_config {
-    cookie_behavior = "all"
-  }
-  headers_config {
-    header_behavior = "whitelist"
-    headers {
-      items = ["Authorization", "Content-Type", "Origin", "Sec-Fetch-Site", "X-Requested-With"]
-    }
-  }
-  query_strings_config {
-    query_string_behavior = "all"
-  }
-}
-
 resource "aws_cloudfront_cache_policy" "static_assets" {
   count       = var.deploy_api_service ? 1 : 0
   name        = "${local.name}-static-assets"
@@ -627,13 +608,15 @@ resource "aws_cloudfront_distribution" "app" {
   }
 
   ordered_cache_behavior {
-    path_pattern               = "/api/*"
-    target_origin_id           = "apprunner-api"
-    viewer_protocol_policy     = "redirect-to-https"
-    allowed_methods            = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
-    cached_methods             = ["GET", "HEAD"]
-    cache_policy_id            = aws_cloudfront_cache_policy.api_no_cache[0].id
-    origin_request_policy_id   = aws_cloudfront_origin_request_policy.api[0].id
+    path_pattern           = "/api/*"
+    target_origin_id       = "apprunner-api"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods         = ["GET", "HEAD"]
+    cache_policy_id        = aws_cloudfront_cache_policy.api_no_cache[0].id
+    # AWS managed AllViewerExceptHostHeader: pass import/idempotency/auth/CSRF
+    # and future API contract headers while preserving the origin Host header.
+    origin_request_policy_id   = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
     response_headers_policy_id = aws_cloudfront_response_headers_policy.security[0].id
     compress                   = true
     function_association {

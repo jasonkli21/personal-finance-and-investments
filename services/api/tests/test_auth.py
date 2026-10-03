@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import secrets
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import replace
@@ -12,18 +13,21 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 from joserfc import jwk, jwt
 from sqlalchemy import create_engine, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.auth import service as auth_service
 from app.auth.bind_principal import bind_principal
 from app.auth.oidc import load_provider_metadata, validate_verified_identity
 from app.auth.service import SESSION_COOKIE, get_principal
 from app.config import load_settings
 from app.db.models import AuthPrincipal, AuthSession, Base, SecurityAuditEvent
+from app.db.transactions import run_database_unit as database_retry
 from app.main import create_app
 
 ISSUER = "https://identity.example.test"
@@ -83,6 +87,100 @@ def test_principal_binding_is_explicit_and_idempotent() -> None:
                     subject=SUBJECT,
                     scope_id="attacker-scope",
                 )
+    engine.dispose()
+
+
+def test_slow_session_lookup_does_not_block_health_route(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    configure_auth(monkeypatch, tmp_path)
+    engine = create_engine("sqlite://", poolclass=StaticPool)
+    application = create_app(engine=engine)
+
+    def slow_lookup(*_args: Any, **_kwargs: Any) -> None:
+        time.sleep(0.2)
+        return None
+
+    monkeypatch.setattr("app.main.get_principal", slow_lookup)
+
+    async def requests() -> tuple[float, int]:
+        transport = httpx.ASGITransport(app=application)
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="https://finance.example.test",
+        ) as client:
+            start = time.monotonic()
+            protected = asyncio.create_task(client.get("/v1/accounts"))
+            await asyncio.sleep(0)
+            health = await client.get("/health")
+            elapsed = time.monotonic() - start
+            protected_response = await protected
+            assert health.status_code == 200
+            assert protected_response.status_code == 401
+            return elapsed, health.status_code
+
+    elapsed, _ = asyncio.run(requests())
+    engine.dispose()
+    assert elapsed < 0.15
+
+
+def test_session_database_retry_reuses_one_token_and_logical_session(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    configure_auth(monkeypatch, tmp_path)
+    settings = load_settings()
+    engine = create_engine("sqlite://", poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    with Session(engine) as session, session.begin():
+        session.add(
+            AuthPrincipal(
+                id=uuid4(),
+                issuer=ISSUER,
+                subject=SUBJECT,
+                scope_id=SCOPE_ID,
+                active=True,
+            )
+        )
+
+    token_calls = 0
+    original_token = secrets.token_urlsafe
+
+    def token_once(length: int) -> str:
+        nonlocal token_calls
+        token_calls += 1
+        return original_token(length)
+
+    class SyntheticRollback(Exception):
+        pass
+
+    def retry_after_rollback(factory_arg: Any, operation: Any) -> Any:
+        with factory_arg() as session:
+            try:
+                with session.begin():
+                    operation(session)
+                    raise SyntheticRollback
+            except SyntheticRollback:
+                pass
+        return database_retry(factory_arg, operation, sleep=lambda _seconds: None)
+
+    monkeypatch.setattr(secrets, "token_urlsafe", token_once)
+    monkeypatch.setattr(auth_service, "run_database_unit", retry_after_rollback)
+    created = auth_service.create_session(
+        factory,
+        settings,
+        issuer=ISSUER,
+        subject=SUBJECT,
+        scope_id=SCOPE_ID,
+        correlation_id="synthetic-retry-correlation",
+    )
+    assert created is not None
+    token, context = created
+    assert token_calls == 1
+    assert context.session_id is not None
+    with Session(engine) as session:
+        assert session.scalar(select(AuthSession.id)) == context.session_id
+        assert len(session.scalars(select(SecurityAuditEvent.id)).all()) == 1
     engine.dispose()
 
 

@@ -12,7 +12,8 @@ COPY alembic ./alembic
 RUN uv sync --locked --no-dev
 
 RUN groupadd --system --gid 10001 app \
-    && useradd --system --uid 10001 --gid app --create-home app
+    && useradd --system --uid 10001 --gid app --create-home app \
+    && install -d -o 10001 -g 10001 -m 0700 /app/.private
 
 EXPOSE 8000
 USER 10001:10001

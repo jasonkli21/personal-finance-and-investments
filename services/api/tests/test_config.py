@@ -305,6 +305,32 @@ def test_production_requires_private_authenticated_dsql_configuration(
     assert settings.auth_cookie_secure is True
 
 
+def test_production_worker_flag_uses_one_fail_closed_effective_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_valid_production(monkeypatch)
+    monkeypatch.delenv("JOB_WORKER_ENABLED")
+    assert load_settings().job_worker_enabled is False
+    monkeypatch.setenv("JOB_WORKER_ENABLED", "false")
+    assert load_settings().job_worker_enabled is False
+    monkeypatch.setenv("JOB_WORKER_ENABLED", "true")
+    with pytest.raises(ValueError, match="lease gate"):
+        load_settings()
+    monkeypatch.setenv("JOB_WORKER_ENABLED", "sometimes")
+    with pytest.raises(ValueError, match="must be 'true' or 'false'"):
+        load_settings()
+
+
+def test_import_file_limit_cannot_exceed_private_object_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clear_database_env(monkeypatch)
+    monkeypatch.setenv("MAX_PRIVATE_FILE_BYTES", "1024")
+    monkeypatch.setenv("MAX_IMPORT_FILE_BYTES", "2048")
+    with pytest.raises(ValueError, match="cannot exceed"):
+        load_settings()
+
+
 @pytest.mark.parametrize(
     ("variable", "value", "message"),
     [

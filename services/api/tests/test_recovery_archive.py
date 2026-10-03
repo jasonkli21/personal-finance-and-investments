@@ -419,11 +419,16 @@ def test_encrypted_export_restore_recovery_idempotency_and_golden_report(
         monkeypatch.delenv("DATABASE_URL", raising=False)
         restore_dir = tmp_path / target_name
 
-        def interrupt(phase: str) -> None:
-            assert phase == "before_commit"
-            raise RuntimeError("synthetic interruption before publication")
+        committed_batches = 0
 
-        with pytest.raises(RuntimeError, match="synthetic interruption"):
+        def interrupt(phase: str) -> None:
+            nonlocal committed_batches
+            if phase == "after_database_batch":
+                committed_batches += 1
+                if committed_batches == 2:
+                    raise RuntimeError("synthetic interruption between batches")
+
+        with pytest.raises(RuntimeError, match="between batches"):
             restore_archive(
                 archive_path,
                 PASSPHRASE,
@@ -434,6 +439,7 @@ def test_encrypted_export_restore_recovery_idempotency_and_golden_report(
                 acknowledge_target=target_name,
                 checkpoint=interrupt,
             )
+        assert committed_batches == 2
         interrupted_engine = create_engine(target_url)
         try:
             with interrupted_engine.connect() as connection:

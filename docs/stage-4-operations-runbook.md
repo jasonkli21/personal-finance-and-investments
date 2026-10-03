@@ -56,12 +56,21 @@ The required records are:
 Check the bundle after all records are present and while the matching disposable
 DSQL test configuration remains selected:
 
+Create a separate, operator-reviewed `current-target-configurations.json` from
+the current sanitized configuration inputs for each target. Use exactly the
+`production`, `synthetic_launch`, and `dsql_test` keys, each with a lowercase
+64-character SHA-256 of that target's canonical settings/IaC input artifact.
+Keep this file outside the evidence bundle; do not copy hashes from evidence
+records or the manifest. Distinct targets intentionally have distinct hashes.
+
     .venv/bin/python -m app.release.stage4_gate check \
       --manifest '/secure/release/stage4-evidence.json' \
+      --expected-configurations '/secure/release/current-target-configurations.json' \
       --report '/secure/release/stage4-gate-report.json'
 
-The checker requires the current source and image digest to match the bundle;
-the DSQL evidence checker additionally requires its approved disposable
+The checker requires each evidence hash to match the independently supplied
+current target configuration artifact, as well as requiring the current source
+and image digest to match the bundle. The DSQL evidence checker additionally requires its approved disposable
 cluster, roles, region, backend configuration, and image to remain selected.
 Evidence older than 30 days, from another build/schema/fixture/configuration
 fingerprint, missing, skipped, failed, malformed, path-escaping, or changed

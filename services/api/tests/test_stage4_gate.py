@@ -125,12 +125,17 @@ def _bundle(tmp_path: Path) -> Path:
     return manifest
 
 
+def _expected_configs() -> dict[str, str]:
+    return dict(CONTEXTS)
+
+
 def test_release_gate_accepts_complete_fresh_hash_bound_bundle(tmp_path: Path) -> None:
     manifest = _bundle(tmp_path)
 
     report = evaluate_manifest(
         manifest,
         current_release=RELEASE,
+        expected_context_configurations=_expected_configs(),
         validate_dsql_runtime=False,
     )
 
@@ -177,6 +182,7 @@ def test_release_gate_blocks_bad_or_stale_evidence(
     report = evaluate_manifest(
         manifest,
         current_release=RELEASE,
+        expected_context_configurations=_expected_configs(),
         validate_dsql_runtime=False,
     )
 
@@ -194,6 +200,24 @@ def test_release_gate_rejects_missing_gate_inventory(tmp_path: Path) -> None:
         evaluate_manifest(
             manifest,
             current_release=RELEASE,
+            expected_context_configurations=_expected_configs(),
+            validate_dsql_runtime=False,
+        )
+
+
+def test_release_gate_requires_independent_well_formed_target_configs(
+    tmp_path: Path,
+) -> None:
+    manifest = _bundle(tmp_path)
+    with pytest.raises(GateError, match="Independent current target"):
+        evaluate_manifest(
+            manifest, current_release=RELEASE, validate_dsql_runtime=False
+        )
+    with pytest.raises(GateError, match="incomplete or malformed"):
+        evaluate_manifest(
+            manifest,
+            current_release=RELEASE,
+            expected_context_configurations=[],  # type: ignore[arg-type]
             validate_dsql_runtime=False,
         )
 
@@ -213,6 +237,7 @@ def test_dsql_skip_and_missing_matrix_evidence_block_release(
     report = evaluate_manifest(
         manifest,
         current_release=RELEASE,
+        expected_context_configurations=_expected_configs(),
         validate_dsql_runtime=False,
     )
 
@@ -233,11 +258,37 @@ def test_different_configuration_hash_within_one_context_blocks(
     report = evaluate_manifest(
         manifest,
         current_release=RELEASE,
+        expected_context_configurations=_expected_configs(),
         validate_dsql_runtime=False,
     )
 
     assert report["result"] == "blocked"
     assert "cost_and_budget_approval" in report["blocked_gates"]
+
+
+def test_unanimous_stale_production_configuration_cannot_pass(tmp_path: Path) -> None:
+    manifest = _bundle(tmp_path)
+    data = json.loads(manifest.read_text())
+    old_hash = "f" * 64
+    for gate_id, relative in data["gates"].items():
+        path = tmp_path / relative
+        evidence = json.loads(path.read_text())
+        if gate_id == "real_dsql_release_suite":
+            evidence["configuration_sha256"] = CONTEXTS["dsql_test"]
+        else:
+            context = evidence["configuration_context"]
+            if context == "production":
+                evidence["environment_configuration_sha256"] = old_hash
+        _write_json(path, evidence)
+
+    report = evaluate_manifest(
+        manifest,
+        current_release=RELEASE,
+        expected_context_configurations=_expected_configs(),
+        validate_dsql_runtime=False,
+    )
+    assert report["result"] == "blocked"
+    assert "target_configuration" in report["blocked_gates"]
 
 
 def test_gate_does_not_accept_empty_or_boolean_test_counts() -> None:

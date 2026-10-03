@@ -69,6 +69,11 @@ def load_settings() -> Settings:
     app_env = environ.get("APP_ENV", "development").casefold()
     if app_env not in {"development", "test", "production"}:
         raise ValueError("APP_ENV must be development, test or production")
+    worker_raw = environ.get(
+        "JOB_WORKER_ENABLED", "false" if app_env == "production" else "true"
+    ).casefold()
+    if worker_raw not in {"true", "false"}:
+        raise ValueError("JOB_WORKER_ENABLED must be 'true' or 'false'")
     auth_raw = environ.get("AUTH_ENABLED", "false").casefold()
     if auth_raw not in {"true", "false"}:
         raise ValueError("AUTH_ENABLED must be 'true' or 'false'")
@@ -177,7 +182,7 @@ def load_settings() -> Settings:
                 )
         if environ.get("DEMO_MODE", "false").casefold() == "true":
             raise ValueError("Production cannot run DEMO_MODE")
-        if environ.get("JOB_WORKER_ENABLED", "false").casefold() == "true":
+        if worker_raw == "true":
             raise ValueError(
                 "Production job worker stays disabled until the live DSQL "
                 "lease gate passes"
@@ -191,9 +196,6 @@ def load_settings() -> Settings:
             "authentication/service authorization and data-handling review "
             "are not implemented"
         )
-    worker_raw = environ.get("JOB_WORKER_ENABLED", "true").casefold()
-    if worker_raw not in {"true", "false"}:
-        raise ValueError("JOB_WORKER_ENABLED must be 'true' or 'false'")
     backend = environ.get("DATABASE_BACKEND", "postgres")
     if backend not in {"postgres", "aurora_dsql"}:
         raise ValueError("DATABASE_BACKEND must be 'postgres' or 'aurora_dsql'")
@@ -258,6 +260,15 @@ def load_settings() -> Settings:
     if job_lease_seconds <= pdf_timeout_seconds:
         raise ValueError("JOB_LEASE_SECONDS must exceed PDF_PARSER_TIMEOUT_SECONDS")
 
+    max_private_file_bytes = _int_setting(
+        "MAX_PRIVATE_FILE_BYTES", 20_000_000, minimum=1024, maximum=100_000_000
+    )
+    max_import_file_bytes = _int_setting(
+        "MAX_IMPORT_FILE_BYTES", 5_000_000, minimum=1024, maximum=20_000_000
+    )
+    if max_import_file_bytes > max_private_file_bytes:
+        raise ValueError("MAX_IMPORT_FILE_BYTES cannot exceed MAX_PRIVATE_FILE_BYTES")
+
     return Settings(
         app_env=app_env,
         app_public_origin=public_origin,
@@ -294,12 +305,8 @@ def load_settings() -> Settings:
         private_s3_bucket=private_bucket,
         private_s3_kms_key_id=kms_key_id,
         static_assets_bucket=static_bucket,
-        max_private_file_bytes=_int_setting(
-            "MAX_PRIVATE_FILE_BYTES", 20_000_000, minimum=1024, maximum=100_000_000
-        ),
-        max_import_file_bytes=_int_setting(
-            "MAX_IMPORT_FILE_BYTES", 5_000_000, minimum=1024, maximum=20_000_000
-        ),
+        max_private_file_bytes=max_private_file_bytes,
+        max_import_file_bytes=max_import_file_bytes,
         max_import_rows=_int_setting(
             "MAX_IMPORT_ROWS", 5000, minimum=1, maximum=20_000
         ),
