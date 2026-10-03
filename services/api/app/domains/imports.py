@@ -37,7 +37,7 @@ from app.db.models import (
     utc_now,
 )
 from app.db.transactions import run_database_unit
-from app.storage.file_store import PrivateFileStore
+from app.storage.file_store import FileStore
 
 IMPORT_BATCH_ROWS = 200
 IMPORT_BATCH_BYTES = 900_000
@@ -372,7 +372,7 @@ def _batch_rows(rows: list[dict[str, str]]) -> list[list[dict[str, str]]]:
 
 def create_position_import(
     session_factory: sessionmaker[Session],
-    file_store: PrivateFileStore,
+    file_store: FileStore,
     *,
     content: bytes,
     filename: str,

@@ -1,6 +1,6 @@
 # Data sources and free-tier strategy
 
-**Status:** Stage 1 upload-only issuer parsers implemented; other sources remain a research shortlist | **Provider pages checked:** 2026-09-25; Stage 1 issuer and Stage 3 tax sources checked: 2026-10-02
+**Status:** Stage 1 upload-only issuer parsers implemented; other sources remain a research shortlist | **Provider pages checked:** 2026-09-25; Stage 1 issuer and Stage 3 tax sources checked: 2026-10-02; AWS/DSQL runtime and pricing checked: 2026-10-02
 **Rule:** Prices, download shapes, terms of use, eligibility and quotas change. Reverify the official page before implementing or deploying a connector. Links here are evidence of published availability, **not** permission to scrape, redistribute, or automate a download.
 
 ## 1. Source-selection policy
@@ -99,10 +99,12 @@ Data display rules:
 ## 9. Aurora DSQL as production structured-data store (not an external market-data provider)
 
 - **Local PostgreSQL 16 is always available** with manual/CSV data and cached ETF snapshots. Production uses Aurora DSQL with the same source adapters; moving to AWS does not magically grant new market-data rights, data freshness or account access.
-- [Official Aurora DSQL pricing](https://aws.amazon.com/rds/aurora/dsql/pricing/) (verified 2026-09-25): ongoing **100,000 DPUs + 1 GB-month storage per month**. Excess usage and unrelated AWS services (EC2/Lambda, S3, CloudFront, AWS Backup, network endpoints, logging) can cost money. Track **per-source refreshes as potential database DPU consumption**, not merely HTTP API quotas.
+- [Official Aurora DSQL pricing](https://aws.amazon.com/rds/aurora/dsql/pricing/) (verified 2026-10-02): published recurring allowance is **100,000 DPUs + 1 GB-month storage per month**; excess DSQL and unrelated AWS services (compute, S3, CloudFront, AWS Backup, network endpoints, logging) may cost money. The account/organization's eligibility and total-stack costs require confirmation before provisioning. Track **per-source refreshes as potential database DPU consumption**, not merely HTTP API quotas.
 - Retain bounded structured snapshots in DSQL, and put raw issuer holdings downloads, brokerage statement PDFs, screenshot images and archive exports in **private S3**. Avoid storing megabyte-scale raw provider JSON in DSQL. Use immutable provenance hashes and S3 object keys in the database.
 - Optimize polling/refresh schedules with as-of-aware conditional downloads and cache hits; refreshing the same ETF every minute creates cost without improving a daily holdings snapshot.
 - See [`07-aurora-dsql-compatibility.md`](07-aurora-dsql-compatibility.md) for write batching, search restrictions, and DSQL test requirements.
+
+**Stage 4 implementation check, 2026-10-02:** AWS's current [DSQL quota/transaction documentation](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/CHAP_quotas.html) was checked for transaction/connection ceilings; the DSQL-compatible engine continues to use the official [AWS SQLAlchemy dialect](https://pypi.org/project/aurora-dsql-sqlalchemy/) and [Python connector](https://pypi.org/project/aurora-dsql-python-connector/) with IAM token-on-connect and TLS hostname verification. The lock currently pins dialect 1.3.0 and connector 0.2.7. For private originals, S3 [conditional `PutObject`](https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutObject.html) supports `If-None-Match` to reject replacement of an existing content key, and [server-side encryption](https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingServerSideEncryption.html) supports explicit SSE-S3 or SSE-KMS. These official feature references do not replace live IAM, bucket-policy, region, cost, or recovery verification for the operator's account.
 
 ## Stage 1 issuer verification — 2026-10-02
 

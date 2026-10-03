@@ -34,7 +34,6 @@ from app.api.contracts import (
 from app.db.models import FinancialTransaction, TransactionImport
 from app.db.transactions import run_database_unit
 from app.domains import transactions
-from app.storage.file_store import PrivateFileStore
 
 router = APIRouter(
     prefix="/v1",
@@ -114,7 +113,7 @@ async def post_transaction_import_preview(
         import_id, duplicate = await asyncio.to_thread(
             transactions.create_csv_import,
             request.app.state.session_factory,
-            PrivateFileStore(request.app.state.private_file_root),
+            request.app.state.file_store,
             content=content,
             filename=request.headers.get("x-file-name", "transactions.csv"),
             account_id=account_id,

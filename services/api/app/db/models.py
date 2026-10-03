@@ -861,6 +861,69 @@ class Calculation(Base):
     )
 
 
+class AuthPrincipal(Base):
+    """One explicitly bound personal subject and its server-owned scope."""
+
+    __tablename__ = "auth_principals"
+    __table_args__ = (
+        UniqueConstraint("issuer", "subject", name="uq_auth_principals_issuer_subject"),
+        UniqueConstraint("scope_id", name="uq_auth_principals_scope"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    issuer: Mapped[str] = mapped_column(String(1000), nullable=False)
+    subject: Mapped[str] = mapped_column(String(200), nullable=False)
+    scope_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    active: Mapped[bool] = mapped_column(nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class AuthSession(Base):
+    """Revocable opaque browser session; only its SHA-256 digest is persisted."""
+
+    __tablename__ = "auth_sessions"
+    __table_args__ = (
+        UniqueConstraint("token_hash", name="uq_auth_sessions_token_hash"),
+        Index("ix_auth_sessions_expiry", "expires_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    principal_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("auth_principals.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class SecurityAuditEvent(Base):
+    """Redacted authentication and security event record."""
+
+    __tablename__ = "security_audit_events"
+    __table_args__ = (Index("ix_security_audit_created", "created_at"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    actor_subject: Mapped[str | None] = mapped_column(String(200))
+    scope_id: Mapped[str | None] = mapped_column(String(64))
+    action: Mapped[str] = mapped_column(String(80), nullable=False)
+    target_type: Mapped[str | None] = mapped_column(String(80))
+    target_id: Mapped[str | None] = mapped_column(String(128))
+    result: Mapped[str] = mapped_column(String(24), nullable=False)
+    correlation_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
 class TransactionImport(TimestampMixin, Base):
     """Reviewed bank/card CSV import attempt; source rows remain immutable."""
 

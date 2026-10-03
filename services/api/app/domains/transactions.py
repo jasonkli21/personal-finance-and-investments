@@ -41,7 +41,7 @@ from app.db.models import (
     utc_now,
 )
 from app.db.transactions import run_database_unit
-from app.storage.file_store import PrivateFileStore
+from app.storage.file_store import FileStore
 
 TRANSACTION_PARSER_VERSION = "bank-card-csv/1"
 MAX_TRANSACTION_ROWS = 500
@@ -188,7 +188,7 @@ def _private_file(
 
 def create_csv_import(
     session_factory: sessionmaker[Session],
-    file_store: PrivateFileStore,
+    file_store: FileStore,
     *,
     content: bytes,
     filename: str,

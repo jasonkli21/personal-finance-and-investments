@@ -5,8 +5,18 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import stat
 import uuid
 from pathlib import Path
+from typing import Protocol
+
+
+class FileStore(Protocol):
+    """Private immutable file operations shared by local and cloud storage."""
+
+    def put(self, content: bytes) -> tuple[str, str]: ...
+
+    def read(self, key: str, *, max_bytes: int | None = None) -> bytes: ...
 
 
 class PrivateFileStore:
@@ -14,14 +24,19 @@ class PrivateFileStore:
 
     _KEY = re.compile(r"^[0-9a-f]{64}\.blob$")
 
-    def __init__(self, root: str | Path) -> None:
+    def __init__(self, root: str | Path, *, max_object_bytes: int = 20_000_000) -> None:
+        if max_object_bytes < 1:
+            raise ValueError("Private file size limit must be positive")
         self.root = Path(root).expanduser().absolute()
+        self.max_object_bytes = max_object_bytes
         self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
         if self.root.is_symlink() or not self.root.is_dir():
             raise ValueError("PRIVATE_FILE_DIR must be a real directory")
         os.chmod(self.root, 0o700)
 
     def put(self, content: bytes) -> tuple[str, str]:
+        if len(content) > self.max_object_bytes:
+            raise ValueError("Private file exceeds the configured write limit")
         digest = hashlib.sha256(content).hexdigest()
         key = f"{digest}.blob"
         destination = self.root / key
@@ -59,13 +74,28 @@ class PrivateFileStore:
             temporary.unlink(missing_ok=True)
         return key, digest
 
-    def read(self, key: str) -> bytes:
+    def read(self, key: str, *, max_bytes: int | None = None) -> bytes:
         if not self._KEY.fullmatch(key):
             raise ValueError("Invalid private file key")
         path = self.root / key
-        if path.is_symlink() or not path.is_file():
-            raise FileNotFoundError(key)
-        return path.read_bytes()
+        limit = (
+            self.max_object_bytes
+            if max_bytes is None
+            else min(self.max_object_bytes, max_bytes)
+        )
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        with os.fdopen(descriptor, "rb") as stream:
+            metadata = os.fstat(stream.fileno())
+            if not stat.S_ISREG(metadata.st_mode):
+                raise FileNotFoundError(key)
+            if metadata.st_size > limit:
+                raise ValueError("Private file exceeds the configured read limit")
+            content = stream.read(limit + 1)
+        if len(content) > limit:
+            raise ValueError("Private file exceeds the configured read limit")
+        if hashlib.sha256(content).hexdigest() != key.removesuffix(".blob"):
+            raise OSError("Private file content hash mismatch")
+        return content
 
     @staticmethod
     def _hash_file(path: Path) -> str:

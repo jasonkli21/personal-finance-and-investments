@@ -1,6 +1,6 @@
 # Stage 4 implementation plan
 
-**Status:** Proposed optional deployment track; no infrastructure provisioned by this plan  
+**Status:** Implementation underway; no infrastructure provisioned or live DSQL verified
 **Updated:** 2026-10-02
 **Roadmap coverage:** Work packages 4.1–4.6
 

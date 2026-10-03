@@ -1,13 +1,13 @@
 # Security, privacy, portability and AWS deployment
 
-**Status:** Local Stage 1 controls implemented; cloud/AI launch gates planned | **Updated:** 2026-10-02
+**Status:** Local Stage 1 controls implemented; Stage 4.1 config/auth/storage prepared locally; cloud launch gates remain | **Updated:** 2026-10-02
 **Deployment strategy:** PostgreSQL 16 runs locally indefinitely. Cloud deployment is optional in timing, but **Aurora DSQL is mandatory for production**. Its recurring database allowance is not a promise of free total cloud hosting. See [`07-aurora-dsql-compatibility.md`](07-aurora-dsql-compatibility.md).
 
 ## 1. Threat model and scope
 
 The app may hold account identifiers, positions, investments, statements, credit-card transactions and tax lots. Major risks include unintended cloud sharing, leaked API keys/connection tokens, exposed PostgreSQL/S3, malicious uploaded documents, duplicate/incorrect ingestion, stolen device access, and accidental cloud costs. Treat personal-financial confidentiality and numeric correctness as security properties, not cosmetic preferences.
 
-**Local MVP:** single user, backend binds to `127.0.0.1` by default, PostgreSQL not published to public network, private document folder excluded from version control/backups unless encrypted. If using Docker port mappings, bind published ports to loopback, not `0.0.0.0`. A truly remote network deployment **must have authentication** before exposure.
+**Local MVP:** single user, backend binds to `127.0.0.1` by default, PostgreSQL not published to public network, private document folder excluded from version control/backups unless encrypted. If using Docker port mappings, bind published ports to loopback, not `0.0.0.0`. A truly remote network deployment **must have authentication** before exposure. Stage 4.1 adds fail-closed production settings, one configured personal identity, database-backed revocable browser sessions, and an S3-backed private `FileStore`; this is prepared code, not evidence of AWS deployment or live DSQL.
 
 **No trading authority:** do not request or store brokerage trade credentials; allow only user uploads or explicitly authorized read-only provider APIs. A research agent can retrieve public data and summarize, never execute transactions.
 
@@ -34,25 +34,40 @@ If enabling Plaid later: use hosted consent/link flows, store only encrypted ser
 
 ## 4. Local configuration and data portability
 
-Illustrative future production settings (not all are implemented). Actual Stage 1 settings are in the root `.env.example`:
+The root `.env.example` documents the implemented local settings and names of production settings. Production is deliberately not runnable with defaults:
 
 ```dotenv
 APP_ENV=development
 DATABASE_BACKEND=postgres
-DATABASE_URL=postgresql+psycopg://app:change-me@127.0.0.1:5432/portfolio
-# Production: DATABASE_BACKEND=aurora_dsql; cluster endpoint/region/user via environment
-# Production: use AWS compute IAM role, NOT a persisted database password
-APP_BIND_HOST=127.0.0.1
 FILE_STORAGE_BACKEND=local
 PRIVATE_FILE_DIR=./.private/uploads
-PRICE_PROVIDER=manual
-ETF_PROVIDER_MODE=manual
 PERSONAL_AI_ENABLED=false
-# Account sync and paid-provider policy remain future gates, not live flags.
-# No finance-owned model-provider URL or credentials.
+
+# Production: APP_ENV=production, HTTPS origin, Aurora DSQL, and S3 are required.
+# AWS_REGION=us-west-2
+# AURORA_DSQL_CLUSTER_ENDPOINT=<cluster-endpoint>
+# AURORA_DSQL_DB_USER=<least-privilege-application-role>
+# AURORA_DSQL_MIGRATION_DB_USER=<separate-schema-migration-role>
+# PRIVATE_S3_BUCKET=<private-bucket-distinct-from-static-assets>
+# AUTH_ENABLED=true
+# AUTH_ISSUER_URL=https://<configured-oidc-issuer>
+# AUTH_CLIENT_ID=<registered-confidential-client-id>
+# AUTH_CLIENT_SECRET=<injected-from-secret-manager>
+# AUTH_SESSION_SIGNING_KEY=<at-least-32-random-characters-from-secret-manager>
+# AUTH_ALLOWED_SUBJECT=<exact-stable-oidc-subject>
+# AUTH_PERSONAL_SCOPE_ID=<stable-personal-scope>
+# APP_PUBLIC_ORIGIN=https://<configured-app-host>
+# AUTH_COOKIE_SECURE=true
+# JOB_WORKER_ENABLED=false until real DSQL lease evidence is accepted.
 ```
 
-Do **not** use the literal sample password outside an isolated local dev database. Production DSQL uses scoped IAM token-on-connect, not a static `DATABASE_URL` password. Validate environment combinations: production must fail startup if using dev secrets, open binding without auth, public bucket for private documents, or unsupported provider billing setting.
+Stage 4.1 uses a provider-neutral OpenID Connect authorization-code flow with PKCE `S256`. Configure an issuer that publishes standard discovery metadata, register the exact `https://<APP_PUBLIC_ORIGIN>/api/v1/auth/callback` callback, and inject its confidential-client secret from a secret manager. The CloudFront API path behavior strips the external `/api` prefix before forwarding to FastAPI. [Authlib's Starlette integration](https://docs.authlib.org/en/stable/oauth2/client/web/starlette.html) validates callback state, PKCE, the ID-token signature from discovered JWKS, issuer, audience, expiry, and nonce. Finance then requires the exact configured `(issuer, subject)` allowlist and the server-owned personal scope; client claims never set financial ownership. The 10-minute signed `pf_oidc_transaction` cookie is `HttpOnly`, `Secure`, and `SameSite=Lax` so the provider can return to the callback. After verification the browser receives an opaque `HttpOnly`, `Secure`, `SameSite=Strict` session cookie; only its SHA-256 digest is stored in DSQL/PostgreSQL. Database-backed expiry and logout revocation apply to every request. Redacted login/logout audit rows carry a server-generated correlation ID.
+
+Generate `AUTH_SESSION_SIGNING_KEY` with `python -c 'import secrets; print(secrets.token_urlsafe(48))'` and store it with the identity-provider client secret in the runtime secret store. Before login works in a newly initialized environment, an operator explicitly maps the configured issuer/subject/scope with `uv run --directory services/api --locked python -m app.auth.bind_principal` (dry-run) and `--apply` after review. The app does not choose or provision an identity provider; its issuer, client, callback registration, and subject remain operator decisions.
+
+When `AUTH_ENABLED=true`, backend middleware protects every `/v1` route, checks the configured origin for all writes, rejects cross-site writes, and adds non-cache/security headers. The production SPA is held behind the session gate; 401 responses clear cached workspace data. `/health` and `/health/ready` disclose only a status. Production settings reject local PostgreSQL, missing auth/HTTPS, non-S3 private storage, a private/static bucket collision, demo mode, an absent separate migration role, and the in-process worker before its DSQL lease test gate. S3 objects use generated SHA-256 keys, conditional create, bounded transfers, server-side encryption, and integrity verification; no presigned public preview link is issued. The S3 policy/IAM resources are not yet provisioned.
+
+Production DSQL uses scoped IAM token-on-connect, not a static `DATABASE_URL` password. AWS credentials come only from the runtime role/standard credential chain. Keep `.env` and credentials out of Git; the values above are operator configuration names, not copied account/region targets.
 
 Finance can stay on AWS while personal-AI runs on another cloud. Future integration uses authenticated HTTPS with explicit egress/cost/retention controls; it requires no shared VPC, datastore or object bucket. This decision does not change PostgreSQL/DSQL, IAM/TLS, private S3 or AWS production gates.
 
@@ -83,7 +98,7 @@ Infrastructure details:
 6. No production deployment until the DSQL readiness suite in `07-aurora-dsql-compatibility.md` passes on a real cluster and importer retries/partial staging are verified.
 7. Infrastructure-as-code should tag each resource and support teardown; make all optional chargeable services explicitly opt-in. Avoid NAT/PrivateLink/ALB solely because they appear in a generic AWS reference architecture.
 
-**Database free allowance (AWS [official DSQL pricing](https://aws.amazon.com/rds/aurora/dsql/pricing/), checked 2026-09-25):** first **100,000 DPUs + 1 GB-month of Aurora DSQL storage per month** free, with **billable overages**. This differs from time-limited new AWS account promotional credits and must not be confused with permanent free RDS. AWS Compute, S3, CloudFront, data transfer, logging, AWS Backup, domain names and PrivateLink may still be charged. Free-tier benefits/eligibility and prices change; confirm in the actual account before deployment. **Budgets/alerts are warnings, not hard spend caps.**
+**Database allowance (AWS [official DSQL pricing](https://aws.amazon.com/rds/aurora/dsql/pricing/), checked 2026-10-02):** pricing states a recurring first **100,000 DPUs + 1 GB-month of Aurora DSQL storage per month**, with **billable overages**. This differs from time-limited new AWS account promotional credits and must not be confused with free hosting. AWS Compute, S3, CloudFront, data transfer, logging, AWS Backup, domain names and PrivateLink may still be charged. Eligibility and unit prices must be rechecked in the actual account; an allowance is not a spending cap. **Budgets/alerts are warnings, not hard spend caps.**
 
 ## 6. Cloud launch gate
 

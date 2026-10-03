@@ -5843,6 +5843,35 @@
         "title": "SecurityResolution",
         "type": "object"
       },
+      "SessionRead": {
+        "properties": {
+          "authenticated": {
+            "title": "Authenticated",
+            "type": "boolean"
+          },
+          "local_mode": {
+            "title": "Local Mode",
+            "type": "boolean"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          }
+        },
+        "required": [
+          "authenticated",
+          "local_mode"
+        ],
+        "title": "SessionRead",
+        "type": "object"
+      },
       "SpendingCategoryCreate": {
         "properties": {
           "display_name": {
@@ -8220,6 +8249,41 @@
           }
         },
         "summary": "Put Positions"
+      }
+    },
+    "/v1/auth/logout": {
+      "post": {
+        "operationId": "logout_v1_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Logout",
+        "tags": [
+          "authentication"
+        ]
+      }
+    },
+    "/v1/auth/session": {
+      "get": {
+        "operationId": "get_session_v1_auth_session_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Session",
+        "tags": [
+          "authentication"
+        ]
       }
     },
     "/v1/categories": {

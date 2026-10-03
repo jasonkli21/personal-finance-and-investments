@@ -26,7 +26,7 @@ from app.db.models import (
 from app.db.transactions import run_database_unit
 from app.domains import imports
 from app.providers.fund_formats import ParsedFund, parse_fund, weight
-from app.storage.file_store import PrivateFileStore
+from app.storage.file_store import FileStore
 
 
 def classify(raw: str) -> str:
@@ -85,7 +85,7 @@ def match(
 
 def preview(
     factory: sessionmaker[Session],
-    store: PrivateFileStore,
+    store: FileStore,
     *,
     content: bytes,
     filename: str,

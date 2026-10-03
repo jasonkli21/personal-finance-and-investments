@@ -16,7 +16,7 @@ from app.db.models import Account, DocumentImport, ImportAttempt, PrivateFile, u
 from app.db.transactions import run_database_unit
 from app.domains import imports
 from app.ingestion.brokerage_pdf import PDF_PARSER_VERSION, parse_brokerage_pdf
-from app.storage.file_store import PrivateFileStore
+from app.storage.file_store import FileStore
 
 
 class DocumentError(ValueError):
@@ -70,7 +70,7 @@ def _document_file(
 
 def create_brokerage_pdf_import(
     session_factory: sessionmaker[Session],
-    file_store: PrivateFileStore,
+    file_store: FileStore,
     *,
     content: bytes,
     filename: str,
@@ -277,7 +277,7 @@ def read_document_import(session: Session, document_id: UUID) -> dict[str, Any]:
 
 
 def read_document_file(
-    session: Session, file_id: UUID, file_store: PrivateFileStore
+    session: Session, file_id: UUID, file_store: FileStore
 ) -> tuple[bytes, str, str]:
     source = session.scalar(
         select(PrivateFile)

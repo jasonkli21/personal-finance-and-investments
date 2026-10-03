@@ -3,6 +3,7 @@
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
+from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -10,12 +11,19 @@ from pydantic import BaseModel
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
+from starlette.middleware.base import RequestResponseEndpoint
+from starlette.middleware.sessions import SessionMiddleware
+from starlette.responses import Response
 
 from app.api.routes import router as api_router
 from app.api.transaction_routes import router as transaction_router
+from app.auth.oidc import OIDC_TRANSACTION_COOKIE, create_oidc_client
+from app.auth.routes import router as auth_router
+from app.auth.service import SESSION_COOKIE, PrincipalContext, get_principal
 from app.config import load_settings
 from app.db.engine import DatabaseEngineFactory
 from app.integrations.personal_ai import DisabledPersonalAIClient
+from app.storage.factory import create_file_store
 
 
 class HealthResponse(BaseModel):
@@ -28,6 +36,7 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
     session_factory: sessionmaker[Session] = sessionmaker(
         bind=database_engine, expire_on_commit=False
     )
+    file_store = create_file_store(settings)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -39,7 +48,7 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
                 worker_task = asyncio.create_task(
                     run_worker(
                         session_factory,
-                        settings.private_file_dir,
+                        file_store,
                         poll_interval_seconds=settings.job_poll_interval_seconds,
                         lease_seconds=settings.job_lease_seconds,
                     )
@@ -53,12 +62,21 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
             database_engine.dispose()
 
     app = FastAPI(
-        title="Portfolio Intelligence API", version="0.1.0", lifespan=lifespan
+        title="Portfolio Intelligence API",
+        version="0.1.0",
+        lifespan=lifespan,
+        docs_url=None if settings.app_env == "production" else "/docs",
+        redoc_url=None if settings.app_env == "production" else "/redoc",
+        openapi_url=None if settings.app_env == "production" else "/openapi.json",
     )
     app.state.database_engine = database_engine
     app.state.session_factory = session_factory
+    app.state.settings = settings
     app.state.private_file_root = settings.private_file_dir
+    app.state.file_store = file_store
+    app.state.oidc_client = create_oidc_client(settings)
     app.state.max_import_file_bytes = settings.max_import_file_bytes
+    app.state.max_private_file_bytes = settings.max_private_file_bytes
     app.state.max_import_rows = settings.max_import_rows
     app.state.max_pdf_pages = settings.max_pdf_pages
     app.state.pdf_parser_timeout_seconds = settings.pdf_parser_timeout_seconds
@@ -67,6 +85,7 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
     app.state.job_lease_seconds = settings.job_lease_seconds
     app.state.job_max_attempts = settings.job_max_attempts
     app.state.personal_ai_client = DisabledPersonalAIClient()
+    app.include_router(auth_router)
     app.include_router(api_router)
     app.include_router(transaction_router)
     from app.api.finance_routes import router as finance_router
@@ -92,6 +111,72 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
     app.include_router(stage3_planning_router)
     app.include_router(stage3_sales_router)
     app.include_router(stage3_tax_router)
+
+    if settings.auth_enabled:
+        signing_key = settings.auth_session_signing_key
+        if signing_key is None:
+            raise ValueError("OIDC transaction signing key is required")
+        app.add_middleware(
+            SessionMiddleware,
+            secret_key=signing_key,
+            session_cookie=OIDC_TRANSACTION_COOKIE,
+            max_age=600,
+            path="/",
+            same_site="lax",
+            https_only=settings.auth_cookie_secure,
+        )
+
+    @app.middleware("http")
+    async def authorize_financial_routes(
+        request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        request.state.correlation_id = str(uuid4())
+        path = request.url.path
+        response: Response | None = None
+        if settings.auth_enabled and path.startswith("/v1"):
+            if request.method not in {"GET", "HEAD", "OPTIONS"}:
+                origin = request.headers.get("origin")
+                if origin != settings.app_public_origin:
+                    response = JSONResponse(
+                        status_code=403,
+                        content={"detail": "Request origin is not allowed"},
+                    )
+                elif request.headers.get("sec-fetch-site") == "cross-site":
+                    response = JSONResponse(
+                        status_code=403,
+                        content={"detail": "Cross-site requests are not allowed"},
+                    )
+            if response is None and path not in {
+                "/v1/auth/login",
+                "/v1/auth/callback",
+                "/v1/auth/session",
+            }:
+                principal: PrincipalContext | None = get_principal(
+                    session_factory,
+                    settings,
+                    request.cookies.get(SESSION_COOKIE),
+                )
+                if principal is None:
+                    response = JSONResponse(
+                        status_code=401,
+                        content={"detail": "Authentication required"},
+                    )
+                request.state.principal = principal
+            elif response is None and path == "/v1/auth/session":
+                request.state.principal = get_principal(
+                    session_factory,
+                    settings,
+                    request.cookies.get(SESSION_COOKIE),
+                )
+        if response is None:
+            response = await call_next(request)
+        response.headers["X-Request-ID"] = request.state.correlation_id
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        if path.startswith("/v1"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
 
     @app.exception_handler(SQLAlchemyError)
     def database_error_handler(

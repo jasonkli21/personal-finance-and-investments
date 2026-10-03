@@ -28,6 +28,23 @@ def clear_database_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "DATABASE_MAX_OVERFLOW",
         "DATABASE_POOL_RECYCLE_SECONDS",
         "DATABASE_CONNECT_TIMEOUT_SECONDS",
+        "APP_ENV",
+        "APP_PUBLIC_ORIGIN",
+        "FILE_STORAGE_BACKEND",
+        "PRIVATE_S3_BUCKET",
+        "PRIVATE_S3_KMS_KEY_ID",
+        "STATIC_ASSETS_BUCKET",
+        "MAX_PRIVATE_FILE_BYTES",
+        "AUTH_ENABLED",
+        "AUTH_ISSUER_URL",
+        "AUTH_CLIENT_ID",
+        "AUTH_CLIENT_SECRET",
+        "AUTH_SESSION_SIGNING_KEY",
+        "AUTH_ALLOWED_SUBJECT",
+        "AUTH_PERSONAL_SCOPE_ID",
+        "AUTH_SESSION_TTL_SECONDS",
+        "AUTH_COOKIE_SECURE",
+        "JOB_WORKER_ENABLED",
     ):
         monkeypatch.delenv(key, raising=False)
 
@@ -170,4 +187,101 @@ def test_invalid_database_port_fails_configuration(
     monkeypatch.setenv("DATABASE_PORT", value)
 
     with pytest.raises(ValueError, match="DATABASE_PORT"):
+        load_settings()
+
+
+def configure_valid_production(monkeypatch: pytest.MonkeyPatch) -> None:
+    clear_database_env(monkeypatch)
+    for key in (
+        "APP_ENV",
+        "APP_PUBLIC_ORIGIN",
+        "FILE_STORAGE_BACKEND",
+        "PRIVATE_S3_BUCKET",
+        "AUTH_ENABLED",
+        "AUTH_ISSUER_URL",
+        "AUTH_CLIENT_ID",
+        "AUTH_CLIENT_SECRET",
+        "AUTH_SESSION_SIGNING_KEY",
+        "AUTH_ALLOWED_SUBJECT",
+        "AUTH_PERSONAL_SCOPE_ID",
+        "AUTH_COOKIE_SECURE",
+        "AWS_REGION",
+        "AURORA_DSQL_CLUSTER_ENDPOINT",
+        "AURORA_DSQL_DB_USER",
+        "AURORA_DSQL_MIGRATION_DB_USER",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("APP_PUBLIC_ORIGIN", "https://finance.example.test")
+    monkeypatch.setenv("FILE_STORAGE_BACKEND", "s3")
+    monkeypatch.setenv("PRIVATE_S3_BUCKET", "finance-private-example")
+    monkeypatch.setenv("STATIC_ASSETS_BUCKET", "finance-static-example")
+    monkeypatch.setenv("AUTH_ENABLED", "true")
+    monkeypatch.setenv("AUTH_ISSUER_URL", "https://identity.example.test")
+    monkeypatch.setenv("AUTH_CLIENT_ID", "finance-client")
+    monkeypatch.setenv("AUTH_CLIENT_SECRET", "synthetic-client-secret")
+    monkeypatch.setenv(
+        "AUTH_SESSION_SIGNING_KEY", "synthetic-signing-key-that-is-long-enough"
+    )
+    monkeypatch.setenv("AUTH_ALLOWED_SUBJECT", "local-owner")
+    monkeypatch.setenv("AUTH_PERSONAL_SCOPE_ID", "personal-finance")
+    monkeypatch.setenv("AUTH_COOKIE_SECURE", "true")
+    monkeypatch.setenv("AWS_REGION", "us-east-1")
+    monkeypatch.setenv("AURORA_DSQL_CLUSTER_ENDPOINT", "cluster.dsql.us-east-1.on.aws")
+    monkeypatch.setenv("AURORA_DSQL_DB_USER", "portfolio_app")
+    monkeypatch.setenv("AURORA_DSQL_MIGRATION_DB_USER", "portfolio_migrator")
+    monkeypatch.setenv("DATABASE_BACKEND", "aurora_dsql")
+    monkeypatch.setenv("JOB_WORKER_ENABLED", "false")
+
+
+def test_production_requires_private_authenticated_dsql_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clear_database_env(monkeypatch)
+    monkeypatch.setenv("APP_ENV", "production")
+    with pytest.raises(ValueError, match="AUTH_ENABLED"):
+        load_settings()
+
+    configure_valid_production(monkeypatch)
+    settings = load_settings()
+    assert settings.app_env == "production"
+    assert settings.database_backend == "aurora_dsql"
+    assert settings.file_storage_backend == "s3"
+    assert settings.auth_enabled is True
+    assert settings.auth_cookie_secure is True
+
+
+@pytest.mark.parametrize(
+    ("variable", "value", "message"),
+    [
+        ("AUTH_ISSUER_URL", "http://identity.example.test", "HTTPS issuer"),
+        ("AUTH_SESSION_SIGNING_KEY", "too-short", "at least 32 characters"),
+    ],
+)
+def test_production_requires_secure_oidc_settings(
+    monkeypatch: pytest.MonkeyPatch, variable: str, value: str, message: str
+) -> None:
+    configure_valid_production(monkeypatch)
+    monkeypatch.setenv(variable, value)
+    with pytest.raises(ValueError, match=message):
+        load_settings()
+
+
+@pytest.mark.parametrize(
+    ("variable", "value", "message"),
+    [
+        ("AUTH_COOKIE_SECURE", "false", "Secure"),
+        ("DATABASE_BACKEND", "postgres", "aurora_dsql"),
+        ("FILE_STORAGE_BACKEND", "local", "private S3"),
+        ("STATIC_ASSETS_BUCKET", "", "static assets bucket"),
+        ("JOB_WORKER_ENABLED", "true", "lease gate"),
+        ("DEMO_MODE", "true", "DEMO_MODE"),
+    ],
+)
+def test_production_rejects_unsafe_runtime_modes(
+    monkeypatch: pytest.MonkeyPatch, variable: str, value: str, message: str
+) -> None:
+    configure_valid_production(monkeypatch)
+    monkeypatch.setenv(variable, value)
+    with pytest.raises(ValueError, match=message):
         load_settings()

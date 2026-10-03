@@ -1,6 +1,6 @@
 # Aurora DSQL compatibility contract
 
-**Status:** DSQL boundary implemented; live cluster remains unverified | **Verified against AWS/PyPI official documentation:** 2026-10-02
+**Status:** DSQL boundary implemented; Stage 4 auth tables added to migration plan; live cluster remains unverified | **Verified against AWS/PyPI official documentation:** 2026-10-02
 **Architecture:** PostgreSQL 16 locally and for personal/offline operation; **single-Region Amazon Aurora DSQL in production**. The same FastAPI domain logic must support both. No claim is made that a live DSQL cluster has been tested yet.
 
 This file is the authoritative DSQL-specific companion to [`02-architecture.md`](02-architecture.md), [`05-roadmap.md`](05-roadmap.md), and [`06-security-and-deployment.md`](06-security-and-deployment.md). Recheck the official links before implementing: Aurora DSQL is adding PostgreSQL features frequently.
@@ -8,7 +8,7 @@ This file is the authoritative DSQL-specific companion to [`02-architecture.md`]
 ## 1. Why this split
 
 - **Local:** Docker Compose runs PostgreSQL 16; no AWS credentials, API spend or connectivity needed. Local PostgreSQL is a complete personal deployment, not merely a disposable test database.
-- **Production:** Aurora DSQL is the required SQL database. As checked 2026-09-25, its ongoing monthly free allowance is **100,000 DPUs plus 1 GB-month of storage**; excess usage is billable. This is an *account/organization-level allowance*, not a promise of a free cluster in every Region or a free full AWS stack. [Official pricing](https://aws.amazon.com/rds/aurora/dsql/pricing/).
+- **Production:** Aurora DSQL is the required SQL database. As checked 2026-10-02, its published monthly free allowance is **100,000 DPUs plus 1 GB-month of storage**; excess usage is billable. This is an *account/organization-level allowance*, not a promise of a free cluster in every Region or a free full AWS stack. [Official pricing](https://aws.amazon.com/rds/aurora/dsql/pricing/).
 - **Shared:** One schema *logical model*, Pydantic contracts, exposure engine and import/business logic. Small, explicit database-specific adapters handle engine/authentication, migration quirks and worker job claiming. The UI is identical.
 - **Avoid two apps:** Production code must be covered by real Aurora DSQL smoke/integration tests. Local PostgreSQL passing on its own is insufficient evidence of production compatibility.
 
@@ -79,6 +79,8 @@ Stage 3.3 adds a read-only sale-simulation endpoint over the existing position, 
 Stage 3.4 adds a read-only hypothetical portfolio-scenario endpoint over existing account, position, quote, security and published fund records. It adds no schema or migration and performs no canonical writes. Its SQLAlchemy queries use portable selects. Synthetic SQLite API tests cover scenario calculations and unchanged position revisions; they do not establish live PostgreSQL or DSQL runtime behavior. See [Stage 3 release status](stage-3-release.md).
 
 Stage 3.5 adds a read-only income/runway/purchase-planning endpoint over existing account balances, position snapshots and valuations, published transactions, and reviewed dividend events. It adds no schema or migration and performs no canonical writes. Its SQLAlchemy queries use portable selects; synthetic SQLite API tests cover cash/liquidity grouping, projections, history gaps, provenance, and unchanged canonical record counts. These tests do not establish live PostgreSQL or DSQL runtime behavior. See [Stage 3 release status](stage-3-release.md).
+
+Stage 4.1 adds Alembic revision `0015_stage4_authentication` with `auth_principals`, `auth_sessions`, and `security_audit_events`, plus the `expires_at` and audit `created_at` indexes. `auth_principals` binds an exact OIDC `(issuer, subject)` pair to one server-owned scope. The named two-column uniqueness is supported in DSQL's [CREATE TABLE constraint syntax](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/create-table-syntax-support.html), rechecked 2026-10-02. The DSQL plan adds the matching three one-statement table steps and two asynchronous indexes (five resumable ledger steps). App-generated UUIDs, portable timestamps/strings, a principal/session FK and named uniqueness match the SQLAlchemy metadata. Local structural and SQLite session tests do not establish that revision 0015 or its indexes have been applied to DSQL; Stage 4 release evidence records the pending live-cluster gate.
 
 As verified on 2026-10-01, [AWS DSQL limits](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/CHAP_quotas.html) include **10 MiB of changed data**, **3,000 modified rows**, **five minutes per transaction**, and **60 minutes per connection**. DSQL uses optimistic concurrency and fixed Repeatable Read isolation; conflicting transactions may abort and need a whole-unit retry. These are upper limits, **not** recommended targets.
 

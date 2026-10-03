@@ -19,7 +19,6 @@ from app.api.routes import SessionDependency, _read_bounded_request
 from app.db.models import FundSnapshot, ImportAttempt
 from app.db.transactions import run_database_unit
 from app.domains import funds, imports
-from app.storage.file_store import PrivateFileStore
 
 router = APIRouter(prefix="/v1")
 
@@ -60,7 +59,7 @@ async def upload(
             raise imports.InvalidCsv("Mapping must be an object of header names")
         identifier, duplicate = funds.preview(
             request.app.state.session_factory,
-            PrivateFileStore(request.app.state.private_file_root),
+            request.app.state.file_store,
             content=content,
             filename=request.headers.get("x-file-name", "fund.csv"),
             fund_id=fund_id,

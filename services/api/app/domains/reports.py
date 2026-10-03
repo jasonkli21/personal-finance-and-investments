@@ -27,7 +27,7 @@ from app.db.models import (
 from app.db.transactions import run_database_unit
 from app.domains.exposure import VERSION, calculate
 from app.providers.quotes import CachedQuoteProvider, QuoteProvider
-from app.storage.file_store import PrivateFileStore
+from app.storage.file_store import FileStore
 
 
 class ReportNotFound(Exception):
@@ -291,7 +291,7 @@ def capture(
 
 def create(
     factory: sessionmaker[Session],
-    store: PrivateFileStore,
+    store: FileStore,
     *,
     account_ids: list[UUID],
     as_of: datetime | None,
@@ -344,7 +344,7 @@ def create(
     return result
 
 
-def read(session: Session, store: PrivateFileStore, identifier: UUID) -> dict[str, Any]:
+def read(session: Session, store: FileStore, identifier: UUID) -> dict[str, Any]:
     record = session.get(Calculation, identifier)
     if record is None:
         raise ReportNotFound

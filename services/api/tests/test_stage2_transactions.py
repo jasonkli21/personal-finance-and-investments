@@ -566,6 +566,7 @@ def test_reupload_after_cancelling_completed_pdf_review(
     account = _account(browser)
     sessions = sessionmaker(engine, expire_on_commit=False)
     root = tmp_path / "private"
+    file_store = PrivateFileStore(root)
     content = (
         Path(__file__).parents[3] / "fixtures/stage-2/synthetic-brokerage-statement.pdf"
     ).read_bytes()
@@ -573,7 +574,7 @@ def test_reupload_after_cancelling_completed_pdf_review(
     def enqueue(key: str) -> dict[str, Any]:
         return jobs.enqueue_pdf_preview(
             sessions,
-            PrivateFileStore(root),
+            file_store,
             content=content,
             filename="synthetic.pdf",
             account_id=UUID(account["id"]),
@@ -590,7 +591,7 @@ def test_reupload_after_cancelling_completed_pdf_review(
         )
 
     first = enqueue("completed-cancelled")
-    assert _process_one(sessions, str(root), worker_id="synthetic", lease_seconds=30)
+    assert _process_one(sessions, file_store, worker_id="synthetic", lease_seconds=30)
     with sessions.begin() as session:
         completed = jobs.read_job(session, first["id"])
         assert completed["status"] == "completed", completed
@@ -608,7 +609,7 @@ def test_reupload_after_cancelling_completed_pdf_review(
     assert retry["id"] != first["id"]
     assert retry["status"] == "pending"
     assert enqueue(retry_key)["id"] == retry["id"]
-    assert _process_one(sessions, str(root), worker_id="synthetic", lease_seconds=30)
+    assert _process_one(sessions, file_store, worker_id="synthetic", lease_seconds=30)
     with sessions() as session:
         replacement = jobs.read_job(session, retry["id"])
         assert replacement["status"] == "completed", replacement

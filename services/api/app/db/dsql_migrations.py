@@ -2344,6 +2344,56 @@ STAGE2_TRANSACTIONS = DsqlMigration(
     ),
 )
 
+TABLE_COLUMNS["auth_principals"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("issuer", "character varying", "NO", 1000, None, None),
+    ("subject", "character varying", "NO", 200, None, None),
+    ("scope_id", "character varying", "NO", 64, None, None),
+    ("active", "boolean", "NO", None, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["auth_principals"] = (
+    ("auth_principals_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    (
+        "uq_auth_principals_issuer_subject",
+        "UNIQUE",
+        ("unique(issuer,subject)",),
+    ),
+    ("uq_auth_principals_scope", "UNIQUE", ("unique(scope_id)",)),
+)
+TABLE_COLUMNS["auth_sessions"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("principal_id", "uuid", "NO", None, None, None),
+    ("token_hash", "character varying", "NO", 64, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+    ("expires_at", "timestamp with time zone", "NO", None, None, None),
+    ("revoked_at", "timestamp with time zone", "YES", None, None, None),
+)
+TABLE_CONSTRAINTS["auth_sessions"] = (
+    ("auth_sessions_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    ("uq_auth_sessions_token_hash", "UNIQUE", ("unique(token_hash)",)),
+    (
+        "auth_sessions_principal_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(principal_id)referencesauth_principals(id)ondeletecascade",),
+    ),
+)
+TABLE_COLUMNS["security_audit_events"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("actor_subject", "character varying", "YES", 200, None, None),
+    ("scope_id", "character varying", "YES", 64, None, None),
+    ("action", "character varying", "NO", 80, None, None),
+    ("target_type", "character varying", "YES", 80, None, None),
+    ("target_id", "character varying", "YES", 128, None, None),
+    ("result", "character varying", "NO", 24, None, None),
+    ("correlation_id", "character varying", "NO", 36, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["security_audit_events"] = (
+    ("security_audit_events_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+)
+
+
 DSQL_MIGRATIONS = (
     CORE_SCHEMA,
     POSITION_SNAPSHOT_REVISION,
@@ -2742,6 +2792,88 @@ DSQL_MIGRATIONS = (
                 "tax_lots.state_revision",
                 "SELECT true",
                 expected_column=("integer", "NO", "1"),
+            ),
+        ),
+    ),
+    DsqlMigration(
+        "0015_stage4_authentication",
+        (
+            DsqlMigrationStep(
+                "create_auth_principals",
+                "table",
+                """CREATE TABLE auth_principals (
+                    id uuid NOT NULL,
+                    issuer varchar(1000) NOT NULL,
+                    subject varchar(200) NOT NULL,
+                    scope_id varchar(64) NOT NULL,
+                    active boolean NOT NULL,
+                    created_at timestamptz NOT NULL,
+                    CONSTRAINT auth_principals_pkey PRIMARY KEY (id),
+                    CONSTRAINT uq_auth_principals_issuer_subject
+                        UNIQUE (issuer, subject),
+                    CONSTRAINT uq_auth_principals_scope UNIQUE (scope_id)
+                )""",
+                "auth_principals",
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = current_schema() AND table_name = :object_name)",
+            ),
+            DsqlMigrationStep(
+                "create_auth_sessions",
+                "table",
+                """CREATE TABLE auth_sessions (
+                    id uuid NOT NULL,
+                    principal_id uuid NOT NULL,
+                    token_hash varchar(64) NOT NULL,
+                    created_at timestamptz NOT NULL,
+                    expires_at timestamptz NOT NULL,
+                    revoked_at timestamptz,
+                    CONSTRAINT auth_sessions_pkey PRIMARY KEY (id),
+                    CONSTRAINT uq_auth_sessions_token_hash UNIQUE (token_hash),
+                    CONSTRAINT auth_sessions_principal_id_fkey FOREIGN KEY
+                        (principal_id) REFERENCES auth_principals(id) ON DELETE CASCADE
+                )""",
+                "auth_sessions",
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = current_schema() AND table_name = :object_name)",
+            ),
+            DsqlMigrationStep(
+                "index_auth_sessions_expiry",
+                "index",
+                "CREATE INDEX ASYNC ix_auth_sessions_expiry "
+                "ON auth_sessions (expires_at)",
+                "ix_auth_sessions_expiry",
+                "SELECT true",
+                expected_index_table="auth_sessions",
+                expected_index_columns=("expires_at",),
+            ),
+            DsqlMigrationStep(
+                "create_security_audit_events",
+                "table",
+                """CREATE TABLE security_audit_events (
+                    id uuid NOT NULL,
+                    actor_subject varchar(200),
+                    scope_id varchar(64),
+                    action varchar(80) NOT NULL,
+                    target_type varchar(80),
+                    target_id varchar(128),
+                    result varchar(24) NOT NULL,
+                    correlation_id varchar(36) NOT NULL,
+                    created_at timestamptz NOT NULL,
+                    CONSTRAINT security_audit_events_pkey PRIMARY KEY (id)
+                )""",
+                "security_audit_events",
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = current_schema() AND table_name = :object_name)",
+            ),
+            DsqlMigrationStep(
+                "index_security_audit_created",
+                "index",
+                "CREATE INDEX ASYNC ix_security_audit_created "
+                "ON security_audit_events (created_at)",
+                "ix_security_audit_created",
+                "SELECT true",
+                expected_index_table="security_audit_events",
+                expected_index_columns=("created_at",),
             ),
         ),
     ),

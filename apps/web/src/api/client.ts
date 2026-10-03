@@ -13,12 +13,19 @@ export class ApiError extends Error {
   }
 }
 
+function noteAuthenticationFailure(response: Response) {
+  if (response.status === 401 && typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('finance:unauthorized'))
+  }
+}
+
 async function unwrap<T>(result: {
   data?: T
   error?: unknown
   response: Response
 }): Promise<T> {
   if (!result.response.ok) {
+    noteAuthenticationFailure(result.response)
     const body = result.error as { detail?: string } | undefined
     throw new ApiError(
       result.response.status,
@@ -146,6 +153,7 @@ export async function previewPositionImport(input: {
   const body = (await response.json()) as
     components['schemas']['ImportCreated'] | { detail?: string }
   if (!response.ok) {
+    noteAuthenticationFailure(response)
     throw new ApiError(
       response.status,
       'detail' in body
@@ -182,6 +190,7 @@ export async function previewBrokeragePdf(input: {
   const body = (await response.json()) as
     components['schemas']['JobRead'] | { detail?: string }
   if (!response.ok) {
+    noteAuthenticationFailure(response)
     throw new ApiError(
       response.status,
       'detail' in body
@@ -229,6 +238,7 @@ export async function previewTransactionImport(input: {
   const body = (await response.json()) as
     components['schemas']['TransactionImportCreated'] | { detail?: string }
   if (!response.ok) {
+    noteAuthenticationFailure(response)
     throw new ApiError(
       response.status,
       'detail' in body
@@ -492,6 +502,7 @@ export async function previewFundImport(input: {
     (await response.json()) as components['schemas']['ImportCreated'] & {
       detail?: string
     }
+  if (!response.ok) noteAuthenticationFailure(response)
   if (!response.ok)
     throw new ApiError(response.status, body.detail ?? 'Fund review failed')
   return body
@@ -654,6 +665,7 @@ export async function previewTaxLotImport(input: {
   const body = (await response.json()) as
     components['schemas']['TaxLotImportCreated'] | { detail?: string }
   if (!response.ok) {
+    noteAuthenticationFailure(response)
     throw new ApiError(
       response.status,
       'detail' in body

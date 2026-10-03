@@ -91,6 +91,40 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/auth/logout': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Logout */
+    post: operations['logout_v1_auth_logout_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/auth/session': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Session */
+    get: operations['get_session_v1_auth_session_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/categories': {
     parameters: {
       query?: never
@@ -3236,6 +3270,15 @@ export interface components {
        */
       status: 'resolved' | 'ambiguous' | 'unknown'
     }
+    /** SessionRead */
+    SessionRead: {
+      /** Authenticated */
+      authenticated: boolean
+      /** Local Mode */
+      local_mode: boolean
+      /** Subject */
+      subject?: string | null
+    }
     /** SpendingCategoryCreate */
     SpendingCategoryCreate: {
       /** Display Name */
@@ -4204,6 +4247,44 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  logout_v1_auth_logout_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  get_session_v1_auth_session_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SessionRead']
         }
       }
     }

@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import hashlib
 from datetime import date, timedelta
-from pathlib import Path
 from uuid import uuid4
 
 from sqlalchemy import update
@@ -14,7 +13,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.db.models import Job, PrivateFile, utc_now
 from app.domains import documents, jobs
 from app.ingestion.brokerage_pdf import PdfExtractionError
-from app.storage.file_store import PrivateFileStore
+from app.storage.file_store import FileStore
 
 
 class _LeaseLost(RuntimeError):
@@ -33,7 +32,7 @@ def _stop_if_cancelled_or_stale(
 
 def _process_one(
     session_factory: sessionmaker[Session],
-    file_root: str,
+    file_store: FileStore,
     *,
     worker_id: str,
     lease_seconds: int,
@@ -86,7 +85,7 @@ def _process_one(
         content_hash = source.content_hash
 
     try:
-        content = PrivateFileStore(file_root).read(storage_key)
+        content = file_store.read(storage_key, max_bytes=20_000_000)
         if hashlib.sha256(content).hexdigest() != content_hash:
             raise ValueError("private_source_integrity")
         if not jobs.progress_job(
@@ -122,7 +121,7 @@ def _process_one(
         payload = claim.payload
         result = documents.create_brokerage_pdf_import(
             session_factory,
-            PrivateFileStore(file_root),
+            file_store,
             content=content,
             filename=str(payload["filename"]),
             account_id=claim.account_id,
@@ -198,20 +197,19 @@ def _process_one(
 
 async def run_worker(
     session_factory: sessionmaker[Session],
-    file_root: str | Path,
+    file_store: FileStore,
     *,
     poll_interval_seconds: int,
     lease_seconds: int,
 ) -> None:
     """Poll the durable queue without holding DB transactions around parsing."""
     worker_id = str(uuid4())
-    root = str(file_root)
     while True:
         operation = asyncio.create_task(
             asyncio.to_thread(
                 _process_one,
                 session_factory,
-                root,
+                file_store,
                 worker_id=worker_id,
                 lease_seconds=lease_seconds,
             )

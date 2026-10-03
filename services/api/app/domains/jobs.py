@@ -23,7 +23,7 @@ from app.db.models import (
 from app.db.transactions import run_database_unit
 from app.domains import documents
 from app.ingestion.brokerage_pdf import PDF_PARSER_VERSION
-from app.storage.file_store import PrivateFileStore
+from app.storage.file_store import FileStore
 
 PDF_PREVIEW_JOB = "brokerage_pdf_preview_v1"
 JOB_LEASE_SECONDS = 30
@@ -103,7 +103,7 @@ def _pdf_payload(
 
 def enqueue_pdf_preview(
     session_factory: sessionmaker[Session],
-    file_store: PrivateFileStore,
+    file_store: FileStore,
     *,
     content: bytes,
     filename: str,

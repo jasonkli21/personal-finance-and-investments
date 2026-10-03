@@ -42,7 +42,6 @@ from app.api.contracts import (
 from app.db.models import ImportAttempt, ImportBatch, Issuer, PositionSnapshot, Security
 from app.db.transactions import run_database_unit
 from app.domains import accounts, documents, imports, jobs, portfolio, securities
-from app.storage.file_store import PrivateFileStore
 
 router = APIRouter(
     prefix="/v1",
@@ -288,7 +287,7 @@ async def post_brokerage_pdf_preview(
         job_result = await asyncio.to_thread(
             jobs.enqueue_pdf_preview,
             request.app.state.session_factory,
-            PrivateFileStore(request.app.state.private_file_root),
+            request.app.state.file_store,
             content=content,
             filename=request.headers.get("x-file-name", "statement.pdf"),
             account_id=account_id,
@@ -334,7 +333,7 @@ def get_private_file_preview(
         content, content_type, filename = documents.read_document_file(
             session,
             file_id,
-            PrivateFileStore(request.app.state.private_file_root),
+            request.app.state.file_store,
         )
     except documents.DocumentNotFound as exc:
         raise HTTPException(status_code=404, detail="Private file not found.") from exc
@@ -391,7 +390,7 @@ async def post_position_import_preview(
     try:
         import_id, duplicate = imports.create_position_import(
             request.app.state.session_factory,
-            PrivateFileStore(request.app.state.private_file_root),
+            request.app.state.file_store,
             content=content,
             filename=request.headers.get("x-file-name", "positions.csv"),
             account_id=account_id,

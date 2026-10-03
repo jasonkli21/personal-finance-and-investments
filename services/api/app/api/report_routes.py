@@ -18,7 +18,6 @@ from app.api.contracts import (
 )
 from app.api.routes import SessionDependency
 from app.domains import reports
-from app.storage.file_store import PrivateFileStore
 
 router = APIRouter(prefix="/v1/portfolio")
 View = Literal["owned", "security", "issuer"]
@@ -28,9 +27,7 @@ def load(
     request: Request, session: SessionDependency, identifier: UUID
 ) -> dict[str, Any]:
     try:
-        return reports.read(
-            session, PrivateFileStore(request.app.state.private_file_root), identifier
-        )
+        return reports.read(session, request.app.state.file_store, identifier)
     except reports.ReportNotFound as exc:
         raise HTTPException(
             status_code=404,
@@ -43,7 +40,7 @@ def create(request: Request, data: ReportCreate) -> ReportSummary:
     try:
         report = reports.create(
             request.app.state.session_factory,
-            PrivateFileStore(request.app.state.private_file_root),
+            request.app.state.file_store,
             account_ids=data.account_ids,
             as_of=data.as_of,
             include_archived=data.include_archived,

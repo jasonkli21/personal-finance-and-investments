@@ -22,7 +22,6 @@ from app.api.stage3_contracts import (
 from app.db.models import TaxLotImport
 from app.db.transactions import run_database_unit
 from app.domains import tax
-from app.storage.file_store import PrivateFileStore
 
 router = APIRouter(prefix="/v1")
 
@@ -79,7 +78,7 @@ async def preview_tax_lots(
             raise tax.TaxError("Column mapping must map field names to CSV headers.")
         identifier, duplicate = tax.create_csv_import(
             request.app.state.session_factory,
-            PrivateFileStore(request.app.state.private_file_root),
+            request.app.state.file_store,
             content=content,
             filename=request.headers.get("x-file-name", "tax-lots.csv"),
             account_id=account_id,
