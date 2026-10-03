@@ -85,8 +85,17 @@ def test_official_dsql_dialect_compiles_core_schema_without_connecting() -> None
             for table in Base.metadata.sorted_tables
             for index in table.indexes
         ]
-        assert len(table_ddl) == 38
-        assert len(index_ddl) == 30
+        assert len(table_ddl) == 45
+        assert len(index_ddl) == 35
+        assert {
+            "research_documents",
+            "reported_facts",
+            "research_runs",
+            "research_results",
+            "research_run_contexts",
+            "research_thesis_notes",
+            "research_watchlist_events",
+        }.issubset({table.name for table in Base.metadata.sorted_tables})
         assert all(
             statement.lstrip().startswith("CREATE TABLE") for statement in table_ddl
         )

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 from uuid import UUID, uuid4
@@ -30,6 +31,11 @@ from app.db.models import (
     ResearchWatchlistEvent,
     Security,
 )
+from app.integrations.personal_ai import DisabledPersonalAIClient
+from app.integrations.research_evidence import (
+    EvidenceScopeDocument,
+    ResearchEvidenceEligibility,
+)
 from app.main import create_app
 
 
@@ -51,6 +57,14 @@ def research_client(
 def _fixture() -> dict[str, Any]:
     path = (
         Path(__file__).parents[3] / "fixtures/stage-5/synthetic-company-research.json"
+    )
+    return cast(dict[str, Any], json.loads(path.read_text()))
+
+
+def _evaluation_fixture() -> dict[str, Any]:
+    path = (
+        Path(__file__).parents[3]
+        / "fixtures/stage-5/synthetic-research-evaluation.json"
     )
     return cast(dict[str, Any], json.loads(path.read_text()))
 
@@ -355,6 +369,150 @@ def test_offline_baseline_freezes_cited_facts_and_is_idempotent(
         assert (
             session.scalar(select(func.count()).select_from(FinancialTransaction)) == 0
         )
+
+
+def test_stage5_offline_evaluation_citations_privacy_and_disabled_parity(
+    research_client: TestClient,
+) -> None:
+    evaluation = _evaluation_fixture()
+    issuer_id = _issuer(research_client)
+    documents = _add_documents(research_client, issuer_id)
+    facts = []
+    for index, fact in enumerate(_fixture()["facts"]):
+        response = research_client.post(
+            "/v1/research/facts",
+            json={**fact, "document_id": documents[index]["id"]},
+        )
+        assert response.status_code == 201, response.text
+        facts.append(response.json())
+
+    comparison_case = evaluation["comparison"]
+    comparison = research_client.post(
+        "/v1/research/comparisons",
+        json={
+            "prior_fact_id": facts[comparison_case["prior_fact_index"]]["id"],
+            "current_fact_id": facts[comparison_case["current_fact_index"]]["id"],
+        },
+    )
+    assert comparison.status_code == 200, comparison.text
+    assert comparison.json()["status"] == comparison_case["expected_status"]
+    assert (
+        comparison.json()["absolute_change"]
+        == comparison_case["expected_absolute_change"]
+    )
+    assert (
+        comparison.json()["percent_change"]
+        == comparison_case["expected_percent_change"]
+    )
+
+    note_text = evaluation["untrusted_thesis_note"]
+    note = research_client.post(
+        "/v1/research/thesis-notes",
+        json={
+            "issuer_id": issuer_id,
+            "text": note_text,
+            "idempotency_key": "synthetic-evaluation-hostile-thesis",
+        },
+    )
+    assert note.status_code == 201, note.text
+
+    factory = cast(Any, research_client.app).state.session_factory
+    with factory() as session:
+        canonical_counts_before = {
+            model.__name__: session.scalar(select(func.count()).select_from(model))
+            for model in (Account, PositionSnapshot, FinancialTransaction)
+        }
+
+    baseline = research_client.post(
+        "/v1/research/runs",
+        json={
+            "issuer_id": issuer_id,
+            "question": "Compare synthetic annual revenue against the saved thesis",
+            "fact_ids": [item["id"] for item in facts],
+            "idempotency_key": "synthetic-evaluation-offline-run",
+            "thesis_note_id": note.json()["id"],
+        },
+    )
+    assert baseline.status_code == 201, baseline.text
+    result = baseline.json()["result"]
+    assert result["mode"] == evaluation["expected_result_mode"]
+    assert result["inferences"] == evaluation["expected_inferences"]
+    assert result["thesis_note"]["text"] == note_text
+    assert len(result["citations"]) == 2
+    assert {
+        citation["fact_id"]: citation for citation in result["citations"]
+    }.keys() == {item["id"] for item in facts}
+    for index, (fact, document) in enumerate(zip(facts, documents, strict=True)):
+        citation = next(
+            item for item in result["citations"] if item["fact_id"] == fact["id"]
+        )
+        assert citation["document_id"] == document["id"]
+        assert citation["accession_number"] == document["accession_number"]
+        assert citation["source_url"] == document["source_url"]
+        assert citation["quality_status"] == "user_supplied_unverified"
+        assert citation["fact_id"] == facts[index]["id"]
+
+    assert note_text not in json.dumps(result["citations"])
+    assert (
+        "No shared research service or model synthesis was run." in result["unknowns"]
+    )
+    assert isinstance(
+        cast(Any, research_client.app).state.personal_ai_client,
+        DisabledPersonalAIClient,
+    )
+
+    eligibility = ResearchEvidenceEligibility(
+        issuer_id=UUID(issuer_id),
+        allowed_documents=[
+            EvidenceScopeDocument(
+                document_id=UUID(document["id"]),
+                issuer_id=UUID(issuer_id),
+                accession_number=document["accession_number"],
+                source_url=document["source_url"],
+                filing_date=document["filing_date"],
+                source_status="user_supplied_unverified",
+            )
+            for document in documents
+        ],
+        as_of=datetime(2026, 10, 3, tzinfo=UTC),
+    )
+    eligibility_payload = eligibility.model_dump(mode="json")
+    assert set(eligibility_payload) == {
+        "schema_version",
+        "issuer_id",
+        "allowed_documents",
+        "as_of",
+        "max_age_days",
+        "minimum_evidence",
+        "max_items",
+        "max_excerpt_bytes",
+        "max_total_bytes",
+    }
+    assert all(
+        set(document)
+        == {
+            "document_id",
+            "issuer_id",
+            "accession_number",
+            "source_url",
+            "filing_date",
+            "source_status",
+        }
+        for document in eligibility_payload["allowed_documents"]
+    )
+    serialized_eligibility = json.dumps(eligibility_payload)
+    assert note_text not in serialized_eligibility
+    assert not any(
+        token in serialized_eligibility.lower()
+        for token in ("account", "balance", "portfolio", "thesis")
+    )
+
+    with factory() as session:
+        canonical_counts_after = {
+            model.__name__: session.scalar(select(func.count()).select_from(model))
+            for model in (Account, PositionSnapshot, FinancialTransaction)
+        }
+    assert canonical_counts_after == canonical_counts_before
 
 
 def test_portfolio_context_notes_and_watchlist_are_frozen_locally(

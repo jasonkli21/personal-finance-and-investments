@@ -1,6 +1,6 @@
 # Stage 5 implementation status
 
-**Status:** safe offline slices of S5.1.1, S5.2.1, and S5.3 plus a provisional local evidence validator implemented; shared SEC/IR retrieval, AI synthesis, monitoring, live DSQL, and hosted promotion remain gated
+**Status:** safe offline slices of S5.1.1, S5.2.1, S5.3, provisional evidence validation, and S5.6 evaluation implemented; shared SEC/IR retrieval, AI synthesis, monitoring, live DSQL, and hosted promotion remain gated
 **Updated:** 2026-10-03
 
 This record separates finance-owned offline research workflow evidence from shared-service and provider capabilities that have not been integrated. No SEC data, personal portfolio context, or personal-AI service was requested or called during this implementation.
@@ -52,7 +52,7 @@ This blocks a safe S5.5 implementation because monitoring requires durable idemp
 - **S5.3 remote context/inference and automatic report history:** not implemented. Portfolio context and thesis notes remain local; only manually registered filings are available.
 - **S5.4 shared evidence retrieval:** not integrated. The upstream contract, authorization, evidence provenance, and owner propagation remain unresolved; no finance index/search/database is added.
 - **S5.5 monitoring:** not implemented. Stage 2 job delivery, restart, cleanup, and live DSQL lease acceptance remain partial/unverified; source cadence/rights and notification policy are undecided.
-- **S5.6 evaluation/release:** pending. Real DSQL is unverified; hosted promotion remains blocked by Stage 4 evidence and authorization gates.
+- **S5.6 evaluation/release:** an offline synthetic evaluation slice is implemented and reported in [the Stage 5 evaluation report](stage-5-evaluation.md). It verifies deterministic fixture arithmetic, registered citation identity, a local-only evidence-scope shape, disabled research behavior, and unchanged canonical account/position/transaction rows. Semantic claim support, quote traceability, public source accessibility, upstream parity, browser E2E, PostgreSQL runtime, and real DSQL remain unverified; this is not a Stage 5 or hosted release pass.
 
 ## S5.1 verification
 
@@ -83,3 +83,10 @@ This blocks a safe S5.5 implementation because monitoring requires durable idemp
 
 - Reviewed [`docs/stage-2-release.md`](stage-2-release.md) and [`docs/07-aurora-dsql-compatibility.md`](07-aurora-dsql-compatibility.md): Stage 2 S2.6 is partial; restart/cancellation acceptance, parsed-output reuse, cleanup, and real DSQL lease tests remain required. The Stage 2 local worker is in-process and handles PDF preview only.
 - No S5.5 code or tests were added because the durable scheduling and delivery gates are not met. Existing watchlists are manual and offline; they do not fetch or notify.
+
+## S5.6 offline evaluation
+
+- See [the dated synthetic evaluation report](stage-5-evaluation.md). Its harness checks the fixture's exact `$20,000,000` / `20%` comparison, binds each citation to the selected fact and manually registered accession/URL, preserves a hostile user-authored thesis as a note with no generated inference, checks the local evidence-eligibility shape for absence of portfolio/account/note content, and confirms the baseline succeeds with the default disabled AI client without changing canonical financial row counts.
+- The citation check validates record identity, not source accessibility, excerpt authenticity, quotation fidelity, or semantic claim support. No generated claim exists to evaluate. S5.4 validator tests cover stale, wrong-scope, conflict, insufficient, untraceable, and oversized synthetic candidates.
+- No shared provider, public filing, or personal data was used. No upstream comparison, provider failure/idempotency, browser journey, live PostgreSQL persistence, or real DSQL test ran. The offline evaluation does not clear the unresolved S5.2.2 or hosted release gates.
+- The full API suite passed **195 tests**, with **37 PostgreSQL/DSQL opt-in tests skipped**; the web suite passed **9 tests**. Full Python mypy/Ruff and the generated API check passed. Web typecheck and production build passed (existing 536 kB chunk advisory). The report records two remaining repository checks: web ESLint has four existing state-in-effect findings, and whole-tree Ruff format check reports existing differences in applied migrations `0007` and `0015`; changed Python files are formatted. The migration-count and current-head regression expectations were updated for the Stage 5 schema.

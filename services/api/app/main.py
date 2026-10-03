@@ -16,8 +16,8 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import Response
 
-from app.api.routes import router as api_router
 from app.api.research_routes import router as research_router
+from app.api.routes import router as api_router
 from app.api.transaction_routes import router as transaction_router
 from app.auth.oidc import OIDC_TRANSACTION_COOKIE, create_oidc_client
 from app.auth.routes import router as auth_router

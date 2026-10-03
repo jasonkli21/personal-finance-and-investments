@@ -242,7 +242,7 @@ def test_schema_fingerprint_is_current_and_excludes_auth_and_jobs() -> None:
     assert "private_files" in names
     assert "portfolio_calculations" in names
     assert len(_schema_fingerprint()) == 64
-    assert _alembic_head() == "0015_stage4_authentication"
+    assert _alembic_head() == "0018_stage5_portfolio_context"
 
 
 def test_encrypted_export_restore_recovery_idempotency_and_golden_report(
