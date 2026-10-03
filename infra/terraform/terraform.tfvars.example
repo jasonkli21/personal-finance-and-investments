@@ -14,3 +14,9 @@ auth_allowed_subject               = "OFFLINE-PLACEHOLDER"
 auth_personal_scope_id             = "OFFLINE-PLACEHOLDER"
 app_database_role                  = "finance_app"
 migration_trusted_principal_arn    = "arn:aws:iam::123456789012:role/OFFLINE-PLACEHOLDER"
+
+# Optional account-wide cost notifications: set both only after selecting an
+# operator-approved limit and a real recipient. Alerts do not cap spend.
+# monthly_cost_budget_usd       = 25
+# cost_alert_email_addresses    = ["REPLACE_WITH_CONFIRMED_RECIPIENT"]
+# api_max_import_rows           = 1000

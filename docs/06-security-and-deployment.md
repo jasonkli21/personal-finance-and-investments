@@ -1,6 +1,6 @@
 # Security, privacy, portability and AWS deployment
 
-**Status:** Local Stage 1 controls implemented; Stage 4.1 config/auth/storage prepared locally; cloud launch gates remain | **Updated:** 2026-10-02
+**Status:** Local Stage 1 controls implemented; Stage 4.1–4.4 config/auth/storage/infrastructure/cost controls prepared locally; cloud launch gates remain | **Updated:** 2026-10-03
 **Deployment strategy:** PostgreSQL 16 runs locally indefinitely. Cloud deployment is optional in timing, but **Aurora DSQL is mandatory for production**. Its recurring database allowance is not a promise of free total cloud hosting. See [`07-aurora-dsql-compatibility.md`](07-aurora-dsql-compatibility.md).
 
 ## 1. Threat model and scope
@@ -99,6 +99,8 @@ Infrastructure details:
 7. Infrastructure-as-code should tag each resource and support teardown; make all optional chargeable services explicitly opt-in. Avoid NAT/PrivateLink/ALB solely because they appear in a generic AWS reference architecture.
 
 The current [`Terraform resource plan`](../infra/terraform/README.md) creates one protected DSQL cluster, two public-blocked S3 buckets, an immutable-digest ECR repository, scoped runtime/migration IAM, App Runner, and CloudFront. API/edge creation is opt-in after a separate ECR foundation step because the API must reference an already-pushed immutable image. DNS, certificate, identity-provider resources, budget recipient and Terraform state bucket remain operator-managed inputs. App Runner log groups contain generated service IDs; the checked script sets and verifies 30-day retention after creation. Nothing is applied, and the endpoint, identity, DNS/TLS, image, cost forecast, or real DSQL path is unverified. See the S4.2 evidence in [stage-4-release](stage-4-release.md).
+
+Infrastructure injects bounded request settings: one 0.25-vCPU/1-GB App Runner instance at concurrency 10, a 1,000-row import cap, 5 MB import files, 20 MB private files, 40 PDF pages, an 8-second parser timeout and three job attempts. Workers and personal-AI remain off. These controls bound individual work and do not cap total charges. S3 private originals and portable exports have no expiration rule until an explicit retention/recovery policy is chosen; ECR retains the newest 20 images, and App Runner logs use a 30-day post-create retention gate. An optional account-wide AWS Budget defaults off until the operator chooses a USD amount and email recipient. Budget notification delay means it is not a spending cap. The dated unit prices, bounded examples and account-specific estimate checklist are in the [Stage 4 cost register](stage-4-cost-register.md).
 
 **Database allowance (AWS [official DSQL pricing](https://aws.amazon.com/rds/aurora/dsql/pricing/), checked 2026-10-02):** pricing states a recurring first **100,000 DPUs + 1 GB-month of Aurora DSQL storage per month**, with **billable overages**. This differs from time-limited new AWS account promotional credits and must not be confused with free hosting. AWS Compute, S3, CloudFront, data transfer, logging, AWS Backup, domain names and PrivateLink may still be charged. Eligibility and unit prices must be rechecked in the actual account; an allowance is not a spending cap. **Budgets/alerts are warnings, not hard spend caps.**
 

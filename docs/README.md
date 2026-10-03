@@ -1,7 +1,7 @@
 # Personal Finance & Portfolio Intelligence — Docs
 
-**Status:** Stage 0 local exit gate complete; Stage 1 local MVP complete; Stage 2 in progress; Stage 3 locally complete; Stage 4.1–4.2 prepared locally; cloud/DSQL release unverified
-**Last reviewed:** 2026-10-02
+**Status:** Stage 0 local exit gate complete; Stage 1 local MVP complete; Stage 2 in progress; Stage 3 locally complete; Stage 4.1–4.4 prepared locally; cloud/DSQL release unverified
+**Last reviewed:** 2026-10-03
 **Databases:** PostgreSQL 16 local/personal; Aurora DSQL required for production  
 **Deployment:** local indefinitely; AWS deployment optional until ready, with production targeting DSQL  
 **Cost target:** zero recurring charges for the local MVP; no automatic use of paid API tiers
@@ -37,6 +37,7 @@ The plans below expand the roadmap into execution backlogs using the phase-plan 
 | [`stage-3-release.md`](stage-3-release.md) | Actual Stage 3 package status, methodology choices, commands and verification limits |
 | [`stage-4-implementation-plan.md`](stage-4-implementation-plan.md) | 4.1–4.6: optional authenticated AWS/DSQL deployment, cost gates, real-cluster tests and portable recovery |
 | [`stage-4-release.md`](stage-4-release.md) | Actual Stage 4 implementation status, evidence, and credentialed launch gates |
+| [`stage-4-cost-register.md`](stage-4-cost-register.md) | Dated official AWS unit-price sources, bounded workload examples, budget-alert behavior, and target-specific cost gates |
 | [`stage-5-implementation-plan.md`](stage-5-implementation-plan.md) | 5.1–5.6: public filings/facts, portfolio/thesis context, shared personal-AI retrieval and cited research and optional monitoring |
 
 Task IDs follow roadmap packages (`S0.3` corresponds to 0.3); dotted subtask suffixes split a package into smaller slices. `S3.R` is the Stage 3 completion/evaluation task, not a new product stage. Dependency order takes precedence over numeric order. Stage 4 may follow Stage 1; research requires reliable portfolio data and only consumes later history/jobs when those features are available. Local completion never substitutes for the real-DSQL production gate.

@@ -45,6 +45,17 @@ operator inputs and are not a spending cap or an availability commitment.
 There is no queue or remote worker resource because the implemented worker is
 not DSQL-lease verified. No NAT, ALB, VPC, PrivateLink, WAF, or customer-managed
 KMS key is included; add one only for a documented requirement and cost review.
+The optional `monthly_cost_budget_usd` creates one whole-account AWS Budgets
+notification in the `us-east-1` billing control plane, with actual alerts at
+50%/100% and a forecast alert at 80%. It defaults off because no monthly
+exposure or email recipient has been approved. If enabled, set both it and at
+least one `cost_alert_email_addresses` recipient. Its cost types exclude credits
+to make the threshold reflect post-credit spend. AWS began requiring new
+recipients to confirm email subscriptions on 2026-09-30; confirm the AWS email
+subscription after provisioning. The account-wide budget can include costs
+outside this Terraform stack, notifications may lag billing data by hours, and
+the resource has no actions or spending cap. Keep budget email/other operator
+inputs out of shared plans and protect Terraform state.
 CloudFront is global. Its ACM certificate is required in `us-east-1`; regional
 data and API resources use the explicitly supplied `aws_region`. DNS remains
 external and must point `app_domain_name` to the CloudFront output.
@@ -55,6 +66,18 @@ edge. The same app issuer/subject/session/scope checks protect every financial
 API route and private file operation at either hostname. Only the minimal
 health routes are unauthenticated. Do not migrate private data until the direct
 origin synthetic test confirms these controls.
+
+Production request work is bounded at one App Runner instance, concurrency 10,
+1 GB/0.25 vCPU, 1,000 rows per import, 5 MB import files, 20 MB private files,
+40 PDF pages, an 8-second parser timeout, and three job attempts. The worker and
+personal-AI gates remain off. The import-row variable only permits 502–1,000
+until the largest current synthetic release fixture is resized and reverified.
+These are local controls and do not cap aggregate AWS spend. No S3 expiry is
+configured for private originals or exports: user data retention needs an
+explicit policy and recovery plan. The ECR lifecycle retains the newest 20
+immutable images. See the [dated cost register](../../docs/stage-4-cost-register.md)
+for official unit-price sources, workload calculations, and the target estimate
+gate.
 
 ## Ordered preparation and plan
 
@@ -75,7 +98,11 @@ origin synthetic test confirms these controls.
    it for a real target plan or apply. A local no-network structural plan using
    fake credentials, `-refresh=false`, a temporary ignored skip-STS override,
    and a closed localhost proxy produced 18 foundation resources; enabling
-   `deploy_api_service` produced 30 total resources. These plans were saved only
+   `deploy_api_service` produced 30 total resources. With the optional budget
+   enabled, a separate no-refresh plan produced 19 foundation resources; the
+   recipient-less configuration failed the Terraform precondition as intended.
+   The same one-resource budget increment applies to the full plan if selected.
+   These plans were saved only
    under `/private/tmp`, do not represent an AWS account or validate resource
    availability, and cannot satisfy a target-specific review gate. The
    temporary override was removed after the checks.

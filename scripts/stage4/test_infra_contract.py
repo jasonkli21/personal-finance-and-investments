@@ -86,6 +86,32 @@ class TerraformContractTests(unittest.TestCase):
         self.assertIn("COPY alembic ./alembic", dockerfile)
         self.assertIn("USER 10001:10001", dockerfile)
 
+    def test_cost_controls_are_optional_and_workload_bounds_are_injected(self) -> None:
+        budget = MAIN.split(
+            'resource "aws_budgets_budget" "account_monthly_cost"', 1
+        )[1].split('\nresource "', 1)[0]
+        self.assertIn('provider = aws.billing', budget)
+        self.assertIn('count    = var.monthly_cost_budget_usd == null ? 0 : 1', budget)
+        self.assertIn('notification_type          = "ACTUAL"', budget)
+        self.assertIn('notification_type          = "FORECASTED"', budget)
+        self.assertIn('threshold                  = 50', budget)
+        self.assertIn('threshold                  = 80', budget)
+        self.assertIn('threshold                  = 100', budget)
+        self.assertIn('include_credit = false', budget)
+        self.assertIn('length(var.cost_alert_email_addresses) > 0', budget)
+        self.assertIn('JOB_WORKER_ENABLED               = "false"', MAIN)
+        self.assertIn('PERSONAL_AI_ENABLED              = "false"', MAIN)
+        self.assertIn('MAX_IMPORT_ROWS                  = tostring(var.api_max_import_rows)', MAIN)
+        self.assertIn('MAX_IMPORT_FILE_BYTES            = "5000000"', MAIN)
+        self.assertIn('MAX_PRIVATE_FILE_BYTES           = "20000000"', MAIN)
+        self.assertIn('MAX_PDF_PAGES                    = "40"', MAIN)
+        self.assertIn('PDF_PARSER_TIMEOUT_SECONDS       = "8"', MAIN)
+        self.assertIn('default     = 1000', VARIABLES.split('variable "api_max_import_rows"', 1)[1])
+        self.assertIn('var.api_max_import_rows >= 502 && var.api_max_import_rows <= 1000', VARIABLES)
+        self.assertIn('default     = null', VARIABLES.split('variable "monthly_cost_budget_usd"', 1)[1])
+        self.assertIn('countNumber = 20', MAIN)
+        self.assertIn('AWS Budgets', README)
+
 
 if __name__ == "__main__":
     unittest.main()

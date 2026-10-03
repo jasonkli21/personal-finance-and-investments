@@ -35,6 +35,12 @@ def clear_database_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "PRIVATE_S3_KMS_KEY_ID",
         "STATIC_ASSETS_BUCKET",
         "MAX_PRIVATE_FILE_BYTES",
+        "MAX_IMPORT_FILE_BYTES",
+        "MAX_IMPORT_ROWS",
+        "MAX_PDF_PAGES",
+        "PDF_PARSER_TIMEOUT_SECONDS",
+        "JOB_LEASE_SECONDS",
+        "JOB_MAX_ATTEMPTS",
         "AUTH_ENABLED",
         "AUTH_ISSUER_URL",
         "AUTH_CLIENT_ID",
@@ -95,6 +101,54 @@ def test_demo_mode_rejects_database_url_and_nonlocal_host(
     monkeypatch.delenv("DATABASE_URL")
     monkeypatch.setenv("DATABASE_HOST", "remote.example")
     with pytest.raises(ValueError, match="loopback or Compose"):
+        load_settings()
+
+
+def test_stage4_bounded_request_settings_are_loaded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clear_database_env(monkeypatch)
+    settings = {
+        "MAX_PRIVATE_FILE_BYTES": "20000000",
+        "MAX_IMPORT_FILE_BYTES": "5000000",
+        "MAX_IMPORT_ROWS": "1000",
+        "MAX_PDF_PAGES": "40",
+        "PDF_PARSER_TIMEOUT_SECONDS": "8",
+        "JOB_MAX_ATTEMPTS": "3",
+        "JOB_WORKER_ENABLED": "false",
+    }
+    for key, value in settings.items():
+        monkeypatch.setenv(key, value)
+
+    loaded = load_settings()
+
+    assert loaded.max_private_file_bytes == 20_000_000
+    assert loaded.max_import_file_bytes == 5_000_000
+    assert loaded.max_import_rows == 1000
+    assert loaded.max_pdf_pages == 40
+    assert loaded.pdf_parser_timeout_seconds == 8
+    assert loaded.job_max_attempts == 3
+    assert loaded.job_worker_enabled is False
+
+
+@pytest.mark.parametrize(
+    ("setting", "value"),
+    [
+        ("MAX_PRIVATE_FILE_BYTES", "100000001"),
+        ("MAX_IMPORT_FILE_BYTES", "20000001"),
+        ("MAX_IMPORT_ROWS", "20001"),
+        ("MAX_PDF_PAGES", "101"),
+        ("PDF_PARSER_TIMEOUT_SECONDS", "31"),
+        ("JOB_MAX_ATTEMPTS", "9"),
+    ],
+)
+def test_stage4_request_settings_reject_unbounded_values(
+    monkeypatch: pytest.MonkeyPatch, setting: str, value: str
+) -> None:
+    clear_database_env(monkeypatch)
+    monkeypatch.setenv(setting, value)
+
+    with pytest.raises(ValueError, match=setting):
         load_settings()
 
 

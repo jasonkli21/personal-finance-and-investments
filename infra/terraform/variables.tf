@@ -198,6 +198,40 @@ variable "api_max_concurrency" {
   }
 }
 
+variable "api_max_import_rows" {
+  description = "Hard per-upload row cap injected into the API; 502 preserves the largest existing synthetic import fixture."
+  type        = number
+  default     = 1000
+
+  validation {
+    condition     = var.api_max_import_rows >= 502 && var.api_max_import_rows <= 1000
+    error_message = "api_max_import_rows must be between 502 and 1000 until the release fixture is resized and reverified."
+  }
+}
+
+variable "monthly_cost_budget_usd" {
+  description = "Optional whole-account AWS monthly cost alert threshold. Alerts do not cap usage or apply account actions."
+  type        = number
+  default     = null
+
+  validation {
+    condition     = var.monthly_cost_budget_usd == null || (var.monthly_cost_budget_usd >= 1 && var.monthly_cost_budget_usd <= 1000000)
+    error_message = "monthly_cost_budget_usd must be unset or between USD 1 and USD 1,000,000."
+  }
+}
+
+variable "cost_alert_email_addresses" {
+  description = "Explicit email recipients for the optional account budget; AWS requires subscribers to verify notifications and limits each notice to 10 addresses."
+  type        = set(string)
+  default     = []
+  sensitive   = true
+
+  validation {
+    condition     = length(var.cost_alert_email_addresses) <= 10 && alltrue([for address in var.cost_alert_email_addresses : can(regex("^[^@[:space:]]+@[^@[:space:]]+\\.[^@[:space:]]+$", address))])
+    error_message = "cost_alert_email_addresses must contain at most 10 valid email-shaped addresses."
+  }
+}
+
 variable "job_worker_enabled" {
   description = "Must remain false until the real DSQL job lease/retry gate has passed."
   type        = bool

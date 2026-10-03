@@ -26,4 +26,11 @@ provider "aws" {
   }
 }
 
+# AWS Budgets is an account-level billing control plane. Keep its supported
+# endpoint in us-east-1 independent of the operator-selected data Region.
+provider "aws" {
+  alias  = "billing"
+  region = "us-east-1"
+}
+
 provider "random" {}

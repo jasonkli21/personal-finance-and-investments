@@ -1,7 +1,7 @@
 # Stage 4 release evidence
 
-**Status:** S4.1 configuration/storage/auth and S4.2 declarative resource inventory prepared locally; no AWS resources provisioned and live DSQL remains unverified
-**Updated:** 2026-10-02
+**Status:** S4.1–S4.4 production configuration, infrastructure, real-DSQL evidence machinery, cost controls and dated register prepared locally; no AWS resources provisioned and live DSQL remains unverified
+**Updated:** 2026-10-03
 
 This record distinguishes locally implemented release machinery from credentialed launch evidence. A passed SQLite/PostgreSQL test or skipped AWS suite does not satisfy the real Aurora DSQL, bucket-policy, cost-approval, recovery, or HTTPS launch gates.
 
@@ -45,11 +45,11 @@ The synthetic auth tests cover RSA-signed ID-token acceptance, invalid-signature
 | S4.1 | Production configuration, auth, private storage adapter, and `0015` migration plan | Real DSQL migration/reconnect, scoped IAM and S3 policies, HTTPS synthetic journey |
 | S4.2 | Terraform lockfile, provider schema validation, static policy guardrails, and fake-input no-network plans prepared | Explicit account/region/domain/certificate/image/identity/budget inputs, target-specific reviewed plan, runtime smoke/benchmark, and approved apply |
 | S4.3 | Nine-case real-DSQL suite and fail-closed evidence runner prepared; all nine cases skip without explicit opt-in | Execute against an approved isolated DSQL cluster and pass with zero skipped tests; separately close the populated-upgrade, interrupted-migration, token-expiry, and real DSQL OCC-gap evidence |
-| S4.4 | Official allowance/pricing source rechecked 2026-10-02 | Account-specific whole-stack forecast, approved spend exposure, budget routing test |
+| S4.4 | Bounded production workload settings, optional post-credit account budget alerts, and dated public-price register prepared on 2026-10-03; fake-input disabled/enabled plans succeeded and missing-recipient plan failed closed | Target account/Region and credit eligibility, region-specific whole-stack forecast, selected monthly threshold, verified recipients, and alert delivery test |
 | S4.5 | Pending | Encrypted portable export and isolated restore with tamper/interruption negatives |
 | S4.6 | Pending | Approved gated release, synthetic launch, rollback/pause/teardown rehearsal and retained-resource inventory |
 
-The published DSQL allowance is 100,000 DPUs plus 1 GB-month of storage per month, with billable overages; it is not a whole-stack cap. AWS account, target region, identity, alert recipient, monthly exposure, and deployment approval have not been supplied. No infrastructure apply, cloud test, data transfer, push, or deployment is authorized by this release record.
+The current published DSQL free tier is 100,000 DPUs plus 1 GB-month of storage per month, with billable overages; it is not a whole-stack cap. AWS account, target region, identity, alert recipient, monthly exposure, and deployment approval have not been supplied. No infrastructure apply, cloud test, data transfer, push, or deployment is authorized by this release record.
 
 ## S4.2 — Declarative single-region infrastructure preparation
 
@@ -95,10 +95,12 @@ indefinite CloudWatch retention. The checked helper sets and verifies 30 days;
 doing so after creation/replacement is a mandatory launch gate. Terraform
 `1.16.5` `fmt` and `validate` passed. `.terraform.lock.hcl` records HashiCorp
 AWS provider `6.67.0` and Random provider `3.7.2` checksums fetched from their
-official registry. Fake-input no-network plans described 18 foundation
-resources and 30 total resources when App Runner/CloudFront were enabled; they
-used a temporary local skip-STS override, fake credentials, no refresh, and a
-closed localhost proxy, and were saved outside the repository. They do not prove
+official registry. Fake-input no-refresh plans described 18 foundation
+resources and 30 total resources when App Runner/CloudFront were enabled with
+the optional budget off; a separate plan with the budget enabled described 19
+foundation resources, and a plan with a configured budget but no recipient
+failed closed. They used temporary local skip-STS settings, fake credentials,
+and a closed localhost proxy, and were saved outside the repository. They do not prove
 the actual account's resource availability, quota, costs, identity, or DNS/TLS.
 No account API was queried, no App Runner runtime was benchmarked, and there has
 been no real target plan, Terraform apply, image build/push, DNS/TLS test, DSQL
@@ -163,3 +165,40 @@ was configured here: a direct default invocation reported all nine gated cases
 skipped, and no evidence record was issued. Local evidence-gate tests prove
 that skip/failure/stale-schema records cannot be promoted. Live DSQL therefore
 remains **unverified**.
+
+## S4.4 — Cost controls and register
+
+[`stage-4-cost-register.md`](stage-4-cost-register.md) records official AWS
+pricing pages checked on 2026-10-03, resource-specific usage drivers, App Runner
+and DSQL examples, workload assumptions, and the account-specific inputs still
+needed for an actual forecast. App Runner's provisional ceiling is one
+0.25-vCPU/1-GB instance with concurrency 10; the API receives 1,000-row import,
+5-MB import file, 20-MB private-file, 40-page PDF, 8-second parser, and three
+job-attempt limits. The 1,000-row default is constrained to 502–1,000 to
+preserve the largest current synthetic release fixture. Job workers and
+personal-AI remain disabled.
+
+Terraform adds a disabled-by-default, whole-account monthly USD AWS Budget in
+the billing control plane's `us-east-1` Region. When explicitly configured, it
+alerts at 50% actual, 80% forecast, and 100% actual; it excludes credits to flag
+the post-credit charge profile and creates no budget actions. At least one
+valid recipient (up to ten) is required. AWS announced email verification for
+newly added recipients effective 2026-09-30; the recipient must confirm through
+the target account before mail is delivered. AWS Budgets data is delayed, so
+notifications are not an account cap or emergency shutdown.
+
+S3 original and export retention remains indefinite until an explicit user-data
+retention policy and recovery plan are approved; no expiry rule silently
+deletes user records. ECR retains 20 immutable API images. App Runner generated
+logs have a 30-day post-create retention helper gate. Per-request bounds, one
+running instance, and disabled optional features reduce exposure but cannot cap
+aggregate DSQL, S3, CloudFront, egress, or log spend. Terraform syntax/contract
+checks and fake-input no-refresh plans pass locally; no budget amount, address,
+account query, real pricing-calculator estimate, or alert-delivery test was
+possible. Full budget/target forecast evidence remains launch-gated.
+
+The 30 configuration tests pass, including the injected 1,000-row/file/page/
+parser/job limits and over-bound configuration rejection. Five Terraform
+contract tests pass. Terraform `1.16.5` formatting/schema validation passes.
+The fake `.invalid` recipient was used only to validate a no-refresh local plan;
+it is not an alert routing or recipient confirmation test.

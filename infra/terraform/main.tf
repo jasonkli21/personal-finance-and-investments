@@ -27,6 +27,12 @@ locals {
     DEMO_MODE                        = "false"
     FILE_STORAGE_BACKEND             = "s3"
     JOB_WORKER_ENABLED               = "false"
+    JOB_MAX_ATTEMPTS                 = "3"
+    MAX_IMPORT_FILE_BYTES            = "5000000"
+    MAX_IMPORT_ROWS                  = tostring(var.api_max_import_rows)
+    MAX_PDF_PAGES                    = "40"
+    MAX_PRIVATE_FILE_BYTES           = "20000000"
+    PDF_PARSER_TIMEOUT_SECONDS       = "8"
     PERSONAL_AI_ENABLED              = "false"
     PRIVATE_S3_BUCKET                = aws_s3_bucket.private_files.bucket
     STATIC_ASSETS_BUCKET             = aws_s3_bucket.static_assets.bucket
@@ -203,6 +209,55 @@ resource "aws_ecr_lifecycle_policy" "api" {
       action = { type = "expire" }
     }]
   })
+}
+
+resource "aws_budgets_budget" "account_monthly_cost" {
+  provider = aws.billing
+  count    = var.monthly_cost_budget_usd == null ? 0 : 1
+
+  name         = "${local.name}-account-monthly-cost"
+  account_id   = var.aws_account_id
+  budget_type  = "COST"
+  limit_amount = tostring(var.monthly_cost_budget_usd)
+  limit_unit   = "USD"
+  time_unit    = "MONTHLY"
+  tags         = merge(local.common_tags, { Owner = var.resource_owner_tag, Purpose = "whole-account-cost-alert" })
+
+  cost_types {
+    # Model post-credit exposure because AWS Free Tier credits can expire.
+    include_credit = false
+  }
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    notification_type          = "ACTUAL"
+    threshold                  = 50
+    threshold_type             = "PERCENTAGE"
+    subscriber_email_addresses = var.cost_alert_email_addresses
+  }
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    notification_type          = "FORECASTED"
+    threshold                  = 80
+    threshold_type             = "PERCENTAGE"
+    subscriber_email_addresses = var.cost_alert_email_addresses
+  }
+
+  notification {
+    comparison_operator        = "GREATER_THAN"
+    notification_type          = "ACTUAL"
+    threshold                  = 100
+    threshold_type             = "PERCENTAGE"
+    subscriber_email_addresses = var.cost_alert_email_addresses
+  }
+
+  lifecycle {
+    precondition {
+      condition     = length(var.cost_alert_email_addresses) > 0
+      error_message = "An explicit recipient is required before creating an AWS cost budget."
+    }
+  }
 }
 
 data "aws_iam_policy_document" "apprunner_ecr_trust" {
@@ -648,4 +703,14 @@ output "private_file_bucket" {
 output "static_assets_bucket" {
   description = "Private CloudFront-only Vite asset origin."
   value       = aws_s3_bucket.static_assets.bucket
+}
+
+output "account_monthly_cost_budget_name" {
+  description = "Optional whole-account AWS Budgets alert; null when no operator-selected amount was supplied."
+  value       = try(aws_budgets_budget.account_monthly_cost[0].name, null)
+}
+
+output "account_monthly_cost_budget_arn" {
+  description = "Optional account cost-alert resource ARN; this is not an account spending cap."
+  value       = try(aws_budgets_budget.account_monthly_cost[0].arn, null)
 }

@@ -1,7 +1,7 @@
 # Stage 4 implementation plan
 
-**Status:** S4.1–S4.3 locally prepared; no infrastructure provisioned or live DSQL verified
-**Updated:** 2026-10-02
+**Status:** S4.1–S4.4 locally prepared; no infrastructure provisioned or live DSQL verified
+**Updated:** 2026-10-03
 **Roadmap coverage:** Work packages 4.1–4.6
 
 This is the execution plan for private AWS production hosting with **Aurora DSQL as the structured-data source of truth**. Read [security and deployment](06-security-and-deployment.md), [the DSQL contract](07-aurora-dsql-compatibility.md), and [the source/cost policy](03-data-sources.md) first. Stage 4 can be scheduled after [Stage 1](stage-1-implementation-plan.md); it does not require Stage 2, 3, or 5 features to be built first.
