@@ -1,6 +1,6 @@
 # Stage 3 implementation status
 
-**Status:** In progress; S3.1 and S3.2 delivered locally
+**Status:** In progress; S3.1–S3.4 delivered locally
 **Updated:** 2026-10-02
 
 Stage 3 remains incomplete until S3.1–S3.5 and S3.R meet the [implementation plan](stage-3-implementation-plan.md). These notes record implemented behavior and verification, not the remaining planned scope. Local PostgreSQL and live Aurora DSQL evidence are tracked separately.
@@ -62,3 +62,19 @@ UV_CACHE_DIR=/private/tmp/codex-personal-finance-uv-cache uv run --directory ser
 ```
 
 This command passed 29 tests. It includes the two-lot $500/$200 golden comparison, proportional partial-lot basis/fees/value rounding, unavailable basis, a cross-account potential warning, stale-price/snapshot and over-sale rejection, and unchanged canonical record counts/revisions across simulation. Focused Ruff, mypy, web TypeScript, changed-file ESLint, production build and generated OpenAPI checks passed. Full API and web-suite results are recorded in the final Stage 3 review. The sale simulator adds no persistent schema and therefore no PostgreSQL/DSQL migration. The route has not been exercised against a live PostgreSQL 16 instance or Aurora DSQL; those production-gate checks remain outstanding.
+
+## S3.4 — Hypothetical portfolio scenarios
+
+Added read-only `POST /v1/simulations/portfolio` and a portfolio scenario workspace. A request freezes the accepted position revisions and dated exposure inputs, then applies up to 100 explicit USD equity/ETF trades plus signed, labeled USD cash assumptions. Account selection, date, share quantity, trade price and fees are explicit; only cash-only financing is supported. A buy must be funded by available USD cash, and a sale cannot exceed an actually owned position. Foreign-currency trades and cash assumptions are rejected. Existing holdings retain the frozen baseline valuation price; a new position uses the entered trade price until a source-backed valuation exists. If an existing position's execution price differs from its baseline valuation price, the difference changes modeled NAV and is disclosed.
+
+Before and after calculations use the existing versioned one-level exposure engine with the latest published fund composition dated on or before the valuation date. An ETF absent from the baseline is loaded from the same dated local evidence when available; missing composition remains opaque. The API returns included valued NAV, completeness, direct assets, indirect look-through, residual categories, security/issuer exposure, per-fund overlap membership and shared dollar exposure, custom category drift, cash settlement, data warnings, methodology versions, and fingerprints. Direct + indirect + residual must reconcile to valued NAV on each side. Look-through and overlap are decomposition/analysis only and do not increase owned value. Foreign-currency, unpriced and unresolved baseline positions make NAV incomplete and receive explicit warnings; custom actual percentages are withheld for incomplete valuations.
+
+The UI compares baseline and scenario allocations, top security/issuer rows, cash and trade fees, overlap, fund evidence, warnings, and fingerprints. It flags current account revisions that have changed since a same-day result, keeps historical results frozen, and allows a JSON export. Results are never saved by the application and no canonical finance rows are changed.
+
+Focused S3.4 verification:
+
+```sh
+UV_CACHE_DIR=/private/tmp/codex-personal-finance-uv-cache uv run --directory services/api --locked pytest -q tests/test_stage3_performance.py tests/test_stage3_portfolio_scenarios.py tests/test_stage3_sales.py tests/test_stage3_tax_lots.py tests/test_stage3_history.py
+```
+
+This command passed 23 tests. Scenario cases cover fee/cash reconciliation, category drift, an ETF buy using dated look-through, an ETF sale that removes indirect exposure and adds proceeds to cash, shared-membership overlap without NAV double counting, an opaque fund with foreign cash/no FX conversion, insufficient cash, overselling, explicit cash assumptions, rejected foreign-currency trades, and unchanged accepted position records/revisions. Focused Ruff and mypy passed; web tests (9), TypeScript, changed-file ESLint, production build, and regenerated OpenAPI checks passed. The scenario route adds no schema or migration and has not been exercised against live PostgreSQL 16 or Aurora DSQL. Both live database gates remain outstanding.

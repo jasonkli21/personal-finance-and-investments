@@ -76,6 +76,8 @@ Stage 3.2 adds reviewed tax-lot imports, raw staged rows, published lots, append
 
 Stage 3.3 adds a read-only sale-simulation endpoint over the existing position, quote, lot, adjustment and investment-event records; it adds no schema or migration. The implementation uses portable SQLAlchemy selects and performs no canonical writes. Synthetic SQLite API tests validate the calculation and warning boundaries, but neither those tests nor generated DSQL dialect/migration checks establish live PostgreSQL or DSQL runtime behavior. See [Stage 3 release status](stage-3-release.md).
 
+Stage 3.4 adds a read-only hypothetical portfolio-scenario endpoint over existing account, position, quote, security and published fund records. It adds no schema or migration and performs no canonical writes. Its SQLAlchemy queries use portable selects. Synthetic SQLite API tests cover scenario calculations and unchanged position revisions; they do not establish live PostgreSQL or DSQL runtime behavior. See [Stage 3 release status](stage-3-release.md).
+
 As verified on 2026-10-01, [AWS DSQL limits](https://docs.aws.amazon.com/aurora-dsql/latest/userguide/CHAP_quotas.html) include **10 MiB of changed data**, **3,000 modified rows**, **five minutes per transaction**, and **60 minutes per connection**. DSQL uses optimistic concurrency and fixed Repeatable Read isolation; conflicting transactions may abort and need a whole-unit retry. These are upper limits, **not** recommended targets.
 
 - Keep transaction scopes brief. Prefer batches of a few hundred rows (configurable and measured), with a safety margin for secondary-index changes, provider payload size and latency. Never hold a transaction open while downloading a PDF, calling AI, fetching holdings, or waiting for review.

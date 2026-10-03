@@ -1,6 +1,6 @@
 # Stage 3 implementation plan
 
-**Status:** In progress; S3.1–S3.3 delivered locally, S3.4/S3.5/S3.R remain
+**Status:** In progress; S3.1–S3.4 delivered locally, S3.5/S3.R remain
 **Updated:** 2026-10-02
 **Roadmap coverage:** Work packages 3.1–3.5
 

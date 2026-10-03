@@ -2345,6 +2345,178 @@
         "title": "OwnedValuationLine",
         "type": "object"
       },
+      "PortfolioCategoryTargetInput": {
+        "properties": {
+          "category": {
+            "enum": [
+              "direct",
+              "indirect",
+              "cash",
+              "opaque_fund",
+              "nested_fund",
+              "missing_weight",
+              "unknown_other"
+            ],
+            "title": "Category",
+            "type": "string"
+          },
+          "target_percent": {
+            "maxLength": 40,
+            "pattern": "^\\d+(?:\\.\\d{1,10})?$",
+            "title": "Target Percent",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "target_percent"
+        ],
+        "title": "PortfolioCategoryTargetInput",
+        "type": "object"
+      },
+      "PortfolioExposureSnapshotRead": {
+        "properties": {
+          "categories": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "object"
+          },
+          "direct_assets": {
+            "title": "Direct Assets",
+            "type": "string"
+          },
+          "drift_rows": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioScenarioDriftRead"
+            },
+            "title": "Drift Rows",
+            "type": "array"
+          },
+          "drift_status": {
+            "enum": [
+              "available",
+              "unavailable",
+              "not_requested"
+            ],
+            "title": "Drift Status",
+            "type": "string"
+          },
+          "fund_snapshots": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioScenarioFundRead"
+            },
+            "title": "Fund Snapshots",
+            "type": "array"
+          },
+          "included_valued_nav": {
+            "title": "Included Valued Nav",
+            "type": "string"
+          },
+          "indirect_lookthrough": {
+            "title": "Indirect Lookthrough",
+            "type": "string"
+          },
+          "issuer_rows": {
+            "items": {
+              "$ref": "#/components/schemas/ExposureRowRead"
+            },
+            "title": "Issuer Rows",
+            "type": "array"
+          },
+          "nav_status": {
+            "enum": [
+              "complete",
+              "incomplete"
+            ],
+            "title": "Nav Status",
+            "type": "string"
+          },
+          "opaque_and_unknown_value": {
+            "title": "Opaque And Unknown Value",
+            "type": "string"
+          },
+          "overlap_rows": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioScenarioOverlapRead"
+            },
+            "title": "Overlap Rows",
+            "type": "array"
+          },
+          "percentages_available": {
+            "title": "Percentages Available",
+            "type": "boolean"
+          },
+          "reconciled": {
+            "title": "Reconciled",
+            "type": "boolean"
+          },
+          "residual": {
+            "title": "Residual",
+            "type": "string"
+          },
+          "residual_categories": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Residual Categories",
+            "type": "object"
+          },
+          "security_rows": {
+            "items": {
+              "$ref": "#/components/schemas/ExposureRowRead"
+            },
+            "title": "Security Rows",
+            "type": "array"
+          },
+          "shared_indirect_amount": {
+            "title": "Shared Indirect Amount",
+            "type": "string"
+          },
+          "total_portfolio_nav": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Portfolio Nav"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "included_valued_nav",
+          "total_portfolio_nav",
+          "nav_status",
+          "percentages_available",
+          "direct_assets",
+          "indirect_lookthrough",
+          "residual",
+          "residual_categories",
+          "opaque_and_unknown_value",
+          "categories",
+          "reconciled",
+          "security_rows",
+          "issuer_rows",
+          "overlap_rows",
+          "shared_indirect_amount",
+          "drift_status",
+          "drift_rows",
+          "fund_snapshots",
+          "warnings"
+        ],
+        "title": "PortfolioExposureSnapshotRead",
+        "type": "object"
+      },
       "PortfolioHistoryRead": {
         "properties": {
           "account_id": {
@@ -2520,6 +2692,606 @@
           "diagnostics"
         ],
         "title": "PortfolioPerformanceRead",
+        "type": "object"
+      },
+      "PortfolioScenarioCashAssumptionRead": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "account_name": {
+            "title": "Account Name",
+            "type": "string"
+          },
+          "amount": {
+            "title": "Amount",
+            "type": "string"
+          },
+          "currency": {
+            "const": "USD",
+            "title": "Currency",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "account_name",
+          "amount",
+          "currency",
+          "label"
+        ],
+        "title": "PortfolioScenarioCashAssumptionRead",
+        "type": "object"
+      },
+      "PortfolioScenarioCashInput": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "amount": {
+            "maxLength": 40,
+            "pattern": "^-?\\d+(?:\\.\\d{1,10})?$",
+            "title": "Amount",
+            "type": "string"
+          },
+          "currency": {
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency",
+            "type": "string"
+          },
+          "label": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "amount",
+          "currency",
+          "label"
+        ],
+        "title": "PortfolioScenarioCashInput",
+        "type": "object"
+      },
+      "PortfolioScenarioCashRead": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "account_name": {
+            "title": "Account Name",
+            "type": "string"
+          },
+          "assumption_delta": {
+            "title": "Assumption Delta",
+            "type": "string"
+          },
+          "cash_after": {
+            "title": "Cash After",
+            "type": "string"
+          },
+          "cash_before": {
+            "title": "Cash Before",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "trade_delta": {
+            "title": "Trade Delta",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "account_name",
+          "currency",
+          "cash_before",
+          "assumption_delta",
+          "trade_delta",
+          "cash_after"
+        ],
+        "title": "PortfolioScenarioCashRead",
+        "type": "object"
+      },
+      "PortfolioScenarioDriftRead": {
+        "properties": {
+          "actual_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Percent"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "drift_percentage_points": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drift Percentage Points"
+          },
+          "target_percent": {
+            "title": "Target Percent",
+            "type": "string"
+          }
+        },
+        "required": [
+          "category",
+          "target_percent",
+          "actual_percent",
+          "drift_percentage_points"
+        ],
+        "title": "PortfolioScenarioDriftRead",
+        "type": "object"
+      },
+      "PortfolioScenarioFundRead": {
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "quality_status": {
+            "title": "Quality Status",
+            "type": "string"
+          },
+          "security_id": {
+            "title": "Security Id",
+            "type": "string"
+          },
+          "snapshot_id": {
+            "title": "Snapshot Id",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "security_id",
+          "snapshot_id",
+          "as_of",
+          "source",
+          "source_url",
+          "quality_status",
+          "stale"
+        ],
+        "title": "PortfolioScenarioFundRead",
+        "type": "object"
+      },
+      "PortfolioScenarioOverlapRead": {
+        "properties": {
+          "fund_amounts": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Fund Amounts",
+            "type": "object"
+          },
+          "fund_count": {
+            "title": "Fund Count",
+            "type": "integer"
+          },
+          "fund_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Fund Ids",
+            "type": "array"
+          },
+          "fund_labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Fund Labels",
+            "type": "array"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "security_id": {
+            "title": "Security Id",
+            "type": "string"
+          },
+          "shared_indirect_amount": {
+            "title": "Shared Indirect Amount",
+            "type": "string"
+          }
+        },
+        "required": [
+          "security_id",
+          "label",
+          "fund_count",
+          "fund_ids",
+          "fund_labels",
+          "fund_amounts",
+          "shared_indirect_amount"
+        ],
+        "title": "PortfolioScenarioOverlapRead",
+        "type": "object"
+      },
+      "PortfolioScenarioRead": {
+        "properties": {
+          "account_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Account Ids",
+            "type": "array"
+          },
+          "account_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Account Names",
+            "type": "array"
+          },
+          "account_position_revisions": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Account Position Revisions",
+            "type": "object"
+          },
+          "after": {
+            "$ref": "#/components/schemas/PortfolioExposureSnapshotRead"
+          },
+          "as_of": {
+            "format": "date-time",
+            "title": "As Of",
+            "type": "string"
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "baseline_fingerprint": {
+            "title": "Baseline Fingerprint",
+            "type": "string"
+          },
+          "before": {
+            "$ref": "#/components/schemas/PortfolioExposureSnapshotRead"
+          },
+          "canonical_records_mutated": {
+            "const": false,
+            "title": "Canonical Records Mutated",
+            "type": "boolean"
+          },
+          "cash": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioScenarioCashRead"
+            },
+            "title": "Cash",
+            "type": "array"
+          },
+          "cash_changes": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioScenarioCashAssumptionRead"
+            },
+            "title": "Cash Changes",
+            "type": "array"
+          },
+          "currency": {
+            "const": "USD",
+            "title": "Currency",
+            "type": "string"
+          },
+          "exposure_calculation_version": {
+            "title": "Exposure Calculation Version",
+            "type": "string"
+          },
+          "financing_policy": {
+            "const": "cash_only",
+            "title": "Financing Policy",
+            "type": "string"
+          },
+          "methodology_version": {
+            "title": "Methodology Version",
+            "type": "string"
+          },
+          "persisted": {
+            "const": false,
+            "title": "Persisted",
+            "type": "boolean"
+          },
+          "position_snapshot_ids": {
+            "additionalProperties": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Position Snapshot Ids",
+            "type": "object"
+          },
+          "scenario_fingerprint": {
+            "title": "Scenario Fingerprint",
+            "type": "string"
+          },
+          "trades": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioScenarioTradeRead"
+            },
+            "title": "Trades",
+            "type": "array"
+          }
+        },
+        "required": [
+          "methodology_version",
+          "exposure_calculation_version",
+          "as_of",
+          "account_ids",
+          "account_names",
+          "account_position_revisions",
+          "position_snapshot_ids",
+          "financing_policy",
+          "currency",
+          "before",
+          "after",
+          "trades",
+          "cash",
+          "cash_changes",
+          "baseline_fingerprint",
+          "scenario_fingerprint",
+          "canonical_records_mutated",
+          "persisted",
+          "assumptions"
+        ],
+        "title": "PortfolioScenarioRead",
+        "type": "object"
+      },
+      "PortfolioScenarioRequest": {
+        "properties": {
+          "account_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Account Ids",
+            "type": "array"
+          },
+          "as_of": {
+            "format": "date-time",
+            "title": "As Of",
+            "type": "string"
+          },
+          "cash_changes": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioScenarioCashInput"
+            },
+            "maxItems": 100,
+            "title": "Cash Changes",
+            "type": "array"
+          },
+          "category_targets": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioCategoryTargetInput"
+            },
+            "maxItems": 7,
+            "title": "Category Targets",
+            "type": "array"
+          },
+          "financing_policy": {
+            "const": "cash_only",
+            "title": "Financing Policy",
+            "type": "string"
+          },
+          "trades": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioScenarioTradeInput"
+            },
+            "maxItems": 100,
+            "title": "Trades",
+            "type": "array"
+          }
+        },
+        "required": [
+          "as_of",
+          "financing_policy"
+        ],
+        "title": "PortfolioScenarioRequest",
+        "type": "object"
+      },
+      "PortfolioScenarioTradeInput": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "currency": {
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency",
+            "type": "string"
+          },
+          "fee_amount": {
+            "default": "0",
+            "maxLength": 40,
+            "pattern": "^\\d+(?:\\.\\d{1,10})?$",
+            "title": "Fee Amount",
+            "type": "string"
+          },
+          "price": {
+            "maxLength": 40,
+            "pattern": "^\\d+(?:\\.\\d{1,10})?$",
+            "title": "Price",
+            "type": "string"
+          },
+          "quantity": {
+            "maxLength": 40,
+            "pattern": "^\\d+(?:\\.\\d{1,10})?$",
+            "title": "Quantity",
+            "type": "string"
+          },
+          "security_id": {
+            "format": "uuid",
+            "title": "Security Id",
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "security_id",
+          "side",
+          "quantity",
+          "price",
+          "currency"
+        ],
+        "title": "PortfolioScenarioTradeInput",
+        "type": "object"
+      },
+      "PortfolioScenarioTradeRead": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "account_name": {
+            "title": "Account Name",
+            "type": "string"
+          },
+          "cash_delta": {
+            "title": "Cash Delta",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "execution_price": {
+            "title": "Execution Price",
+            "type": "string"
+          },
+          "fee_amount": {
+            "title": "Fee Amount",
+            "type": "string"
+          },
+          "gross_amount": {
+            "title": "Gross Amount",
+            "type": "string"
+          },
+          "market_value_after": {
+            "title": "Market Value After",
+            "type": "string"
+          },
+          "market_value_before": {
+            "title": "Market Value Before",
+            "type": "string"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "string"
+          },
+          "quantity_after": {
+            "title": "Quantity After",
+            "type": "string"
+          },
+          "quantity_before": {
+            "title": "Quantity Before",
+            "type": "string"
+          },
+          "security_id": {
+            "format": "uuid",
+            "title": "Security Id",
+            "type": "string"
+          },
+          "side": {
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Side",
+            "type": "string"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "valuation_price_source": {
+            "title": "Valuation Price Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "account_name",
+          "security_id",
+          "ticker",
+          "side",
+          "quantity",
+          "quantity_before",
+          "quantity_after",
+          "execution_price",
+          "currency",
+          "gross_amount",
+          "fee_amount",
+          "cash_delta",
+          "market_value_before",
+          "market_value_after",
+          "valuation_price_source"
+        ],
+        "title": "PortfolioScenarioTradeRead",
         "type": "object"
       },
       "PositionInput": {
@@ -9440,6 +10212,44 @@
           }
         },
         "summary": "Patch Security Issuer"
+      }
+    },
+    "/v1/simulations/portfolio": {
+      "post": {
+        "operationId": "simulate_portfolio_v1_simulations_portfolio_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortfolioScenarioRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioScenarioRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Simulate Portfolio"
       }
     },
     "/v1/simulations/sales": {

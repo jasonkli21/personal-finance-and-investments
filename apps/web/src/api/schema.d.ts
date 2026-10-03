@@ -707,6 +707,23 @@ export interface paths {
     patch: operations['patch_security_issuer_v1_securities__security_id__issuer_patch']
     trace?: never
   }
+  '/v1/simulations/portfolio': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Simulate Portfolio */
+    post: operations['simulate_portfolio_v1_simulations_portfolio_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/simulations/sales': {
     parameters: {
       query?: never
@@ -1850,6 +1867,74 @@ export interface components {
       /** Value Currency */
       value_currency: string | null
     }
+    /** PortfolioCategoryTargetInput */
+    PortfolioCategoryTargetInput: {
+      /**
+       * Category
+       * @enum {string}
+       */
+      category:
+        | 'direct'
+        | 'indirect'
+        | 'cash'
+        | 'opaque_fund'
+        | 'nested_fund'
+        | 'missing_weight'
+        | 'unknown_other'
+      /** Target Percent */
+      target_percent: string
+    }
+    /** PortfolioExposureSnapshotRead */
+    PortfolioExposureSnapshotRead: {
+      /** Categories */
+      categories: {
+        [key: string]: string
+      }
+      /** Direct Assets */
+      direct_assets: string
+      /** Drift Rows */
+      drift_rows: components['schemas']['PortfolioScenarioDriftRead'][]
+      /**
+       * Drift Status
+       * @enum {string}
+       */
+      drift_status: 'available' | 'unavailable' | 'not_requested'
+      /** Fund Snapshots */
+      fund_snapshots: components['schemas']['PortfolioScenarioFundRead'][]
+      /** Included Valued Nav */
+      included_valued_nav: string
+      /** Indirect Lookthrough */
+      indirect_lookthrough: string
+      /** Issuer Rows */
+      issuer_rows: components['schemas']['ExposureRowRead'][]
+      /**
+       * Nav Status
+       * @enum {string}
+       */
+      nav_status: 'complete' | 'incomplete'
+      /** Opaque And Unknown Value */
+      opaque_and_unknown_value: string
+      /** Overlap Rows */
+      overlap_rows: components['schemas']['PortfolioScenarioOverlapRead'][]
+      /** Percentages Available */
+      percentages_available: boolean
+      /** Reconciled */
+      reconciled: boolean
+      /** Residual */
+      residual: string
+      /** Residual Categories */
+      residual_categories: {
+        [key: string]: string
+      }
+      /** Security Rows */
+      security_rows: components['schemas']['ExposureRowRead'][]
+      /** Shared Indirect Amount */
+      shared_indirect_amount: string
+      /** Total Portfolio Nav */
+      total_portfolio_nav: string | null
+      /** Warnings */
+      warnings: string[]
+    }
     /** PortfolioHistoryRead */
     PortfolioHistoryRead: {
       /**
@@ -1920,6 +2005,261 @@ export interface components {
       time_weighted_method: string
       /** Time Weighted Return */
       time_weighted_return: string | null
+    }
+    /** PortfolioScenarioCashAssumptionRead */
+    PortfolioScenarioCashAssumptionRead: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Account Name */
+      account_name: string
+      /** Amount */
+      amount: string
+      /**
+       * Currency
+       * @constant
+       */
+      currency: 'USD'
+      /** Label */
+      label: string
+    }
+    /** PortfolioScenarioCashInput */
+    PortfolioScenarioCashInput: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Amount */
+      amount: string
+      /** Currency */
+      currency: string
+      /** Label */
+      label: string
+    }
+    /** PortfolioScenarioCashRead */
+    PortfolioScenarioCashRead: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Account Name */
+      account_name: string
+      /** Assumption Delta */
+      assumption_delta: string
+      /** Cash After */
+      cash_after: string
+      /** Cash Before */
+      cash_before: string
+      /** Currency */
+      currency: string
+      /** Trade Delta */
+      trade_delta: string
+    }
+    /** PortfolioScenarioDriftRead */
+    PortfolioScenarioDriftRead: {
+      /** Actual Percent */
+      actual_percent: string | null
+      /** Category */
+      category: string
+      /** Drift Percentage Points */
+      drift_percentage_points: string | null
+      /** Target Percent */
+      target_percent: string
+    }
+    /** PortfolioScenarioFundRead */
+    PortfolioScenarioFundRead: {
+      /**
+       * As Of
+       * Format: date
+       */
+      as_of: string
+      /** Quality Status */
+      quality_status: string
+      /** Security Id */
+      security_id: string
+      /** Snapshot Id */
+      snapshot_id: string
+      /** Source */
+      source: string
+      /** Source Url */
+      source_url: string | null
+      /** Stale */
+      stale: boolean
+    }
+    /** PortfolioScenarioOverlapRead */
+    PortfolioScenarioOverlapRead: {
+      /** Fund Amounts */
+      fund_amounts: {
+        [key: string]: string
+      }
+      /** Fund Count */
+      fund_count: number
+      /** Fund Ids */
+      fund_ids: string[]
+      /** Fund Labels */
+      fund_labels: string[]
+      /** Label */
+      label: string
+      /** Security Id */
+      security_id: string
+      /** Shared Indirect Amount */
+      shared_indirect_amount: string
+    }
+    /** PortfolioScenarioRead */
+    PortfolioScenarioRead: {
+      /** Account Ids */
+      account_ids: string[]
+      /** Account Names */
+      account_names: string[]
+      /** Account Position Revisions */
+      account_position_revisions: {
+        [key: string]: number
+      }
+      after: components['schemas']['PortfolioExposureSnapshotRead']
+      /**
+       * As Of
+       * Format: date-time
+       */
+      as_of: string
+      /** Assumptions */
+      assumptions: string[]
+      /** Baseline Fingerprint */
+      baseline_fingerprint: string
+      before: components['schemas']['PortfolioExposureSnapshotRead']
+      /**
+       * Canonical Records Mutated
+       * @constant
+       */
+      canonical_records_mutated: false
+      /** Cash */
+      cash: components['schemas']['PortfolioScenarioCashRead'][]
+      /** Cash Changes */
+      cash_changes: components['schemas']['PortfolioScenarioCashAssumptionRead'][]
+      /**
+       * Currency
+       * @constant
+       */
+      currency: 'USD'
+      /** Exposure Calculation Version */
+      exposure_calculation_version: string
+      /**
+       * Financing Policy
+       * @constant
+       */
+      financing_policy: 'cash_only'
+      /** Methodology Version */
+      methodology_version: string
+      /**
+       * Persisted
+       * @constant
+       */
+      persisted: false
+      /** Position Snapshot Ids */
+      position_snapshot_ids: {
+        [key: string]: string
+      }
+      /** Scenario Fingerprint */
+      scenario_fingerprint: string
+      /** Trades */
+      trades: components['schemas']['PortfolioScenarioTradeRead'][]
+    }
+    /** PortfolioScenarioRequest */
+    PortfolioScenarioRequest: {
+      /** Account Ids */
+      account_ids?: string[]
+      /**
+       * As Of
+       * Format: date-time
+       */
+      as_of: string
+      /** Cash Changes */
+      cash_changes?: components['schemas']['PortfolioScenarioCashInput'][]
+      /** Category Targets */
+      category_targets?: components['schemas']['PortfolioCategoryTargetInput'][]
+      /**
+       * Financing Policy
+       * @constant
+       */
+      financing_policy: 'cash_only'
+      /** Trades */
+      trades?: components['schemas']['PortfolioScenarioTradeInput'][]
+    }
+    /** PortfolioScenarioTradeInput */
+    PortfolioScenarioTradeInput: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Currency */
+      currency: string
+      /**
+       * Fee Amount
+       * @default 0
+       */
+      fee_amount: string
+      /** Price */
+      price: string
+      /** Quantity */
+      quantity: string
+      /**
+       * Security Id
+       * Format: uuid
+       */
+      security_id: string
+      /**
+       * Side
+       * @enum {string}
+       */
+      side: 'buy' | 'sell'
+    }
+    /** PortfolioScenarioTradeRead */
+    PortfolioScenarioTradeRead: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Account Name */
+      account_name: string
+      /** Cash Delta */
+      cash_delta: string
+      /** Currency */
+      currency: string
+      /** Execution Price */
+      execution_price: string
+      /** Fee Amount */
+      fee_amount: string
+      /** Gross Amount */
+      gross_amount: string
+      /** Market Value After */
+      market_value_after: string
+      /** Market Value Before */
+      market_value_before: string
+      /** Quantity */
+      quantity: string
+      /** Quantity After */
+      quantity_after: string
+      /** Quantity Before */
+      quantity_before: string
+      /**
+       * Security Id
+       * Format: uuid
+       */
+      security_id: string
+      /**
+       * Side
+       * @enum {string}
+       */
+      side: 'buy' | 'sell'
+      /** Ticker */
+      ticker: string | null
+      /** Valuation Price Source */
+      valuation_price_source: string
     }
     /** PositionInput */
     PositionInput: {
@@ -5497,6 +5837,39 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  simulate_portfolio_v1_simulations_portfolio_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PortfolioScenarioRequest']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PortfolioScenarioRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
         }
       }
     }

@@ -730,3 +730,9 @@ export async function simulateTaxLotSales(
 ) {
   return unwrap(await api.POST('/v1/simulations/sales', { body: input }))
 }
+
+export async function simulatePortfolioScenario(
+  input: components['schemas']['PortfolioScenarioRequest'],
+) {
+  return unwrap(await api.POST('/v1/simulations/portfolio', { body: input }))
+}

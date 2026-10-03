@@ -2,10 +2,13 @@
 
 import json
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.api.contracts import ExposureRowRead
 
 
 class InvestmentEventCreate(BaseModel):
@@ -484,3 +487,212 @@ class SalesSimulationRead(BaseModel):
     canonical_records_mutated: Literal[False]
     persisted: Literal[False]
     disclosures: list[str]
+
+
+class PortfolioScenarioTradeInput(BaseModel):
+    account_id: UUID
+    security_id: UUID
+    side: Literal["buy", "sell"]
+    quantity: str = Field(max_length=40, pattern=r"^\d+(?:\.\d{1,10})?$")
+    price: str = Field(max_length=40, pattern=r"^\d+(?:\.\d{1,10})?$")
+    fee_amount: str = Field(default="0", max_length=40, pattern=r"^\d+(?:\.\d{1,10})?$")
+    currency: str = Field(pattern=r"^[A-Z]{3}$")
+
+    @field_validator("quantity", "price", "fee_amount")
+    @classmethod
+    def trade_precision(cls, value: str) -> str:
+        if len(value.split(".")[0]) > 18:
+            raise ValueError("Trade amount exceeds NUMERIC(28, 10) precision")
+        return value
+
+
+class PortfolioScenarioCashInput(BaseModel):
+    account_id: UUID
+    amount: str = Field(max_length=40, pattern=r"^-?\d+(?:\.\d{1,10})?$")
+    currency: str = Field(pattern=r"^[A-Z]{3}$")
+    label: str = Field(min_length=1, max_length=100)
+
+    @field_validator("amount")
+    @classmethod
+    def cash_precision(cls, value: str) -> str:
+        if len(value.lstrip("-").split(".")[0]) > 18:
+            raise ValueError("Cash assumption exceeds NUMERIC(28, 10) precision")
+        return value
+
+    @field_validator("label")
+    @classmethod
+    def clean_cash_label(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Cash assumption label cannot be blank")
+        return cleaned
+
+
+class PortfolioCategoryTargetInput(BaseModel):
+    category: Literal[
+        "direct",
+        "indirect",
+        "cash",
+        "opaque_fund",
+        "nested_fund",
+        "missing_weight",
+        "unknown_other",
+    ]
+    target_percent: str = Field(max_length=40, pattern=r"^\d+(?:\.\d{1,10})?$")
+
+    @field_validator("target_percent")
+    @classmethod
+    def target_precision(cls, value: str) -> str:
+        if len(value.split(".")[0]) > 3 or Decimal(value) > 100:
+            raise ValueError("Category target must be between 0 and 100 percent")
+        return value
+
+
+class PortfolioScenarioRequest(BaseModel):
+    account_ids: list[UUID] = Field(default_factory=list, max_length=500)
+    as_of: datetime
+    financing_policy: Literal["cash_only"]
+    trades: list[PortfolioScenarioTradeInput] = Field(
+        default_factory=list, max_length=100
+    )
+    cash_changes: list[PortfolioScenarioCashInput] = Field(
+        default_factory=list, max_length=100
+    )
+    category_targets: list[PortfolioCategoryTargetInput] = Field(
+        default_factory=list, max_length=7
+    )
+
+    @field_validator("as_of")
+    @classmethod
+    def scenario_time_has_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("Use an as-of time with timezone")
+        return value
+
+    @model_validator(mode="after")
+    def validate_scenario_scope(self) -> "PortfolioScenarioRequest":
+        if len(self.account_ids) != len(set(self.account_ids)):
+            raise ValueError("Selected accounts must be unique")
+        if not self.trades and not self.cash_changes:
+            raise ValueError("Enter at least one hypothetical trade or cash assumption")
+        trade_keys = [(row.account_id, row.security_id) for row in self.trades]
+        if len(trade_keys) != len(set(trade_keys)):
+            raise ValueError("Use at most one trade per account and security")
+        if any(Decimal(row.amount) == 0 for row in self.cash_changes):
+            raise ValueError("Cash assumptions must be nonzero")
+        categories = [row.category for row in self.category_targets]
+        if len(categories) != len(set(categories)):
+            raise ValueError("Allocation target categories must be unique")
+        if self.category_targets and sum(
+            (Decimal(row.target_percent) for row in self.category_targets), Decimal(0)
+        ) != Decimal(100):
+            raise ValueError("Entered category targets must sum to 100 percent")
+        return self
+
+
+class PortfolioScenarioOverlapRead(BaseModel):
+    security_id: str
+    label: str
+    fund_count: int
+    fund_ids: list[str]
+    fund_labels: list[str]
+    fund_amounts: dict[str, str]
+    shared_indirect_amount: str
+
+
+class PortfolioScenarioDriftRead(BaseModel):
+    category: str
+    target_percent: str
+    actual_percent: str | None
+    drift_percentage_points: str | None
+
+
+class PortfolioScenarioFundRead(BaseModel):
+    security_id: str
+    snapshot_id: str
+    as_of: date
+    source: str
+    source_url: str | None
+    quality_status: str
+    stale: bool
+
+
+class PortfolioExposureSnapshotRead(BaseModel):
+    included_valued_nav: str
+    total_portfolio_nav: str | None
+    nav_status: Literal["complete", "incomplete"]
+    percentages_available: bool
+    direct_assets: str
+    indirect_lookthrough: str
+    residual: str
+    residual_categories: dict[str, str]
+    opaque_and_unknown_value: str
+    categories: dict[str, str]
+    reconciled: bool
+    security_rows: list[ExposureRowRead]
+    issuer_rows: list[ExposureRowRead]
+    overlap_rows: list[PortfolioScenarioOverlapRead]
+    shared_indirect_amount: str
+    drift_status: Literal["available", "unavailable", "not_requested"]
+    drift_rows: list[PortfolioScenarioDriftRead]
+    fund_snapshots: list[PortfolioScenarioFundRead]
+    warnings: list[str]
+
+
+class PortfolioScenarioTradeRead(BaseModel):
+    account_id: UUID
+    account_name: str
+    security_id: UUID
+    ticker: str | None
+    side: Literal["buy", "sell"]
+    quantity: str
+    quantity_before: str
+    quantity_after: str
+    execution_price: str
+    currency: str
+    gross_amount: str
+    fee_amount: str
+    cash_delta: str
+    market_value_before: str
+    market_value_after: str
+    valuation_price_source: str
+
+
+class PortfolioScenarioCashRead(BaseModel):
+    account_id: UUID
+    account_name: str
+    currency: str
+    cash_before: str
+    assumption_delta: str
+    trade_delta: str
+    cash_after: str
+
+
+class PortfolioScenarioCashAssumptionRead(BaseModel):
+    account_id: UUID
+    account_name: str
+    amount: str
+    currency: Literal["USD"]
+    label: str
+
+
+class PortfolioScenarioRead(BaseModel):
+    methodology_version: str
+    exposure_calculation_version: str
+    as_of: datetime
+    account_ids: list[UUID]
+    account_names: list[str]
+    account_position_revisions: dict[str, int]
+    position_snapshot_ids: dict[str, UUID]
+    financing_policy: Literal["cash_only"]
+    currency: Literal["USD"]
+    before: PortfolioExposureSnapshotRead
+    after: PortfolioExposureSnapshotRead
+    trades: list[PortfolioScenarioTradeRead]
+    cash: list[PortfolioScenarioCashRead]
+    cash_changes: list[PortfolioScenarioCashAssumptionRead]
+    baseline_fingerprint: str
+    scenario_fingerprint: str
+    canonical_records_mutated: Literal[False]
+    persisted: Literal[False]
+    assumptions: list[str]
