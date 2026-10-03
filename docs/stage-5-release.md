@@ -1,6 +1,6 @@
 # Stage 5 implementation status
 
-**Status:** safe offline slices of S5.1.1, S5.2.1, and S5.3 implemented; shared SEC/IR retrieval, AI synthesis, evidence validation, monitoring, live DSQL, and hosted promotion remain gated
+**Status:** safe offline slices of S5.1.1, S5.2.1, and S5.3 plus a provisional local evidence validator implemented; shared SEC/IR retrieval, AI synthesis, monitoring, live DSQL, and hosted promotion remain gated
 **Updated:** 2026-10-03
 
 This record separates finance-owned offline research workflow evidence from shared-service and provider capabilities that have not been integrated. No SEC data, personal portfolio context, or personal-AI service was requested or called during this implementation.
@@ -33,12 +33,18 @@ Added immutable, versioned user thesis notes and append-only watchlist changes. 
 
 The current upstream personal-AI contract still does not establish authorization or a reviewed privacy-minimized service payload, so the private context bundle remains local. Earnings/report histories can only contain references a user manually entered; no automatic document/report refresh or model interpretation is implemented.
 
+## S5.4 — Provisional local evidence boundary
+
+Added `app/integrations/research_evidence.py` with a finance-side issuer/document scope, as-of/freshness policy, source identity fields, excerpt byte/count limits, and evidence candidate validation. The validator rejects missing or mismatched issuer/document/accession/URL/date identity, stale or future retrieval times, missing content hashes/excerpts, untraceable byte offsets, and oversized results. Different content hashes for the same registered filing remain together as an explicit conflict group. Empty/too-thin evidence reports `insufficient`; no result is silently truncated. Unit fixtures use only the existing invented, non-resolving SEC-shaped data.
+
+This schema is a **provisional finance validation envelope**, not an agreed personal-AI request/response contract. It does not provide HTTP transport, retrieval, caching, indexing, source parsing, or model routing. Its identity/hash/offset checks validate the service's metadata claims against the user's registered reference; they do not fetch SEC content or independently verify excerpts. The existing immutable finance research result and DSQL migration plan remain independent of generic upstream index storage. No evidence candidate from a service is currently persisted or rendered.
+
 ### Remaining gates
 
 - **S5.1.2 shared public observations:** not implemented. Requires an agreed service request/response contract with issuer and filing eligibility, retrievable provenance/excerpts, size/freshness limits, and service authorization. Upstream's current session/SSE API does not establish that contract.
 - **S5.2.2 synthesized cited research:** not implemented. The only enabled path is the deterministic, user-entered source/fact baseline. No model output is emitted or treated as evidence.
 - **S5.3 remote context/inference and automatic report history:** not implemented. Portfolio context and thesis notes remain local; only manually registered filings are available.
-- **S5.4 shared evidence retrieval:** not implemented yet. No finance index/search/database is added.
+- **S5.4 shared evidence retrieval:** not integrated. The upstream contract, authorization, evidence provenance, and owner propagation remain unresolved; no finance index/search/database is added.
 - **S5.5 monitoring:** not implemented. Stage 2 job delivery, restart, cleanup, and live DSQL lease acceptance remain partial/unverified; adding a second scheduler or notification path would bypass the dependency gate.
 - **S5.6 evaluation/release:** pending. Real DSQL is unverified; hosted promotion remains blocked by Stage 4 evidence and authorization gates.
 
@@ -61,3 +67,8 @@ The current upstream personal-AI contract still does not establish authorization
 - The focused synthetic research and DSQL migration checks passed **17 tests**. They verify the $35,200 issuer context fixture ($30,000 direct + $5,200 ETF-derived), per-account/source rows, note and watchlist revisions, explicit unmapped issuer handling, and frozen historical results after later position/note changes.
 - Changed research Python files passed mypy/Ruff; the generated OpenAPI TypeScript client passed typecheck, formatting, and lint. The web production build succeeds with the previously noted large-chunk advisory.
 - Migration 0018's local PostgreSQL execution remains unverified because no disposable PostgreSQL service was available. DSQL structure/resume checks passed, but live DSQL schema, FK, JSONB and OCC behavior remain unverified.
+
+## S5.4 verification
+
+- `UV_CACHE_DIR=/private/tmp/codex-finance-stage5-uv-cache uv run --directory services/api --locked pytest -q tests/test_stage5_evidence.py` — **4 passed**. Fixtures cover scoped identity, missing attribution, stale dates, offset mismatch, source conflicts, insufficient evidence, and item/byte limits.
+- The validator module and synthetic test passed mypy and Ruff. No personal-AI/SEC/IR transport was called; upstream wire compatibility and evidence authenticity remain unverified by design.
