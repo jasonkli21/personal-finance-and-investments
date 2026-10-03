@@ -4,10 +4,14 @@ import {
   ApiError,
   compareResearchFacts,
   createReportedResearchFact,
+  createResearchThesisNote,
   createResearchRun,
   fetchIssuers,
   fetchResearchCompany,
+  fetchResearchThesisNotes,
+  fetchResearchWatchlistState,
   registerResearchDocument,
+  updateResearchWatchlist,
 } from './api/client'
 import type { components } from './api/schema'
 
@@ -63,6 +67,19 @@ export default function ResearchWorkspace() {
   const [currentFactId, setCurrentFactId] = useState('')
   const [selectedFactIds, setSelectedFactIds] = useState<string[]>([])
   const [question, setQuestion] = useState('Review the selected reported facts')
+  const [portfolioReportId, setPortfolioReportId] = useState('')
+  const [thesisDraft, setThesisDraft] = useState('')
+  const [selectedThesisNoteId, setSelectedThesisNoteId] = useState('')
+  const thesisNotes = useQuery({
+    queryKey: ['research-thesis-notes', issuerId],
+    queryFn: () => fetchResearchThesisNotes(issuerId),
+    enabled: issuerId.length > 0,
+  })
+  const watchlist = useQuery({
+    queryKey: ['research-watchlist-state', issuerId],
+    queryFn: () => fetchResearchWatchlistState(issuerId),
+    enabled: issuerId.length > 0,
+  })
 
   const registerDocument = useMutation({
     mutationFn: registerResearchDocument,
@@ -82,6 +99,34 @@ export default function ResearchWorkspace() {
   })
   const comparison = useMutation({ mutationFn: compareResearchFacts })
   const run = useMutation({ mutationFn: createResearchRun })
+  const saveThesis = useMutation({
+    mutationFn: createResearchThesisNote,
+    onSuccess: async (note) => {
+      setThesisDraft('')
+      setSelectedThesisNoteId(note.id)
+      await queryClient.invalidateQueries({
+        queryKey: ['research-thesis-notes', issuerId],
+      })
+    },
+  })
+  const changeWatchlist = useMutation({
+    mutationFn: (action: 'added' | 'removed') =>
+      updateResearchWatchlist(issuerId, {
+        action,
+        idempotency_key: crypto.randomUUID(),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ['research-watchlist-state', issuerId],
+      })
+    },
+  })
+  const availableNotes = thesisNotes.data ?? []
+  const activeThesisNoteId = availableNotes.some(
+    (note) => note.id === selectedThesisNoteId,
+  )
+    ? selectedThesisNoteId
+    : (availableNotes[0]?.id ?? '')
 
   function saveDocument(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -140,6 +185,18 @@ export default function ResearchWorkspace() {
       question,
       fact_ids: selectedFactIds,
       idempotency_key: crypto.randomUUID(),
+      portfolio_report_id: portfolioReportId.trim() || null,
+      thesis_note_id: activeThesisNoteId || null,
+    })
+  }
+
+  function saveThesisNote(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!issuerId || !thesisDraft.trim()) return
+    saveThesis.mutate({
+      issuer_id: issuerId,
+      text: thesisDraft,
+      idempotency_key: crypto.randomUUID(),
     })
   }
 
@@ -191,6 +248,7 @@ export default function ResearchWorkspace() {
           onChange={(event) => {
             setIssuerId(event.target.value)
             setSelectedFactIds([])
+            setSelectedThesisNoteId('')
             run.reset()
             comparison.reset()
           }}
@@ -737,6 +795,116 @@ export default function ResearchWorkspace() {
             </form>
           )}
 
+          <section className="space-y-4 rounded-xl border border-slate-200 p-4">
+            <div>
+              <h3 className="font-semibold text-slate-900">
+                Private thesis and portfolio context
+              </h3>
+              <p className="mt-1 text-xs text-slate-600">
+                Thesis edits are saved as local versions. Portfolio context is
+                read from a frozen report and stays private to this finance app.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50"
+              disabled={watchlist.isPending || changeWatchlist.isPending}
+              onClick={() =>
+                changeWatchlist.mutate(
+                  watchlist.data?.active ? 'removed' : 'added',
+                )
+              }
+            >
+              {changeWatchlist.isPending
+                ? 'Saving…'
+                : watchlist.data?.active
+                  ? 'Remove from watchlist'
+                  : 'Add to watchlist'}
+            </button>
+            {watchlist.isError && (
+              <p role="alert" className="text-sm text-red-700">
+                Watchlist state could not be loaded:{' '}
+                {message(watchlist.error, 'Request failed.')}
+              </p>
+            )}
+            {changeWatchlist.isError && (
+              <p role="alert" className="text-sm text-red-700">
+                Watchlist update failed:{' '}
+                {message(changeWatchlist.error, 'Request failed.')}
+              </p>
+            )}
+            <form className="space-y-3" onSubmit={saveThesisNote}>
+              <label className="block text-sm text-slate-700">
+                Add a thesis note revision
+                <textarea
+                  className={inputClass}
+                  rows={3}
+                  maxLength={4000}
+                  value={thesisDraft}
+                  onChange={(event) => setThesisDraft(event.target.value)}
+                  placeholder="Your own assumptions or questions; this note is not external evidence."
+                  required
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={saveThesis.isPending || !thesisDraft.trim()}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50"
+              >
+                {saveThesis.isPending ? 'Saving…' : 'Save note version'}
+              </button>
+              {saveThesis.isError && (
+                <p role="alert" className="text-sm text-red-700">
+                  Thesis note could not be saved:{' '}
+                  {message(saveThesis.error, 'Request failed.')}
+                </p>
+              )}
+            </form>
+            {availableNotes.length > 0 && (
+              <label className="block text-sm text-slate-700">
+                Attach a user-authored note version to this offline baseline
+                <select
+                  className={inputClass}
+                  value={activeThesisNoteId}
+                  onChange={(event) =>
+                    setSelectedThesisNoteId(event.target.value)
+                  }
+                >
+                  <option value="">Do not attach a note</option>
+                  {availableNotes.map((note) => (
+                    <option key={note.id} value={note.id}>
+                      Version {note.version} ·{' '}
+                      {new Date(note.created_at).toLocaleString()}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {availableNotes.length > 0 && activeThesisNoteId && (
+              <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+                {
+                  availableNotes.find((note) => note.id === activeThesisNoteId)
+                    ?.text
+                }
+              </p>
+            )}
+            <label className="block text-sm text-slate-700">
+              Frozen portfolio report ID (optional)
+              <input
+                className={inputClass}
+                value={portfolioReportId}
+                onChange={(event) => setPortfolioReportId(event.target.value)}
+                placeholder="Paste a report ID from Portfolio reports above"
+              />
+            </label>
+            <p className="text-xs text-slate-500">
+              A saved run freezes issuer-mapped direct and ETF-derived exposure,
+              account filters, position/quote/fund snapshot IDs, and valuation
+              dates. Account labels and thesis text are never sent to search or
+              AI.
+            </p>
+          </section>
+
           <form
             className="space-y-3 rounded-xl border border-blue-200 bg-blue-50/50 p-4"
             onSubmit={createBaseline}
@@ -799,6 +967,56 @@ export default function ResearchWorkspace() {
                     </li>
                   ))}
                 </ul>
+                {run.data.result.portfolio_context && (
+                  <section className="mt-4 rounded-lg border border-blue-100 bg-blue-50/50 p-3">
+                    <p className="font-medium text-slate-900">
+                      Portfolio exposure · valued{' '}
+                      {new Date(
+                        run.data.result.portfolio_context.valuation_at,
+                      ).toLocaleString()}
+                    </p>
+                    {run.data.result.portfolio_context.status === 'matched' ? (
+                      <>
+                        <p className="mt-1 text-sm text-slate-700">
+                          Direct $
+                          {run.data.result.portfolio_context.direct_exposure} ·
+                          ETF-derived $
+                          {run.data.result.portfolio_context.indirect_exposure}{' '}
+                          · total $
+                          {run.data.result.portfolio_context.total_exposure}
+                        </p>
+                        <ul className="mt-2 space-y-1 text-xs text-slate-600">
+                          {run.data.result.portfolio_context.contributions.map(
+                            (contribution, index) => (
+                              <li
+                                key={`${contribution.position_snapshot_id}-${index}`}
+                              >
+                                {contribution.account_name} ·{' '}
+                                {contribution.exposure_kind} · $
+                                {contribution.amount} · position as of{' '}
+                                {contribution.position_as_of}
+                                {contribution.fund_snapshot_id
+                                  ? ` · fund ${contribution.fund_source ?? 'source unavailable'} as of ${contribution.fund_as_of ?? 'date unavailable'}`
+                                  : ''}
+                              </li>
+                            ),
+                          )}
+                        </ul>
+                      </>
+                    ) : (
+                      <p className="mt-1 text-sm text-amber-800">
+                        No position or ETF look-through mapping was found for
+                        this issuer.
+                      </p>
+                    )}
+                  </section>
+                )}
+                {run.data.result.thesis_note && (
+                  <blockquote className="mt-3 border-l-2 border-slate-300 pl-3 text-sm text-slate-700">
+                    User thesis v{run.data.result.thesis_note.version} (not
+                    evidence): {run.data.result.thesis_note.text}
+                  </blockquote>
+                )}
                 <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-amber-800">
                   {run.data.result.unknowns.map((unknown) => (
                     <li key={unknown}>{unknown}</li>

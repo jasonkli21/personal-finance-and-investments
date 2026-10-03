@@ -1298,3 +1298,84 @@ class ResearchResult(Base):
     generated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
+
+
+class ResearchThesisNote(Base):
+    """Immutable user-authored thesis revisions; never external citations."""
+
+    __tablename__ = "research_thesis_notes"
+    __table_args__ = (
+        UniqueConstraint("issuer_id", "version", name="uq_research_thesis_version"),
+        UniqueConstraint(
+            "issuer_id", "idempotency_key", name="uq_research_thesis_idempotency"
+        ),
+        Index("ix_research_thesis_issuer_version", "issuer_id", "version"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    issuer_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("issuers.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class ResearchWatchlistEvent(Base):
+    """Append-only user changes to a company watchlist."""
+
+    __tablename__ = "research_watchlist_events"
+    __table_args__ = (
+        CheckConstraint(
+            "action IN ('added', 'removed')", name="ck_research_watchlist_action"
+        ),
+        UniqueConstraint(
+            "issuer_id", "version", name="uq_research_watchlist_event_version"
+        ),
+        UniqueConstraint(
+            "issuer_id",
+            "idempotency_key",
+            name="uq_research_watchlist_event_idempotency",
+        ),
+        Index("ix_research_watchlist_issuer_version", "issuer_id", "version"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    issuer_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("issuers.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    action: Mapped[str] = mapped_column(String(12), nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+
+class ResearchRunContext(Base):
+    """Local lineage links for frozen finance context attached to a research run."""
+
+    __tablename__ = "research_run_contexts"
+    __table_args__ = (UniqueConstraint("run_id", name="uq_research_run_context_run"),)
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    run_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("research_runs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    portfolio_report_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("portfolio_calculations.id", ondelete="RESTRICT"),
+    )
+    thesis_note_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("research_thesis_notes.id", ondelete="RESTRICT"),
+    )

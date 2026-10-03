@@ -232,6 +232,8 @@ class ResearchRunCreate(BaseModel):
     question: str = Field(min_length=1, max_length=500)
     fact_ids: list[UUID] = Field(min_length=1, max_length=50)
     idempotency_key: str = Field(min_length=1, max_length=128)
+    portfolio_report_id: UUID | None = None
+    thesis_note_id: UUID | None = None
 
     @field_validator("question", "idempotency_key")
     @classmethod
@@ -260,6 +262,111 @@ class ResearchCitationRead(BaseModel):
     quality_status: Literal["user_supplied_unverified"]
 
 
+class ResearchPortfolioContribution(BaseModel):
+    account_id: UUID
+    account_name: str
+    exposure_kind: Literal["direct", "indirect"]
+    amount: str
+    security_id: UUID
+    position_id: UUID
+    position_snapshot_id: UUID
+    position_as_of: date
+    position_source: str
+    position_quality: str
+    quote_id: UUID | None
+    quote_as_of: datetime | None
+    quote_source: str | None
+    quality_status: str
+    fund_snapshot_id: UUID | None
+    fund_as_of: date | None
+    fund_fetched_at: datetime | None
+    fund_source: str | None
+    fund_source_url: str | None
+    fund_quality: str | None
+    fund_stale: bool
+
+
+class ResearchPortfolioContext(BaseModel):
+    status: Literal["matched", "issuer_unmapped"]
+    report_id: UUID
+    report_input_hash: str
+    report_generated_at: datetime
+    valuation_at: datetime
+    account_ids: list[UUID]
+    nav_status: Literal["complete", "incomplete"]
+    issuer_id: UUID
+    issuer_name: str
+    direct_exposure: str | None
+    indirect_exposure: str | None
+    total_exposure: str | None
+    reconciled: bool
+    contributions: list[ResearchPortfolioContribution]
+    warnings: list[str]
+
+
+class ResearchThesisNoteCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    issuer_id: UUID
+    text: str = Field(min_length=1, max_length=4000)
+    idempotency_key: str = Field(min_length=1, max_length=128)
+
+    @field_validator("text", "idempotency_key")
+    @classmethod
+    def clean_note_text(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Value cannot be blank")
+        return value
+
+
+class ResearchThesisNoteRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    issuer_id: UUID
+    version: int
+    text: str
+    created_at: datetime
+
+
+class ResearchThesisNoteCreated(ResearchThesisNoteRead):
+    duplicate: bool
+
+
+class ResearchWatchlistEventCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    action: Literal["added", "removed"]
+    idempotency_key: str = Field(min_length=1, max_length=128)
+
+    @field_validator("idempotency_key")
+    @classmethod
+    def clean_idempotency_key(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Idempotency key cannot be blank")
+        return value
+
+
+class ResearchWatchlistEventRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    issuer_id: UUID
+    version: int
+    action: Literal["added", "removed"]
+    created_at: datetime
+    duplicate: bool = False
+
+
+class ResearchWatchlistRead(BaseModel):
+    issuer_id: UUID
+    issuer_name: str
+    version: int | None
+    active: bool
+    changed_at: datetime | None
+
+
 class ResearchBaselineSnapshot(BaseModel):
     schema_version: Literal["finance-research-baseline-v1"]
     issuer_id: UUID
@@ -269,6 +376,8 @@ class ResearchBaselineSnapshot(BaseModel):
     mode: Literal["offline_deterministic"]
     facts: list[ResearchFactObservation]
     citations: list[ResearchCitationRead]
+    portfolio_context: ResearchPortfolioContext | None = None
+    thesis_note: ResearchThesisNoteRead | None = None
     inferences: list[str]
     unknowns: list[str]
 

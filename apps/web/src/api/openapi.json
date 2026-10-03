@@ -5745,6 +5745,16 @@
             "title": "Mode",
             "type": "string"
           },
+          "portfolio_context": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResearchPortfolioContext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "question": {
             "title": "Question",
             "type": "string"
@@ -5753,6 +5763,16 @@
             "const": "finance-research-baseline-v1",
             "title": "Schema Version",
             "type": "string"
+          },
+          "thesis_note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResearchThesisNoteRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "unknowns": {
             "items": {
@@ -6163,6 +6183,322 @@
         "title": "ResearchFactObservation",
         "type": "object"
       },
+      "ResearchPortfolioContext": {
+        "properties": {
+          "account_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "title": "Account Ids",
+            "type": "array"
+          },
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchPortfolioContribution"
+            },
+            "title": "Contributions",
+            "type": "array"
+          },
+          "direct_exposure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direct Exposure"
+          },
+          "indirect_exposure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indirect Exposure"
+          },
+          "issuer_id": {
+            "format": "uuid",
+            "title": "Issuer Id",
+            "type": "string"
+          },
+          "issuer_name": {
+            "title": "Issuer Name",
+            "type": "string"
+          },
+          "nav_status": {
+            "enum": [
+              "complete",
+              "incomplete"
+            ],
+            "title": "Nav Status",
+            "type": "string"
+          },
+          "reconciled": {
+            "title": "Reconciled",
+            "type": "boolean"
+          },
+          "report_generated_at": {
+            "format": "date-time",
+            "title": "Report Generated At",
+            "type": "string"
+          },
+          "report_id": {
+            "format": "uuid",
+            "title": "Report Id",
+            "type": "string"
+          },
+          "report_input_hash": {
+            "title": "Report Input Hash",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "matched",
+              "issuer_unmapped"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "total_exposure": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Exposure"
+          },
+          "valuation_at": {
+            "format": "date-time",
+            "title": "Valuation At",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status",
+          "report_id",
+          "report_input_hash",
+          "report_generated_at",
+          "valuation_at",
+          "account_ids",
+          "nav_status",
+          "issuer_id",
+          "issuer_name",
+          "direct_exposure",
+          "indirect_exposure",
+          "total_exposure",
+          "reconciled",
+          "contributions",
+          "warnings"
+        ],
+        "title": "ResearchPortfolioContext",
+        "type": "object"
+      },
+      "ResearchPortfolioContribution": {
+        "properties": {
+          "account_id": {
+            "format": "uuid",
+            "title": "Account Id",
+            "type": "string"
+          },
+          "account_name": {
+            "title": "Account Name",
+            "type": "string"
+          },
+          "amount": {
+            "title": "Amount",
+            "type": "string"
+          },
+          "exposure_kind": {
+            "enum": [
+              "direct",
+              "indirect"
+            ],
+            "title": "Exposure Kind",
+            "type": "string"
+          },
+          "fund_as_of": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund As Of"
+          },
+          "fund_fetched_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Fetched At"
+          },
+          "fund_quality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Quality"
+          },
+          "fund_snapshot_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Snapshot Id"
+          },
+          "fund_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Source"
+          },
+          "fund_source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fund Source Url"
+          },
+          "fund_stale": {
+            "title": "Fund Stale",
+            "type": "boolean"
+          },
+          "position_as_of": {
+            "format": "date",
+            "title": "Position As Of",
+            "type": "string"
+          },
+          "position_id": {
+            "format": "uuid",
+            "title": "Position Id",
+            "type": "string"
+          },
+          "position_quality": {
+            "title": "Position Quality",
+            "type": "string"
+          },
+          "position_snapshot_id": {
+            "format": "uuid",
+            "title": "Position Snapshot Id",
+            "type": "string"
+          },
+          "position_source": {
+            "title": "Position Source",
+            "type": "string"
+          },
+          "quality_status": {
+            "title": "Quality Status",
+            "type": "string"
+          },
+          "quote_as_of": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote As Of"
+          },
+          "quote_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Id"
+          },
+          "quote_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Source"
+          },
+          "security_id": {
+            "format": "uuid",
+            "title": "Security Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "account_id",
+          "account_name",
+          "exposure_kind",
+          "amount",
+          "security_id",
+          "position_id",
+          "position_snapshot_id",
+          "position_as_of",
+          "position_source",
+          "position_quality",
+          "quote_id",
+          "quote_as_of",
+          "quote_source",
+          "quality_status",
+          "fund_snapshot_id",
+          "fund_as_of",
+          "fund_fetched_at",
+          "fund_source",
+          "fund_source_url",
+          "fund_quality",
+          "fund_stale"
+        ],
+        "title": "ResearchPortfolioContribution",
+        "type": "object"
+      },
       "ResearchRunCreate": {
         "additionalProperties": false,
         "properties": {
@@ -6187,11 +6523,35 @@
             "title": "Issuer Id",
             "type": "string"
           },
+          "portfolio_report_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Report Id"
+          },
           "question": {
             "maxLength": 500,
             "minLength": 1,
             "title": "Question",
             "type": "string"
+          },
+          "thesis_note_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thesis Note Id"
           }
         },
         "required": [
@@ -6283,6 +6643,225 @@
           "result"
         ],
         "title": "ResearchRunRead",
+        "type": "object"
+      },
+      "ResearchThesisNoteCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "idempotency_key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "type": "string"
+          },
+          "issuer_id": {
+            "format": "uuid",
+            "title": "Issuer Id",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "issuer_id",
+          "text",
+          "idempotency_key"
+        ],
+        "title": "ResearchThesisNoteCreate",
+        "type": "object"
+      },
+      "ResearchThesisNoteCreated": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "duplicate": {
+            "title": "Duplicate",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "issuer_id": {
+            "format": "uuid",
+            "title": "Issuer Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "issuer_id",
+          "version",
+          "text",
+          "created_at",
+          "duplicate"
+        ],
+        "title": "ResearchThesisNoteCreated",
+        "type": "object"
+      },
+      "ResearchThesisNoteRead": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "issuer_id": {
+            "format": "uuid",
+            "title": "Issuer Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "issuer_id",
+          "version",
+          "text",
+          "created_at"
+        ],
+        "title": "ResearchThesisNoteRead",
+        "type": "object"
+      },
+      "ResearchWatchlistEventCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "added",
+              "removed"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Idempotency Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "idempotency_key"
+        ],
+        "title": "ResearchWatchlistEventCreate",
+        "type": "object"
+      },
+      "ResearchWatchlistEventCreated": {
+        "properties": {
+          "action": {
+            "enum": [
+              "added",
+              "removed"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "duplicate": {
+            "default": false,
+            "title": "Duplicate",
+            "type": "boolean"
+          },
+          "issuer_id": {
+            "format": "uuid",
+            "title": "Issuer Id",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "issuer_id",
+          "version",
+          "action",
+          "created_at"
+        ],
+        "title": "ResearchWatchlistEventCreated",
+        "type": "object"
+      },
+      "ResearchWatchlistRead": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "changed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed At"
+          },
+          "issuer_id": {
+            "format": "uuid",
+            "title": "Issuer Id",
+            "type": "string"
+          },
+          "issuer_name": {
+            "title": "Issuer Name",
+            "type": "string"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "issuer_id",
+          "issuer_name",
+          "version",
+          "active",
+          "changed_at"
+        ],
+        "title": "ResearchWatchlistRead",
         "type": "object"
       },
       "SaleLotResultRead": {
@@ -12352,6 +12931,149 @@
         ]
       }
     },
+    "/v1/research/issuers/{issuer_id}/thesis-notes": {
+      "get": {
+        "operationId": "get_thesis_notes_v1_research_issuers__issuer_id__thesis_notes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "issuer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Issuer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ResearchThesisNoteRead"
+                  },
+                  "title": "Response Get Thesis Notes V1 Research Issuers  Issuer Id  Thesis Notes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Thesis Notes",
+        "tags": [
+          "research"
+        ]
+      }
+    },
+    "/v1/research/issuers/{issuer_id}/watchlist": {
+      "get": {
+        "operationId": "get_issuer_watchlist_v1_research_issuers__issuer_id__watchlist_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "issuer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Issuer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchWatchlistRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Issuer Watchlist",
+        "tags": [
+          "research"
+        ]
+      }
+    },
+    "/v1/research/issuers/{issuer_id}/watchlist/events": {
+      "post": {
+        "operationId": "post_watchlist_event_v1_research_issuers__issuer_id__watchlist_events_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "issuer_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Issuer Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResearchWatchlistEventCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchWatchlistEventCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Watchlist Event",
+        "tags": [
+          "research"
+        ]
+      }
+    },
     "/v1/research/runs": {
       "post": {
         "operationId": "create_research_run_v1_research_runs_post",
@@ -12431,6 +13153,72 @@
           }
         },
         "summary": "Get Research Run",
+        "tags": [
+          "research"
+        ]
+      }
+    },
+    "/v1/research/thesis-notes": {
+      "post": {
+        "operationId": "register_thesis_note_v1_research_thesis_notes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResearchThesisNoteCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchThesisNoteCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register Thesis Note",
+        "tags": [
+          "research"
+        ]
+      }
+    },
+    "/v1/research/watchlist": {
+      "get": {
+        "operationId": "get_watchlist_v1_research_watchlist_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ResearchWatchlistRead"
+                  },
+                  "title": "Response Get Watchlist V1 Research Watchlist Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Watchlist",
         "tags": [
           "research"
         ]

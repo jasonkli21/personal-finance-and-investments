@@ -7,9 +7,10 @@ import json
 from collections.abc import Mapping
 from datetime import date, datetime
 from decimal import Decimal, localcontext
+from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from app.api.contracts import IssuerRead
@@ -23,8 +24,14 @@ from app.api.research_contracts import (
     ResearchDocumentCreate,
     ResearchDocumentRead,
     ResearchFactObservation,
+    ResearchPortfolioContext,
+    ResearchPortfolioContribution,
     ResearchRunCreate,
     ResearchRunRead,
+    ResearchThesisNoteCreate,
+    ResearchThesisNoteRead,
+    ResearchWatchlistEventCreate,
+    ResearchWatchlistRead,
 )
 from app.db.models import (
     Issuer,
@@ -32,6 +39,9 @@ from app.db.models import (
     ResearchDocument,
     ResearchResult,
     ResearchRun,
+    ResearchRunContext,
+    ResearchThesisNote,
+    ResearchWatchlistEvent,
     utc_now,
 )
 
@@ -181,6 +191,260 @@ def document_exists(session: Session, document_id: UUID) -> bool:
     return session.get(ResearchDocument, document_id) is not None
 
 
+def thesis_notes_for_issuer(
+    session: Session, issuer_id: UUID
+) -> list[ResearchThesisNote]:
+    return list(
+        session.scalars(
+            select(ResearchThesisNote)
+            .where(ResearchThesisNote.issuer_id == issuer_id)
+            .order_by(ResearchThesisNote.version.desc())
+            .limit(100)
+        )
+    )
+
+
+def create_thesis_note(
+    session: Session, data: ResearchThesisNoteCreate
+) -> tuple[ResearchThesisNote, bool]:
+    if session.get(Issuer, data.issuer_id) is None:
+        raise ResearchNotFound("Issuer not found")
+    existing = session.scalar(
+        select(ResearchThesisNote).where(
+            ResearchThesisNote.issuer_id == data.issuer_id,
+            ResearchThesisNote.idempotency_key == data.idempotency_key,
+        )
+    )
+    if existing is not None:
+        if existing.text != data.text:
+            raise ResearchConflict("Thesis note key is already used with other text")
+        return existing, True
+    latest_version = session.scalar(
+        select(func.max(ResearchThesisNote.version)).where(
+            ResearchThesisNote.issuer_id == data.issuer_id
+        )
+    )
+    record = ResearchThesisNote(
+        id=uuid4(),
+        issuer_id=data.issuer_id,
+        version=(latest_version or 0) + 1,
+        text=data.text,
+        idempotency_key=data.idempotency_key,
+        created_at=utc_now(),
+    )
+    session.add(record)
+    session.flush()
+    return record, False
+
+
+def thesis_note_for_run(
+    session: Session, note_id: UUID | None, issuer_id: UUID
+) -> ResearchThesisNoteRead | None:
+    if note_id is None:
+        return None
+    record = session.get(ResearchThesisNote, note_id)
+    if record is None or record.issuer_id != issuer_id:
+        raise ResearchNotFound("Thesis note for this issuer was not found")
+    return ResearchThesisNoteRead.model_validate(record)
+
+
+def latest_watchlist_event(
+    session: Session, issuer_id: UUID
+) -> ResearchWatchlistEvent | None:
+    return session.scalar(
+        select(ResearchWatchlistEvent)
+        .where(ResearchWatchlistEvent.issuer_id == issuer_id)
+        .order_by(ResearchWatchlistEvent.version.desc())
+        .limit(1)
+    )
+
+
+def watchlist_state(session: Session, issuer_id: UUID) -> ResearchWatchlistRead:
+    issuer = session.get(Issuer, issuer_id)
+    if issuer is None:
+        raise ResearchNotFound("Issuer not found")
+    event = latest_watchlist_event(session, issuer_id)
+    return ResearchWatchlistRead(
+        issuer_id=issuer.id,
+        issuer_name=issuer.display_name,
+        version=event.version if event is not None else None,
+        active=event.action == "added" if event is not None else False,
+        changed_at=event.created_at if event is not None else None,
+    )
+
+
+def active_watchlist(session: Session) -> list[ResearchWatchlistRead]:
+    latest_versions = (
+        select(
+            ResearchWatchlistEvent.issuer_id.label("issuer_id"),
+            func.max(ResearchWatchlistEvent.version).label("version"),
+        )
+        .group_by(ResearchWatchlistEvent.issuer_id)
+        .subquery()
+    )
+    rows = list(
+        session.execute(
+            select(ResearchWatchlistEvent, Issuer)
+            .join(
+                latest_versions,
+                and_(
+                    latest_versions.c.issuer_id == ResearchWatchlistEvent.issuer_id,
+                    latest_versions.c.version == ResearchWatchlistEvent.version,
+                ),
+            )
+            .join(Issuer, Issuer.id == ResearchWatchlistEvent.issuer_id)
+            .order_by(Issuer.display_name, Issuer.id)
+            .limit(500)
+        )
+    )
+    return [
+        ResearchWatchlistRead(
+            issuer_id=issuer.id,
+            issuer_name=issuer.display_name,
+            version=event.version,
+            active=True,
+            changed_at=event.created_at,
+        )
+        for event, issuer in rows
+        if event.action == "added"
+    ]
+
+
+def change_watchlist(
+    session: Session, issuer_id: UUID, data: ResearchWatchlistEventCreate
+) -> tuple[ResearchWatchlistEvent, bool]:
+    if session.get(Issuer, issuer_id) is None:
+        raise ResearchNotFound("Issuer not found")
+    existing = session.scalar(
+        select(ResearchWatchlistEvent).where(
+            ResearchWatchlistEvent.issuer_id == issuer_id,
+            ResearchWatchlistEvent.idempotency_key == data.idempotency_key,
+        )
+    )
+    if existing is not None:
+        if existing.action != data.action:
+            raise ResearchConflict("Watchlist key is already used for another action")
+        return existing, True
+    latest = latest_watchlist_event(session, issuer_id)
+    record = ResearchWatchlistEvent(
+        id=uuid4(),
+        issuer_id=issuer_id,
+        version=(latest.version if latest is not None else 0) + 1,
+        action=data.action,
+        idempotency_key=data.idempotency_key,
+        created_at=utc_now(),
+    )
+    session.add(record)
+    session.flush()
+    return record, False
+
+
+def _optional_uuid(value: object) -> UUID | None:
+    return UUID(str(value)) if value is not None else None
+
+
+def portfolio_context_from_report(
+    report: dict[str, Any], *, issuer_id: UUID, issuer_name: str
+) -> ResearchPortfolioContext:
+    if report.get("reconciled") is not True:
+        raise ResearchConflict("Selected portfolio report does not reconcile")
+    matching = next(
+        (
+            row
+            for row in report.get("issuer_rows", [])
+            if row.get("id") == str(issuer_id)
+        ),
+        None,
+    )
+    common: dict[str, Any] = {
+        "report_id": UUID(report["id"]),
+        "report_input_hash": str(report["input_hash"]),
+        "report_generated_at": report["generated_at"],
+        "valuation_at": report["valuation_at"],
+        "account_ids": [UUID(value) for value in report.get("account_ids", [])],
+        "nav_status": report["nav_status"],
+        "issuer_id": issuer_id,
+        "issuer_name": issuer_name,
+        "reconciled": True,
+        "warnings": list(report.get("warnings", [])),
+    }
+    if matching is None:
+        return ResearchPortfolioContext(
+            status="issuer_unmapped",
+            direct_exposure=None,
+            indirect_exposure=None,
+            total_exposure=None,
+            contributions=[],
+            warnings=[
+                *common["warnings"],
+                "No direct or ETF-derived exposure maps to this issuer in the report.",
+            ],
+            **{key: value for key, value in common.items() if key != "warnings"},
+        )
+
+    source_rows = matching.get("contributions", [])
+    if len(source_rows) > 100:
+        raise ResearchConflict(
+            "Selected issuer has over 100 source contributions; "
+            "create a narrower report"
+        )
+    contributions = [
+        ResearchPortfolioContribution(
+            account_id=UUID(str(row["account_id"])),
+            account_name=str(row["account_name"]),
+            exposure_kind=row["category"],
+            amount=str(row["amount"]),
+            security_id=UUID(str(row["security_id"])),
+            position_id=UUID(str(row["position_id"])),
+            position_snapshot_id=UUID(str(row["position_snapshot_id"])),
+            position_as_of=row["position_as_of"],
+            position_source=str(row["position_source"]),
+            position_quality=str(row["position_quality"]),
+            quote_id=_optional_uuid(row.get("quote_id")),
+            quote_as_of=row.get("quote_as_of"),
+            quote_source=row.get("quote_source"),
+            quality_status=str(row["quality_status"]),
+            fund_snapshot_id=_optional_uuid(row.get("fund_snapshot_id")),
+            fund_as_of=row.get("fund_as_of"),
+            fund_fetched_at=row.get("fund_fetched_at"),
+            fund_source=row.get("fund_source"),
+            fund_source_url=row.get("fund_source_url"),
+            fund_quality=row.get("fund_quality"),
+            fund_stale=bool(row.get("fund_stale", False)),
+        )
+        for row in source_rows
+    ]
+    direct = Decimal(str(matching["direct"]))
+    indirect = Decimal(str(matching["indirect"]))
+    total = Decimal(str(matching["total"]))
+    contribution_direct = sum(
+        (Decimal(row.amount) for row in contributions if row.exposure_kind == "direct"),
+        Decimal(0),
+    )
+    contribution_indirect = sum(
+        (
+            Decimal(row.amount)
+            for row in contributions
+            if row.exposure_kind == "indirect"
+        ),
+        Decimal(0),
+    )
+    if (
+        direct + indirect != total
+        or contribution_direct != direct
+        or contribution_indirect != indirect
+    ):
+        raise ResearchConflict("Issuer contributions do not reconcile to the report")
+    return ResearchPortfolioContext(
+        status="matched",
+        direct_exposure=_decimal_string(direct),
+        indirect_exposure=_decimal_string(indirect),
+        total_exposure=_decimal_string(total),
+        contributions=contributions,
+        **common,
+    )
+
+
 def company_research(session: Session, issuer_id: UUID) -> ResearchCompanyRead:
     issuer = session.get(Issuer, issuer_id)
     if issuer is None:
@@ -308,15 +572,39 @@ def _result_bytes(snapshot: dict[str, object]) -> bytes:
 
 
 def create_baseline_run(
-    session: Session, data: ResearchRunCreate
+    session: Session,
+    data: ResearchRunCreate,
+    *,
+    portfolio_context: ResearchPortfolioContext | None = None,
+    thesis_note: ResearchThesisNoteRead | None = None,
 ) -> tuple[ResearchRun, ResearchResult, bool]:
     issuer = session.get(Issuer, data.issuer_id)
     if issuer is None:
         raise ResearchNotFound("Issuer not found")
+    if (data.portfolio_report_id is None) != (portfolio_context is None):
+        raise ResearchConflict("Portfolio report context is missing or unexpected")
+    if (
+        portfolio_context is not None
+        and portfolio_context.report_id != data.portfolio_report_id
+    ):
+        raise ResearchConflict("Portfolio context does not match the selected report")
+    if (data.thesis_note_id is None) != (thesis_note is None):
+        raise ResearchConflict("Thesis note snapshot is missing or unexpected")
+    if thesis_note is not None and (
+        thesis_note.id != data.thesis_note_id or thesis_note.issuer_id != data.issuer_id
+    ):
+        raise ResearchConflict("Thesis note does not match the selected issuer")
     fingerprint_data = {
         "issuer_id": str(data.issuer_id),
         "question": data.question,
         "fact_ids": [str(identifier) for identifier in data.fact_ids],
+        "portfolio_report_id": (
+            str(data.portfolio_report_id) if data.portfolio_report_id else None
+        ),
+        "portfolio_report_input_hash": (
+            portfolio_context.report_input_hash if portfolio_context else None
+        ),
+        "thesis_note_id": str(data.thesis_note_id) if data.thesis_note_id else None,
         "schema_version": "finance-research-baseline-v1",
     }
     fingerprint = _fingerprint(fingerprint_data)
@@ -383,10 +671,23 @@ def create_baseline_run(
         mode="offline_deterministic",
         facts=observations,
         citations=citations,
+        portfolio_context=portfolio_context,
+        thesis_note=thesis_note,
         inferences=[],
         unknowns=[
             "No shared research service or model synthesis was run.",
             "Entered source values are unverified and may be incomplete or amended.",
+            *(
+                ["Selected portfolio report has no mapped issuer exposure."]
+                if portfolio_context is not None
+                and portfolio_context.status == "issuer_unmapped"
+                else []
+            ),
+            *(
+                ["No portfolio report was selected; ownership context is unavailable."]
+                if portfolio_context is None
+                else []
+            ),
         ],
     )
     snapshot = snapshot_model.model_dump(mode="json")
@@ -413,7 +714,19 @@ def create_baseline_run(
         result_snapshot=snapshot,
         generated_at=now,
     )
-    session.add_all([run, result])
+    records = [run, result]
+    if portfolio_context is not None or thesis_note is not None:
+        records.append(
+            ResearchRunContext(
+                id=uuid4(),
+                run_id=run.id,
+                portfolio_report_id=(
+                    portfolio_context.report_id if portfolio_context else None
+                ),
+                thesis_note_id=thesis_note.id if thesis_note else None,
+            )
+        )
+    session.add_all(records)
     session.flush()
     return run, result, False
 

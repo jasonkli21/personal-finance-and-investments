@@ -2485,6 +2485,92 @@ TABLE_CONSTRAINTS["research_results"] = (
         ("foreignkey(run_id)referencesresearch_runs(id)ondeletecascade",),
     ),
 )
+TABLE_COLUMNS["research_thesis_notes"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("issuer_id", "uuid", "NO", None, None, None),
+    ("version", "integer", "NO", None, None, None),
+    ("text", "text", "NO", None, None, None),
+    ("idempotency_key", "character varying", "NO", 128, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["research_thesis_notes"] = (
+    ("research_thesis_notes_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    (
+        "uq_research_thesis_version",
+        "UNIQUE",
+        ("unique(issuer_id,version)",),
+    ),
+    (
+        "uq_research_thesis_idempotency",
+        "UNIQUE",
+        ("unique(issuer_id,idempotency_key)",),
+    ),
+    (
+        "research_thesis_notes_issuer_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(issuer_id)referencesissuers(id)ondeleterestrict",),
+    ),
+)
+TABLE_COLUMNS["research_watchlist_events"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("issuer_id", "uuid", "NO", None, None, None),
+    ("version", "integer", "NO", None, None, None),
+    ("action", "character varying", "NO", 12, None, None),
+    ("idempotency_key", "character varying", "NO", 128, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["research_watchlist_events"] = (
+    ("research_watchlist_events_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    (
+        "ck_research_watchlist_action",
+        "CHECK",
+        ("action", "added", "removed"),
+    ),
+    (
+        "uq_research_watchlist_event_version",
+        "UNIQUE",
+        ("unique(issuer_id,version)",),
+    ),
+    (
+        "uq_research_watchlist_event_idempotency",
+        "UNIQUE",
+        ("unique(issuer_id,idempotency_key)",),
+    ),
+    (
+        "research_watchlist_events_issuer_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(issuer_id)referencesissuers(id)ondeleterestrict",),
+    ),
+)
+TABLE_COLUMNS["research_run_contexts"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("run_id", "uuid", "NO", None, None, None),
+    ("portfolio_report_id", "uuid", "YES", None, None, None),
+    ("thesis_note_id", "uuid", "YES", None, None, None),
+)
+TABLE_CONSTRAINTS["research_run_contexts"] = (
+    ("research_run_contexts_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    ("uq_research_run_context_run", "UNIQUE", ("unique(run_id)",)),
+    (
+        "research_run_contexts_run_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(run_id)referencesresearch_runs(id)ondeletecascade",),
+    ),
+    (
+        "research_run_contexts_portfolio_report_id_fkey",
+        "FOREIGN KEY",
+        (
+            "foreignkey(portfolio_report_id)referencesportfolio_calculations(id)ondeleterestrict",
+        ),
+    ),
+    (
+        "research_run_contexts_thesis_note_id_fkey",
+        "FOREIGN KEY",
+        (
+            "foreignkey(thesis_note_id)referencesresearch_thesis_notes(id)ondeleterestrict",
+        ),
+    ),
+)
 
 
 DSQL_MIGRATIONS = (
@@ -3104,6 +3190,100 @@ DSQL_MIGRATIONS = (
                         (run_id) REFERENCES research_runs(id) ON DELETE CASCADE
                 )""",
                 "research_results",
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = current_schema() AND table_name = :object_name)",
+            ),
+        ),
+    ),
+    DsqlMigration(
+        "0018_stage5_portfolio_context",
+        (
+            DsqlMigrationStep(
+                "create_research_thesis_notes",
+                "table",
+                """CREATE TABLE research_thesis_notes (
+                    id uuid NOT NULL,
+                    issuer_id uuid NOT NULL,
+                    version integer NOT NULL,
+                    text text NOT NULL,
+                    idempotency_key varchar(128) NOT NULL,
+                    created_at timestamptz NOT NULL,
+                    CONSTRAINT research_thesis_notes_pkey PRIMARY KEY (id),
+                    CONSTRAINT uq_research_thesis_version
+                        UNIQUE (issuer_id, version),
+                    CONSTRAINT uq_research_thesis_idempotency
+                        UNIQUE (issuer_id, idempotency_key),
+                    CONSTRAINT research_thesis_notes_issuer_id_fkey FOREIGN KEY
+                        (issuer_id) REFERENCES issuers(id) ON DELETE RESTRICT
+                )""",
+                "research_thesis_notes",
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = current_schema() AND table_name = :object_name)",
+            ),
+            DsqlMigrationStep(
+                "index_research_thesis_issuer_version",
+                "index",
+                "CREATE INDEX ASYNC ix_research_thesis_issuer_version "
+                "ON research_thesis_notes (issuer_id, version)",
+                "ix_research_thesis_issuer_version",
+                "SELECT true",
+                expected_index_table="research_thesis_notes",
+                expected_index_columns=("issuer_id", "version"),
+            ),
+            DsqlMigrationStep(
+                "create_research_watchlist_events",
+                "table",
+                """CREATE TABLE research_watchlist_events (
+                    id uuid NOT NULL,
+                    issuer_id uuid NOT NULL,
+                    version integer NOT NULL,
+                    action varchar(12) NOT NULL,
+                    idempotency_key varchar(128) NOT NULL,
+                    created_at timestamptz NOT NULL,
+                    CONSTRAINT research_watchlist_events_pkey PRIMARY KEY (id),
+                    CONSTRAINT ck_research_watchlist_action CHECK
+                        (action IN ('added', 'removed')),
+                    CONSTRAINT uq_research_watchlist_event_version
+                        UNIQUE (issuer_id, version),
+                    CONSTRAINT uq_research_watchlist_event_idempotency
+                        UNIQUE (issuer_id, idempotency_key),
+                    CONSTRAINT research_watchlist_events_issuer_id_fkey FOREIGN KEY
+                        (issuer_id) REFERENCES issuers(id) ON DELETE RESTRICT
+                )""",
+                "research_watchlist_events",
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = current_schema() AND table_name = :object_name)",
+            ),
+            DsqlMigrationStep(
+                "index_research_watchlist_issuer_version",
+                "index",
+                "CREATE INDEX ASYNC ix_research_watchlist_issuer_version "
+                "ON research_watchlist_events (issuer_id, version)",
+                "ix_research_watchlist_issuer_version",
+                "SELECT true",
+                expected_index_table="research_watchlist_events",
+                expected_index_columns=("issuer_id", "version"),
+            ),
+            DsqlMigrationStep(
+                "create_research_run_contexts",
+                "table",
+                """CREATE TABLE research_run_contexts (
+                    id uuid NOT NULL,
+                    run_id uuid NOT NULL,
+                    portfolio_report_id uuid,
+                    thesis_note_id uuid,
+                    CONSTRAINT research_run_contexts_pkey PRIMARY KEY (id),
+                    CONSTRAINT uq_research_run_context_run UNIQUE (run_id),
+                    CONSTRAINT research_run_contexts_run_id_fkey FOREIGN KEY
+                        (run_id) REFERENCES research_runs(id) ON DELETE CASCADE,
+                    CONSTRAINT research_run_contexts_portfolio_report_id_fkey FOREIGN
+                        KEY (portfolio_report_id) REFERENCES portfolio_calculations(id)
+                        ON DELETE RESTRICT,
+                    CONSTRAINT research_run_contexts_thesis_note_id_fkey FOREIGN KEY
+                        (thesis_note_id) REFERENCES research_thesis_notes(id)
+                        ON DELETE RESTRICT
+                )""",
+                "research_run_contexts",
                 "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
                 "WHERE table_schema = current_schema() AND table_name = :object_name)",
             ),

@@ -808,6 +808,57 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/research/issuers/{issuer_id}/thesis-notes': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Thesis Notes */
+    get: operations['get_thesis_notes_v1_research_issuers__issuer_id__thesis_notes_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/research/issuers/{issuer_id}/watchlist': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Issuer Watchlist */
+    get: operations['get_issuer_watchlist_v1_research_issuers__issuer_id__watchlist_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/research/issuers/{issuer_id}/watchlist/events': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Post Watchlist Event */
+    post: operations['post_watchlist_event_v1_research_issuers__issuer_id__watchlist_events_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/research/runs': {
     parameters: {
       query?: never
@@ -834,6 +885,40 @@ export interface paths {
     }
     /** Get Research Run */
     get: operations['get_research_run_v1_research_runs__run_id__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/research/thesis-notes': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Register Thesis Note */
+    post: operations['register_thesis_note_v1_research_thesis_notes_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/research/watchlist': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Watchlist */
+    get: operations['get_watchlist_v1_research_watchlist_get']
     put?: never
     post?: never
     delete?: never
@@ -3330,6 +3415,8 @@ export interface components {
        * @constant
        */
       mode: 'offline_deterministic'
+      portfolio_context?:
+        components['schemas']['ResearchPortfolioContext'] | null
       /** Question */
       question: string
       /**
@@ -3337,6 +3424,7 @@ export interface components {
        * @constant
        */
       schema_version: 'finance-research-baseline-v1'
+      thesis_note?: components['schemas']['ResearchThesisNoteRead'] | null
       /** Unknowns */
       unknowns: string[]
     }
@@ -3485,6 +3573,120 @@ export interface components {
       document: components['schemas']['ResearchDocumentRead']
       fact: components['schemas']['ReportedFactRead']
     }
+    /** ResearchPortfolioContext */
+    ResearchPortfolioContext: {
+      /** Account Ids */
+      account_ids: string[]
+      /** Contributions */
+      contributions: components['schemas']['ResearchPortfolioContribution'][]
+      /** Direct Exposure */
+      direct_exposure: string | null
+      /** Indirect Exposure */
+      indirect_exposure: string | null
+      /**
+       * Issuer Id
+       * Format: uuid
+       */
+      issuer_id: string
+      /** Issuer Name */
+      issuer_name: string
+      /**
+       * Nav Status
+       * @enum {string}
+       */
+      nav_status: 'complete' | 'incomplete'
+      /** Reconciled */
+      reconciled: boolean
+      /**
+       * Report Generated At
+       * Format: date-time
+       */
+      report_generated_at: string
+      /**
+       * Report Id
+       * Format: uuid
+       */
+      report_id: string
+      /** Report Input Hash */
+      report_input_hash: string
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'matched' | 'issuer_unmapped'
+      /** Total Exposure */
+      total_exposure: string | null
+      /**
+       * Valuation At
+       * Format: date-time
+       */
+      valuation_at: string
+      /** Warnings */
+      warnings: string[]
+    }
+    /** ResearchPortfolioContribution */
+    ResearchPortfolioContribution: {
+      /**
+       * Account Id
+       * Format: uuid
+       */
+      account_id: string
+      /** Account Name */
+      account_name: string
+      /** Amount */
+      amount: string
+      /**
+       * Exposure Kind
+       * @enum {string}
+       */
+      exposure_kind: 'direct' | 'indirect'
+      /** Fund As Of */
+      fund_as_of: string | null
+      /** Fund Fetched At */
+      fund_fetched_at: string | null
+      /** Fund Quality */
+      fund_quality: string | null
+      /** Fund Snapshot Id */
+      fund_snapshot_id: string | null
+      /** Fund Source */
+      fund_source: string | null
+      /** Fund Source Url */
+      fund_source_url: string | null
+      /** Fund Stale */
+      fund_stale: boolean
+      /**
+       * Position As Of
+       * Format: date
+       */
+      position_as_of: string
+      /**
+       * Position Id
+       * Format: uuid
+       */
+      position_id: string
+      /** Position Quality */
+      position_quality: string
+      /**
+       * Position Snapshot Id
+       * Format: uuid
+       */
+      position_snapshot_id: string
+      /** Position Source */
+      position_source: string
+      /** Quality Status */
+      quality_status: string
+      /** Quote As Of */
+      quote_as_of: string | null
+      /** Quote Id */
+      quote_id: string | null
+      /** Quote Source */
+      quote_source: string | null
+      /**
+       * Security Id
+       * Format: uuid
+       */
+      security_id: string
+    }
     /** ResearchRunCreate */
     ResearchRunCreate: {
       /** Fact Ids */
@@ -3496,8 +3698,12 @@ export interface components {
        * Format: uuid
        */
       issuer_id: string
+      /** Portfolio Report Id */
+      portfolio_report_id?: string | null
       /** Question */
       question: string
+      /** Thesis Note Id */
+      thesis_note_id?: string | null
     }
     /** ResearchRunRead */
     ResearchRunRead: {
@@ -3547,6 +3753,115 @@ export interface components {
        * @constant
        */
       validation_status: 'source_links_checked_unverified_values'
+    }
+    /** ResearchThesisNoteCreate */
+    ResearchThesisNoteCreate: {
+      /** Idempotency Key */
+      idempotency_key: string
+      /**
+       * Issuer Id
+       * Format: uuid
+       */
+      issuer_id: string
+      /** Text */
+      text: string
+    }
+    /** ResearchThesisNoteCreated */
+    ResearchThesisNoteCreated: {
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Duplicate */
+      duplicate: boolean
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /**
+       * Issuer Id
+       * Format: uuid
+       */
+      issuer_id: string
+      /** Text */
+      text: string
+      /** Version */
+      version: number
+    }
+    /** ResearchThesisNoteRead */
+    ResearchThesisNoteRead: {
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /**
+       * Issuer Id
+       * Format: uuid
+       */
+      issuer_id: string
+      /** Text */
+      text: string
+      /** Version */
+      version: number
+    }
+    /** ResearchWatchlistEventCreate */
+    ResearchWatchlistEventCreate: {
+      /**
+       * Action
+       * @enum {string}
+       */
+      action: 'added' | 'removed'
+      /** Idempotency Key */
+      idempotency_key: string
+    }
+    /** ResearchWatchlistEventCreated */
+    ResearchWatchlistEventCreated: {
+      /**
+       * Action
+       * @enum {string}
+       */
+      action: 'added' | 'removed'
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /**
+       * Duplicate
+       * @default false
+       */
+      duplicate: boolean
+      /**
+       * Issuer Id
+       * Format: uuid
+       */
+      issuer_id: string
+      /** Version */
+      version: number
+    }
+    /** ResearchWatchlistRead */
+    ResearchWatchlistRead: {
+      /** Active */
+      active: boolean
+      /** Changed At */
+      changed_at: string | null
+      /**
+       * Issuer Id
+       * Format: uuid
+       */
+      issuer_id: string
+      /** Issuer Name */
+      issuer_name: string
+      /** Version */
+      version: number | null
     }
     /** SaleLotResultRead */
     SaleLotResultRead: {
@@ -6816,6 +7131,103 @@ export interface operations {
       }
     }
   }
+  get_thesis_notes_v1_research_issuers__issuer_id__thesis_notes_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        issuer_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ResearchThesisNoteRead'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_issuer_watchlist_v1_research_issuers__issuer_id__watchlist_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        issuer_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ResearchWatchlistRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  post_watchlist_event_v1_research_issuers__issuer_id__watchlist_events_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        issuer_id: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ResearchWatchlistEventCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ResearchWatchlistEventCreated']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
   create_research_run_v1_research_runs_post: {
     parameters: {
       query?: never
@@ -6876,6 +7288,59 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  register_thesis_note_v1_research_thesis_notes_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ResearchThesisNoteCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ResearchThesisNoteCreated']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_watchlist_v1_research_watchlist_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ResearchWatchlistRead'][]
         }
       }
     }

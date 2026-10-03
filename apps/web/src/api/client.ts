@@ -134,6 +134,40 @@ export async function createResearchRun(
   return unwrap(await api.POST('/v1/research/runs', { body: input }))
 }
 
+export async function fetchResearchThesisNotes(issuerId: string) {
+  return unwrap(
+    await api.GET('/v1/research/issuers/{issuer_id}/thesis-notes', {
+      params: { path: { issuer_id: issuerId } },
+    }),
+  )
+}
+
+export async function createResearchThesisNote(
+  input: components['schemas']['ResearchThesisNoteCreate'],
+) {
+  return unwrap(await api.POST('/v1/research/thesis-notes', { body: input }))
+}
+
+export async function fetchResearchWatchlistState(issuerId: string) {
+  return unwrap(
+    await api.GET('/v1/research/issuers/{issuer_id}/watchlist', {
+      params: { path: { issuer_id: issuerId } },
+    }),
+  )
+}
+
+export async function updateResearchWatchlist(
+  issuerId: string,
+  input: components['schemas']['ResearchWatchlistEventCreate'],
+) {
+  return unwrap(
+    await api.POST('/v1/research/issuers/{issuer_id}/watchlist/events', {
+      params: { path: { issuer_id: issuerId } },
+      body: input,
+    }),
+  )
+}
+
 export async function fetchResearchRun(runId: string) {
   return unwrap(
     await api.GET('/v1/research/runs/{run_id}', {

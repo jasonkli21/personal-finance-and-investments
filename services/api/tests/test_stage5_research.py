@@ -6,12 +6,14 @@ import json
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, cast
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.pool import StaticPool
+from test_funds import catalog as create_fund_security
+from test_funds import upload as upload_fund
 
 from app.db.models import (
     Account,
@@ -23,6 +25,10 @@ from app.db.models import (
     ResearchDocument,
     ResearchResult,
     ResearchRun,
+    ResearchRunContext,
+    ResearchThesisNote,
+    ResearchWatchlistEvent,
+    Security,
 )
 from app.main import create_app
 
@@ -49,19 +55,10 @@ def _fixture() -> dict[str, Any]:
     return cast(dict[str, Any], json.loads(path.read_text()))
 
 
-def _issuer(client: TestClient) -> str:
-    factory = cast(Any, client.app).state.session_factory
-    identifier = uuid4()
-    with factory() as session:
-        session.add(
-            Issuer(
-                id=identifier,
-                normalized_name="synthetic research inc",
-                display_name="Synthetic Research Inc",
-            )
-        )
-        session.commit()
-    return str(identifier)
+def _issuer(client: TestClient, *, name: str = "Synthetic Research Inc") -> str:
+    response = client.post("/v1/issuers", json={"display_name": name})
+    assert response.status_code == 201, response.text
+    return str(response.json()["id"])
 
 
 def _add_documents(client: TestClient, issuer_id: str) -> list[dict[str, Any]]:
@@ -88,7 +85,8 @@ def test_source_registration_is_explicitly_unverified_and_idempotent(
         "/v1/research/documents", json={"issuer_id": issuer_id, **document}
     )
 
-    assert first.status_code == again.status_code == 201
+    assert first.status_code == 201, first.text
+    assert again.status_code == 201, again.text
     assert first.json()["id"] == again.json()["id"]
     assert first.json()["source_status"] == "user_supplied_unverified"
     assert first.json()["duplicate"] is False
@@ -356,4 +354,273 @@ def test_offline_baseline_freezes_cited_facts_and_is_idempotent(
         assert session.scalar(select(func.count()).select_from(PositionSnapshot)) == 0
         assert (
             session.scalar(select(func.count()).select_from(FinancialTransaction)) == 0
+        )
+
+
+def test_portfolio_context_notes_and_watchlist_are_frozen_locally(
+    research_client: TestClient,
+) -> None:
+    issuer_id = _issuer(research_client)
+    nvda_uuid = uuid4()
+    nvda_id = str(nvda_uuid)
+    factory = cast(Any, research_client.app).state.session_factory
+    with factory() as session:
+        session.add(
+            Security(
+                id=nvda_uuid,
+                security_type="equity",
+                display_ticker="NVDA",
+                name="Synthetic NVIDIA",
+                currency="USD",
+                issuer_id=UUID(issuer_id),
+            )
+        )
+        session.commit()
+    fa_id = create_fund_security(research_client, "FA")
+    fb_id = create_fund_security(research_client, "FB")
+    account = research_client.post(
+        "/v1/accounts",
+        json={
+            "name": "Synthetic brokerage",
+            "account_type": "taxable",
+            "base_currency": "USD",
+        },
+    )
+    assert account.status_code == 201, account.text
+    account_id = account.json()["id"]
+    positions = research_client.put(
+        f"/v1/accounts/{account_id}/positions",
+        json={
+            "expected_revision": 0,
+            "effective_date": "2026-10-01",
+            "positions": [
+                {
+                    "security_id": nvda_id,
+                    "quantity": "300",
+                    "reported_price": "100",
+                    "currency": "USD",
+                },
+                {
+                    "security_id": fa_id,
+                    "quantity": "500",
+                    "reported_price": "100",
+                    "currency": "USD",
+                },
+                {
+                    "security_id": fb_id,
+                    "quantity": "200",
+                    "reported_price": "100",
+                    "currency": "USD",
+                },
+            ],
+        },
+    )
+    assert positions.status_code == 200, positions.text
+    for fund_id, weight in ((fa_id, "8"), (fb_id, "6")):
+        uploaded = upload_fund(
+            research_client,
+            fund_id,
+            f"ticker,weight,type\nNVDA,{weight},equity\nOTHER,92,equity\n".encode(),
+        )
+        published = research_client.post(
+            f"/v1/fund-imports/{uploaded['id']}/publish",
+            json={"expected_review_revision": 1},
+        )
+        assert published.status_code == 200, published.text
+
+    docs = _add_documents(research_client, issuer_id)
+    facts = []
+    for index, fact in enumerate(_fixture()["facts"]):
+        response = research_client.post(
+            "/v1/research/facts",
+            json={**fact, "document_id": docs[index]["id"]},
+        )
+        assert response.status_code == 201, response.text
+        facts.append(response.json())
+
+    first_note = research_client.post(
+        "/v1/research/thesis-notes",
+        json={
+            "issuer_id": issuer_id,
+            "text": "Synthetic thesis note version one.",
+            "idempotency_key": "synthetic-thesis-v1",
+        },
+    )
+    second_note = research_client.post(
+        "/v1/research/thesis-notes",
+        json={
+            "issuer_id": issuer_id,
+            "text": "Synthetic thesis note version two.",
+            "idempotency_key": "synthetic-thesis-v2",
+        },
+    )
+    assert first_note.status_code == second_note.status_code == 201
+    assert first_note.json()["version"] == 1
+    assert second_note.json()["version"] == 2
+    assert (
+        research_client.get(f"/v1/research/issuers/{issuer_id}/thesis-notes").json()[0][
+            "id"
+        ]
+        == second_note.json()["id"]
+    )
+
+    watchlist = f"/v1/research/issuers/{issuer_id}/watchlist"
+    add_payload = {"action": "added", "idempotency_key": "watchlist-add-1"}
+    added = research_client.post(f"{watchlist}/events", json=add_payload)
+    duplicate_add = research_client.post(f"{watchlist}/events", json=add_payload)
+    repeated_add = research_client.post(
+        f"{watchlist}/events",
+        json={"action": "added", "idempotency_key": "watchlist-add-noop"},
+    )
+    removed = research_client.post(
+        f"{watchlist}/events",
+        json={"action": "removed", "idempotency_key": "watchlist-remove-1"},
+    )
+    assert (
+        added.status_code
+        == duplicate_add.status_code
+        == repeated_add.status_code
+        == removed.status_code
+        == 201
+    )
+    assert added.json()["version"] == 1 and duplicate_add.json()["duplicate"] is True
+    assert repeated_add.json()["version"] == 2
+    assert removed.json()["version"] == 3
+    readded = research_client.post(
+        f"{watchlist}/events",
+        json={"action": "added", "idempotency_key": "watchlist-add-2"},
+    )
+    assert readded.json()["version"] == 4
+    assert research_client.get(watchlist).json()["active"] is True
+    assert [
+        entry["issuer_id"]
+        for entry in research_client.get("/v1/research/watchlist").json()
+    ] == [issuer_id]
+
+    portfolio_report = research_client.post("/v1/portfolio/reports", json={})
+    assert portfolio_report.status_code == 200, portfolio_report.text
+    report_id = portfolio_report.json()["id"]
+    baseline_payload = {
+        "issuer_id": issuer_id,
+        "question": "Review synthetic company context",
+        "fact_ids": [item["id"] for item in facts],
+        "idempotency_key": "synthetic-context-run",
+        "portfolio_report_id": report_id,
+        "thesis_note_id": first_note.json()["id"],
+    }
+    saved = research_client.post("/v1/research/runs", json=baseline_payload)
+    assert saved.status_code == 201, saved.text
+    context = saved.json()["result"]["portfolio_context"]
+    assert context["status"] == "matched"
+    assert context["direct_exposure"] == "30000"
+    assert context["indirect_exposure"] == "5200"
+    assert context["total_exposure"] == "35200"
+    assert (
+        sum(1 for row in context["contributions"] if row["exposure_kind"] == "direct")
+        == 1
+    )
+    assert (
+        sum(1 for row in context["contributions"] if row["exposure_kind"] == "indirect")
+        == 2
+    )
+    assert context["account_ids"] == [account_id]
+    assert saved.json()["result"]["thesis_note"]["text"] == first_note.json()["text"]
+
+    updated = research_client.put(
+        f"/v1/accounts/{account_id}/positions",
+        json={
+            "expected_revision": 1,
+            "effective_date": "2026-10-02",
+            "positions": [
+                {
+                    "security_id": nvda_id,
+                    "quantity": "400",
+                    "reported_price": "100",
+                    "currency": "USD",
+                },
+                {
+                    "security_id": fa_id,
+                    "quantity": "500",
+                    "reported_price": "100",
+                    "currency": "USD",
+                },
+                {
+                    "security_id": fb_id,
+                    "quantity": "200",
+                    "reported_price": "100",
+                    "currency": "USD",
+                },
+            ],
+        },
+    )
+    assert updated.status_code == 200, updated.text
+    updated_note = research_client.post(
+        "/v1/research/thesis-notes",
+        json={
+            "issuer_id": issuer_id,
+            "text": "A later note must not rewrite the saved baseline.",
+            "idempotency_key": "synthetic-thesis-v3",
+        },
+    )
+    assert updated_note.json()["version"] == 3
+    loaded = research_client.get(f"/v1/research/runs/{saved.json()['id']}")
+    assert loaded.status_code == 200
+    assert loaded.json()["result"]["portfolio_context"]["total_exposure"] == "35200"
+    assert loaded.json()["result"]["thesis_note"]["id"] == first_note.json()["id"]
+
+    new_report = research_client.post("/v1/portfolio/reports", json={})
+    assert new_report.status_code == 200
+    new_run = research_client.post(
+        "/v1/research/runs",
+        json={
+            **baseline_payload,
+            "idempotency_key": "synthetic-context-run-after-position-change",
+            "portfolio_report_id": new_report.json()["id"],
+            "thesis_note_id": updated_note.json()["id"],
+        },
+    )
+    assert new_run.status_code == 201, new_run.text
+    assert new_run.json()["result"]["portfolio_context"]["total_exposure"] == "45200"
+    assert new_run.json()["result"]["thesis_note"]["version"] == 3
+    assert (
+        research_client.get(f"/v1/research/runs/{saved.json()['id']}").json()["result"][
+            "portfolio_context"
+        ]["total_exposure"]
+        == "35200"
+    )
+
+    unmapped_issuer = _issuer(research_client, name="Unmapped Synthetic Inc")
+    unmapped_documents = _add_documents(research_client, unmapped_issuer)
+    unmapped_fact = research_client.post(
+        "/v1/research/facts",
+        json={
+            **_fixture()["facts"][0],
+            "document_id": unmapped_documents[0]["id"],
+            "idempotency_key": "unmapped-synthetic-revenue",
+        },
+    )
+    assert unmapped_fact.status_code == 201
+    unmapped_run = research_client.post(
+        "/v1/research/runs",
+        json={
+            "issuer_id": unmapped_issuer,
+            "question": "Check unmapped exposure",
+            "fact_ids": [unmapped_fact.json()["id"]],
+            "idempotency_key": "unmapped-synthetic-run",
+            "portfolio_report_id": report_id,
+        },
+    )
+    assert unmapped_run.status_code == 201, unmapped_run.text
+    assert (
+        unmapped_run.json()["result"]["portfolio_context"]["status"]
+        == "issuer_unmapped"
+    )
+    assert unmapped_run.json()["result"]["portfolio_context"]["total_exposure"] is None
+
+    with cast(Any, research_client.app).state.session_factory() as session:
+        assert session.scalar(select(func.count()).select_from(ResearchRunContext)) == 3
+        assert session.scalar(select(func.count()).select_from(ResearchThesisNote)) == 3
+        assert (
+            session.scalar(select(func.count()).select_from(ResearchWatchlistEvent))
+            == 4
         )

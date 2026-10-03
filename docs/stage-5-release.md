@@ -1,6 +1,6 @@
 # Stage 5 implementation status
 
-**Status:** S5.1.1 and the safe offline portion of S5.2.1 implemented; shared SEC/IR retrieval, AI synthesis, portfolio context, monitoring, live DSQL, and hosted promotion remain gated
+**Status:** safe offline slices of S5.1.1, S5.2.1, and S5.3 implemented; shared SEC/IR retrieval, AI synthesis, evidence validation, monitoring, live DSQL, and hosted promotion remain gated
 **Updated:** 2026-10-03
 
 This record separates finance-owned offline research workflow evidence from shared-service and provider capabilities that have not been integrated. No SEC data, personal portfolio context, or personal-AI service was requested or called during this implementation.
@@ -25,11 +25,19 @@ Added a bounded issuer view, manual filing/fact entry, sourced fact table, and e
 
 This completes only the safe manual/offline part of S5.2.1. Automated taxonomy normalization, amended-filing relationships, upstream search, and stale-cache behavior depend on source/retrieval contracts and remain unimplemented. S5.2.2 cited model synthesis remains gated on S5.3 privacy/context boundaries, S5.4 evidence contract/authorization, and explicit inference/data-handling approval.
 
+## S5.3 — Frozen local portfolio context and user notes
+
+The deterministic baseline may now include a verified immutable Stage 1 portfolio report. Finance checks the report artifact hash, takes only the selected issuer's report row, and verifies that direct plus ETF-derived contributions reconcile to the reported issuer total. It freezes the calculation/report input hash, valuation time, account filter IDs, per-account contribution amounts, position/quote/fund snapshot IDs, source dates and quality fields. Direct ownership and ETF look-through stay separate. A report with no issuer mapping is saved with an explicit `issuer_unmapped` status and unknown exposure, not zero exposure. The bundle does not include full portfolio NAV, canonical financial writes, or transmission to an AI/search service. Source-detail snapshots are bounded at 100 contribution rows; a larger issuer row is rejected with guidance to create a narrower report.
+
+Added immutable, versioned user thesis notes and append-only watchlist changes. A run can select a specific note version; it is retained locally as user context and is not represented as external evidence. Later position reports or note revisions do not rewrite old research results. PostgreSQL revision `0018_stage5_portfolio_context` adds notes, watchlist events, and report/note lineage for runs; the separate DSQL plan contains one DDL statement per step and asynchronous indexes.
+
+The current upstream personal-AI contract still does not establish authorization or a reviewed privacy-minimized service payload, so the private context bundle remains local. Earnings/report histories can only contain references a user manually entered; no automatic document/report refresh or model interpretation is implemented.
+
 ### Remaining gates
 
 - **S5.1.2 shared public observations:** not implemented. Requires an agreed service request/response contract with issuer and filing eligibility, retrievable provenance/excerpts, size/freshness limits, and service authorization. Upstream's current session/SSE API does not establish that contract.
 - **S5.2.2 synthesized cited research:** not implemented. The only enabled path is the deterministic, user-entered source/fact baseline. No model output is emitted or treated as evidence.
-- **S5.3 portfolio context and thesis/watchlists:** not implemented yet. No portfolio values or thesis text are transmitted to personal-AI.
+- **S5.3 remote context/inference and automatic report history:** not implemented. Portfolio context and thesis notes remain local; only manually registered filings are available.
 - **S5.4 shared evidence retrieval:** not implemented yet. No finance index/search/database is added.
 - **S5.5 monitoring:** not implemented. Stage 2 job delivery, restart, cleanup, and live DSQL lease acceptance remain partial/unverified; adding a second scheduler or notification path would bypass the dependency gate.
 - **S5.6 evaluation/release:** pending. Real DSQL is unverified; hosted promotion remains blocked by Stage 4 evidence and authorization gates.
@@ -47,3 +55,9 @@ This completes only the safe manual/offline part of S5.2.1. Automated taxonomy n
 - `UV_CACHE_DIR=/private/tmp/codex-finance-stage5-uv-cache uv run --directory services/api --locked pytest -q tests/test_stage5_research.py tests/test_dsql_migrations.py` — **16 passed**. Synthetic coverage includes fiscal-period/unit incompatibility, missing/zero baseline behavior, source linkage, idempotency, frozen result integrity, and DSQL migration structure.
 - Changed research modules passed mypy and Ruff. The frontend passed `pnpm --dir apps/web typecheck`, `pnpm api:check`, and `pnpm --dir apps/web build`; the build reports the existing large-chunk advisory.
 - Migration 0017 is represented in the DSQL migration plan, but PostgreSQL runtime and real Aurora DSQL remain unverified because no local database/cluster is available.
+
+## S5.3 verification
+
+- The focused synthetic research and DSQL migration checks passed **17 tests**. They verify the $35,200 issuer context fixture ($30,000 direct + $5,200 ETF-derived), per-account/source rows, note and watchlist revisions, explicit unmapped issuer handling, and frozen historical results after later position/note changes.
+- Changed research Python files passed mypy/Ruff; the generated OpenAPI TypeScript client passed typecheck, formatting, and lint. The web production build succeeds with the previously noted large-chunk advisory.
+- Migration 0018's local PostgreSQL execution remains unverified because no disposable PostgreSQL service was available. DSQL structure/resume checks passed, but live DSQL schema, FK, JSONB and OCC behavior remain unverified.
