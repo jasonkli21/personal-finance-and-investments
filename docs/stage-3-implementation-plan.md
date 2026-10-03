@@ -1,6 +1,6 @@
 # Stage 3 implementation plan
 
-**Status:** In progress; S3.1–S3.5 delivered locally, S3.R remains
+**Status:** S3.1–S3.5 and S3.R complete locally; live Aurora DSQL verification remains
 **Updated:** 2026-10-02
 **Roadmap coverage:** Work packages 3.1–3.5
 

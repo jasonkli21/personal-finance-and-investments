@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from typing import Any, Self
 
 import pytest
+from sqlalchemy import UniqueConstraint
 
 from app.db import dsql_migrations
 from app.db.dsql_migrations import (
@@ -15,6 +16,7 @@ from app.db.dsql_migrations import (
     run_dsql_migrations,
     validate_migration_plan,
 )
+from app.db.models import Base
 
 
 class FakeResult:
@@ -133,6 +135,22 @@ def test_core_plan_has_single_statement_steps_and_async_indexes() -> None:
     assert sum(row["kind"] == "alter" for row in plan) == 5
     assert sum(row["kind"] == "backfill" for row in plan) == 1
     assert all(";" not in row["statement"] for row in plan)
+
+
+def test_named_unique_constraints_do_not_collide_between_tables() -> None:
+    constraint_tables: dict[str, str] = {}
+    for table in Base.metadata.tables.values():
+        for constraint in table.constraints:
+            name = constraint.name
+            if not isinstance(constraint, UniqueConstraint) or not isinstance(
+                name, str
+            ):
+                continue
+            previous_table = constraint_tables.setdefault(name, table.name)
+            assert previous_table == table.name, (
+                f"Unique constraint name {name!r} is shared by "
+                f"{previous_table!r} and {table.name!r}."
+            )
 
 
 def test_migration_plan_rejects_multiple_statements() -> None:

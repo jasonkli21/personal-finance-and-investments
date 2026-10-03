@@ -397,7 +397,7 @@ class TaxLot(TimestampMixin, Base):
         UniqueConstraint(
             "account_id", "source_label", "identity_key", name="uq_tax_lot_identity"
         ),
-        UniqueConstraint("import_row_id", name="uq_tax_lot_import_row"),
+        UniqueConstraint("import_row_id", name="uq_tax_lots_import_row"),
         Index("ix_tax_lots_account_security", "account_id", "security_id"),
         Index("ix_tax_lots_security_acquired", "security_id", "acquired_at"),
     )

@@ -1949,7 +1949,7 @@ TABLE_CONSTRAINTS["tax_lots"] = (
         "UNIQUE",
         ("unique(account_id,source_label,identity_key)",),
     ),
-    ("uq_tax_lot_import_row", "UNIQUE", ("unique(import_row_id)",)),
+    ("uq_tax_lots_import_row", "UNIQUE", ("unique(import_row_id)",)),
     (
         "tax_lots_account_id_fkey",
         "FOREIGN KEY",
@@ -2624,7 +2624,7 @@ DSQL_MIGRATIONS = (
                     CONSTRAINT tax_lots_pkey PRIMARY KEY (id),
                     CONSTRAINT uq_tax_lot_identity UNIQUE
                         (account_id, source_label, identity_key),
-                    CONSTRAINT uq_tax_lot_import_row UNIQUE (import_row_id),
+                    CONSTRAINT uq_tax_lots_import_row UNIQUE (import_row_id),
                     CONSTRAINT tax_lots_account_id_fkey FOREIGN KEY (account_id)
                         REFERENCES accounts(id) ON DELETE RESTRICT,
                     CONSTRAINT tax_lots_security_id_fkey FOREIGN KEY (security_id)

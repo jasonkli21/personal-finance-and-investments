@@ -1,9 +1,9 @@
 # Stage 3 implementation status
 
-**Status:** In progress; S3.1–S3.5 delivered locally; S3.R evaluation remains
+**Status:** S3.1–S3.5 and S3.R complete locally; live Aurora DSQL production gate remains
 **Updated:** 2026-10-02
 
-Stage 3 remains incomplete until S3.1–S3.5 and S3.R meet the [implementation plan](stage-3-implementation-plan.md). These notes record implemented behavior and verification, not the remaining planned scope. Local PostgreSQL and live Aurora DSQL evidence are tracked separately.
+Stage 3 implementation and local evaluation meet the [implementation plan](stage-3-implementation-plan.md). These notes record implemented behavior and verification. Production promotion remains blocked until the live Aurora DSQL gate described below passes.
 
 ## S3.1 — Historical evidence and performance
 
@@ -25,7 +25,7 @@ The Stage 3 event/performance API and pure calculation tests use synthetic recor
 
 - `uv run --directory services/api --locked pytest -q tests/test_stage3_performance.py tests/test_stage3_history.py tests/test_dsql_migrations.py` — 15 passed.
 - Ruff checks, focused mypy, and the web TypeScript typecheck passed.
-- PostgreSQL 16 migration/runtime tests were not run for this package. The credentialed DSQL integration suite was not run; live DSQL remains unverified.
+- The S3.1 API behavior is covered by synthetic SQLite tests. The Stage 3 migration chain was later exercised successfully on PostgreSQL 16.15 as part of S3.R, but dedicated PostgreSQL route coverage for the history/performance endpoints was not added. The credentialed DSQL integration suite was not run; live DSQL remains unverified.
 
 ## S3.2 — Source-backed tax lots
 
@@ -43,7 +43,7 @@ The local focused checks are:
 UV_CACHE_DIR=/private/tmp/codex-personal-finance-uv-cache uv run --directory services/api --locked pytest -q tests/test_stage3_tax_lots.py tests/test_stage3_history.py tests/test_stage3_performance.py tests/test_dsql_migrations.py tests/test_database_engine.py
 ```
 
-The focused API/migration/dialect suite passes (22 tests). The full local API suite passes 95 tests with 30 skipped; the skips include PostgreSQL and credentialed DSQL gates. Web tests (9), TypeScript, production build, Ruff, mypy, generated OpenAPI validation, and ESLint for changed web files pass. The full `pnpm check` is still blocked by existing React state-in-effect lint findings in `FinanceWorkspace.tsx`, `SpendingWorkspace.tsx`, and `StageOneWorkspace.tsx`; its repository-wide Ruff format check also reports the already-applied `0007_stage2_document_ingestion.py`. That migration was left unchanged per the migration immutability rule. A gated live-DSQL migration/round-trip case now covers a lot import row, fractional lot, and adjustment, but no credentialed Aurora DSQL cluster was available here. PostgreSQL 16 migration/runtime verification for these changes also remains unrun. Production promotion remains blocked on live DSQL evidence.
+The focused API/migration/dialect suite passes (22 tests). S3.R ran the full API suite on a temporary PostgreSQL 16.15 cluster; see its results below. The initial S3.2 checks did not exercise the PostgreSQL migration. S3.R found that the raw-row and published-lot tables declared the same PostgreSQL unique-index name. The migration had not been successfully applied; it now uses the distinct `uq_tax_lots_import_row` name in the migration, ORM metadata and DSQL plan. The fresh migration and schema round trip pass on PostgreSQL 16.15. The reviewed lot import API tests remain synthetic SQLite tests, and the credentialed DSQL integration suite was not run. The full `pnpm check` stops at existing React state-in-effect lint findings in `FinanceWorkspace.tsx`, `SpendingWorkspace.tsx`, and `StageOneWorkspace.tsx`; full repository Ruff formatting also reports the already-applied `0007_stage2_document_ingestion.py`, which remains unchanged. Production promotion remains blocked on live DSQL evidence.
 
 ## S3.3 — Hypothetical lot-sale comparison and qualified warnings
 
@@ -94,3 +94,26 @@ UV_CACHE_DIR=/private/tmp/codex-personal-finance-uv-cache uv run --directory ser
 ```
 
 This command passed 27 tests, including explicit income/expense/dividend assumptions, a scheduled purchase, sensitivity calculations, retirement and unknown-cash handling, liability separation, missing history, validation bounds, and unchanged canonical record counts. Focused Ruff, formatting, mypy, web TypeScript, changed-file ESLint, web tests (9), production build, and generated OpenAPI validation passed. The planning endpoint adds no persistent schema or migration. It was exercised with synthetic SQLite fixtures only; live PostgreSQL 16 and Aurora DSQL runtime checks remain outstanding.
+
+## S3.R — Final evaluation and release gate
+
+The local Stage 3 acceptance review is complete:
+
+| Review area | Evidence and result |
+| --- | --- |
+| Historical evidence and returns | Events retain source and review status. Deposits do not become market return; Modified Dietz is labeled an estimate, and ambiguous or insufficient XIRR inputs remain unavailable. |
+| Supplied tax lots | Raw rows and unknown fields remain reviewable. A synthetic two-lot sale produces the golden $500 versus $200 estimated gains before fees, with no canonical lot or position mutation. |
+| Tax warnings | Holding-period candidates and potential same-security wash-sale activity use a versioned, cited U.S. federal policy; unknown coverage is never presented as clearance. |
+| Portfolio scenarios | Before/after direct assets, look-through and residual reconcile to valued NAV in synthetic cases. Overlap and indirect exposure do not add to net worth. |
+| Liquidity planning | Income, expense and dividend inputs require explicit values and source labels. Cash, investments, restricted assets and liabilities remain separated; purchases reduce only projected cash. Missing coverage and non-USD balances stay visible. |
+| Database gate | Full API tests pass on PostgreSQL 16.15. Aurora DSQL remains unverified; production promotion is blocked on the credentialed DSQL migration and runtime suite. |
+
+The final full API run on a temporary PostgreSQL 16.15 cluster passed **134 tests with 9 skipped**. It covered the fresh Alembic chain through Stage 3 migrations, populated-schema upgrade, repository behavior, and transaction/concurrency tests. The 9 skips are the opt-in DSQL integration cases; no disposable Aurora DSQL cluster was available. The separate PostgreSQL integration group passed 39 tests with 2 skipped. Stage 3 endpoint behavior, including reviewed lot import, history/performance, sale/portfolio simulation and planning, continues to use synthetic SQLite fixtures rather than a dedicated PostgreSQL endpoint suite.
+
+Local frontend and contract checks passed: 9 web tests, TypeScript, changed-file ESLint, Prettier, generated OpenAPI validation and the production build. Full repository Ruff checks and mypy passed. The production build succeeds; Vite warns that the main JavaScript bundle exceeds 500 kB after minification.
+
+The aggregate `pnpm check` command stops at repository-wide web lint because of four existing `react-hooks/set-state-in-effect` findings in `FinanceWorkspace.tsx`, `SpendingWorkspace.tsx` and `StageOneWorkspace.tsx`; changed Stage 3 files pass ESLint. The full Python `ruff format --check .` reports the already-applied `0007_stage2_document_ingestion.py`; it was left unchanged under the migration immutability rule. The changed Stage 3 Python files pass formatting checks. These repository-wide checks do not alter the passing test, type, migration or generated-contract results.
+
+The PostgreSQL run caught and corrected a Stage 3.2 schema defect: `tax_lot_import_rows` and `tax_lots` had declared the same unique-index name. The distinct `uq_tax_lots_import_row` name is now consistent across ORM metadata, Alembic and the DSQL plan, and a regression test rejects duplicate named unique constraints across tables. Fresh PostgreSQL 16.15 migration and schema round-trip now pass. No live DSQL claim is made from that result or from the structural DSQL plan tests.
+
+**Release decision:** Stage 3 is complete for local development. Do not promote to production until the real Aurora DSQL migration, synthetic persistence, retry and runtime checks pass on a disposable cluster, and any resulting DSQL issues are resolved.

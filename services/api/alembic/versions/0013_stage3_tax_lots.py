@@ -130,7 +130,7 @@ def upgrade() -> None:
         sa.UniqueConstraint(
             "account_id", "source_label", "identity_key", name="uq_tax_lot_identity"
         ),
-        sa.UniqueConstraint("import_row_id", name="uq_tax_lot_import_row"),
+        sa.UniqueConstraint("import_row_id", name="uq_tax_lots_import_row"),
     )
     op.create_index(
         "ix_tax_lots_account_security", "tax_lots", ["account_id", "security_id"]
