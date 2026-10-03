@@ -1,19 +1,20 @@
 # Offline planning example only. All identifiers/digests below are conspicuous
 # placeholders; this file is not suitable for terraform apply.
-aws_account_id                     = "123456789012"
-aws_region                         = "us-east-1"
-resource_owner_tag                 = "REPLACE_WITH_OPERATOR_OWNER"
-app_domain_name                    = "finance.example.invalid"
-cloudfront_acm_certificate_arn     = "arn:aws:acm:us-east-1:123456789012:certificate/00000000-0000-0000-0000-000000000000"
-api_image_digest                   = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
-auth_issuer_url                    = "https://issuer.example.invalid"
-auth_client_id                     = "OFFLINE-PLACEHOLDER"
-auth_client_secret_arn             = "arn:aws:secretsmanager:us-east-1:123456789012:secret:OFFLINE-PLACEHOLDER"
-auth_session_signing_key_secret_arn = "arn:aws:secretsmanager:us-east-1:123456789012:secret:OFFLINE-PLACEHOLDER"
-auth_allowed_subject               = "OFFLINE-PLACEHOLDER"
-auth_personal_scope_id             = "OFFLINE-PLACEHOLDER"
-app_database_role                  = "finance_app"
-migration_trusted_principal_arn    = "arn:aws:iam::123456789012:role/OFFLINE-PLACEHOLDER"
+aws_account_id                        = "123456789012"
+aws_region                            = "us-east-1"
+resource_owner_tag                    = "REPLACE_WITH_OPERATOR_OWNER"
+app_domain_name                       = "finance.example.invalid"
+cloudfront_acm_certificate_arn        = "arn:aws:acm:us-east-1:123456789012:certificate/00000000-0000-0000-0000-000000000000"
+api_image_digest                      = "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+auth_issuer_url                       = "https://issuer.example.invalid"
+auth_client_id                        = "OFFLINE-PLACEHOLDER"
+auth_client_secret_arn                = "arn:aws:secretsmanager:us-east-1:123456789012:secret:OFFLINE-PLACEHOLDER"
+auth_session_signing_key_secret_arn   = "arn:aws:secretsmanager:us-east-1:123456789012:secret:OFFLINE-PLACEHOLDER"
+auth_allowed_subject                  = "OFFLINE-PLACEHOLDER"
+auth_personal_scope_id                = "OFFLINE-PLACEHOLDER"
+app_database_role                     = "finance_app"
+apprunner_existing_customer_confirmed = false
+migration_trusted_principal_arn       = "arn:aws:iam::123456789012:role/OFFLINE-PLACEHOLDER"
 
 # Optional account-wide cost notifications: set both only after selecting an
 # operator-approved limit and a real recipient. Alerts do not cap spend.

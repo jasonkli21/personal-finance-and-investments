@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -24,7 +25,7 @@ from xml.etree import ElementTree
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 API_ROOT = REPOSITORY_ROOT / "services" / "api"
 EVIDENCE_VERSION = 1
-FIXTURE_VERSION = "dsql-stage4-synthetic-v1"
+FIXTURE_VERSION = "stage4-release-suite-v1"
 REQUIRED_CASES = frozenset(
     {
         "test_real_dsql_migration_and_synthetic_persistence",
@@ -50,12 +51,15 @@ CONFIG_KEYS = (
     "AUTH_ENABLED",
     "AUTH_ISSUER_URL",
     "AUTH_CLIENT_ID",
+    "AUTH_COOKIE_SECURE",
+    "AUTH_SESSION_TTL_SECONDS",
     "FILE_STORAGE_BACKEND",
     "PRIVATE_S3_BUCKET",
     "PRIVATE_S3_KMS_KEY_ID",
     "STATIC_ASSETS_BUCKET",
     "DATABASE_BACKEND",
     "AWS_REGION",
+    "AURORA_DSQL_CLUSTER_ENDPOINT",
     "AURORA_DSQL_DB_USER",
     "AURORA_DSQL_MIGRATION_DB_USER",
     "DATABASE_POOL_SIZE",
@@ -64,6 +68,15 @@ CONFIG_KEYS = (
     "DATABASE_CONNECT_TIMEOUT_SECONDS",
     "MAX_IMPORT_ROWS",
     "MAX_IMPORT_FILE_BYTES",
+    "MAX_PRIVATE_FILE_BYTES",
+    "MAX_PDF_PAGES",
+    "PDF_PARSER_TIMEOUT_SECONDS",
+    "JOB_WORKER_ENABLED",
+    "JOB_POLL_INTERVAL_SECONDS",
+    "JOB_LEASE_SECONDS",
+    "JOB_MAX_ATTEMPTS",
+    "PERSONAL_AI_ENABLED",
+    "DEMO_MODE",
 )
 
 
@@ -111,10 +124,19 @@ def _source_paths() -> tuple[list[Path], list[Path], list[Path]]:
         API_ROOT / "app" / "db" / "models.py",
         *migrations,
     ]
-    fixture_files = [
-        API_ROOT / "tests" / "test_dsql_integration.py",
-        API_ROOT / "tests" / "test_stage1_dsql_integration.py",
-    ]
+    fixture_files = sorted((API_ROOT / "tests").glob("test_*.py"))
+    fixture_files.extend(
+        path
+        for test_dir in (
+            REPOSITORY_ROOT / "apps" / "web" / "test",
+            REPOSITORY_ROOT / "apps" / "web" / "e2e",
+        )
+        for path in sorted(test_dir.rglob("*"))
+        if path.is_file()
+    )
+    fixture_files.append(
+        REPOSITORY_ROOT / "scripts" / "stage4" / "test_infra_contract.py"
+    )
     return build_files, schema_files, fixture_files
 
 
@@ -165,6 +187,33 @@ def _require_committed_api_source() -> None:
 
 def _configuration_fingerprint() -> str:
     safe_values = {key: os.environ.get(key) for key in CONFIG_KEYS}
+    if (safe_values["AUTH_ENABLED"] or "").casefold() == "true":
+        signing_key = os.environ.get("AUTH_SESSION_SIGNING_KEY", "")
+        private_auth_inputs = {
+            "client_secret": os.environ.get("AUTH_CLIENT_SECRET"),
+            "subject": os.environ.get("AUTH_ALLOWED_SUBJECT"),
+            "scope": os.environ.get("AUTH_PERSONAL_SCOPE_ID"),
+        }
+        if (
+            len(signing_key) < 32
+            or not private_auth_inputs["client_secret"]
+            or not private_auth_inputs["subject"]
+            or not private_auth_inputs["scope"]
+        ):
+            raise EvidenceError(
+                "Enabled authentication requires a signing key, OIDC secret, "
+                "and owner scope for configuration evidence"
+            )
+        private_auth_payload = json.dumps(
+            private_auth_inputs, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+        # Bind private identity and client credentials without storing a
+        # dictionary-guessable hash of any one low-entropy value.
+        safe_values["AUTH_PRIVATE_INPUTS_HMAC_SHA256"] = hmac.new(
+            signing_key.encode("utf-8"), private_auth_payload, hashlib.sha256
+        ).hexdigest()
+    else:
+        safe_values["AUTH_PRIVATE_INPUTS_HMAC_SHA256"] = None
     return _sha256(
         json.dumps(safe_values, sort_keys=True, separators=(",", ":")).encode()
     )
@@ -203,6 +252,7 @@ def _preflight() -> None:
         raise EvidenceError("A source-matched immutable OCI image digest is required")
     _require_committed_api_source()
     _cluster_fingerprint()
+    _configuration_fingerprint()
 
 
 def _parse_junit(path: Path) -> tuple[dict[str, int], set[str]]:

@@ -1,6 +1,6 @@
 # Stage 4 implementation plan
 
-**Status:** S4.1–S4.5 locally prepared; no infrastructure provisioned, live DSQL, or cloud recovery verified
+**Status:** S4.1–S4.6 implementation and local evidence machinery prepared; no infrastructure provisioned, live DSQL, cloud recovery, or launch rehearsal verified
 **Updated:** 2026-10-03
 **Roadmap coverage:** Work packages 4.1–4.6
 
@@ -82,7 +82,7 @@ S4.1.1 + S4.1.2 + test environment ─> S4.5 Recovery drill
 S4.2 + S4.3 + S4.4 + S4.5 ─> S4.6.1 Gated release ─> S4.6.2 Synthetic operations/teardown
 ```
 
-Configuration/IaC/tests/runbooks can be prepared locally. Credentialed cluster execution and resource application require the documented AWS target and approval; personal data stays local until all launch gates pass.
+Configuration/IaC/tests/runbooks can be prepared locally. The current App Runner plan is usable only for eligible existing customer accounts; AWS stopped accepting new customers on 2026-03-31. Confirm target-account eligibility or record a separately reviewed replacement-runtime decision before a deployable plan. Credentialed cluster execution and resource application require the documented AWS target and approval; personal data stays local until all launch gates pass.
 
 ---
 

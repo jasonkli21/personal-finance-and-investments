@@ -244,7 +244,13 @@ variable "job_worker_enabled" {
 }
 
 variable "deploy_api_service" {
-  description = "Enable App Runner and CloudFront only after the ECR repository exists, an approved image digest is pushed, identity/DNS/TLS are ready, and release gates are accepted."
+  description = "Enable App Runner and CloudFront only after the ECR repository exists, the account's existing-customer eligibility is confirmed, an approved image digest is pushed, identity/DNS/TLS are ready, and release gates are accepted."
+  type        = bool
+  default     = false
+}
+
+variable "apprunner_existing_customer_confirmed" {
+  description = "Operator confirmation that the target account is eligible to continue using AWS App Runner; AWS stopped accepting new customers on 2026-03-31."
   type        = bool
   default     = false
 }

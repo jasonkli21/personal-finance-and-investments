@@ -397,6 +397,13 @@ resource "aws_apprunner_service" "api" {
   service_name                   = "${local.name}-api"
   auto_scaling_configuration_arn = aws_apprunner_auto_scaling_configuration_version.api[0].arn
 
+  lifecycle {
+    precondition {
+      condition     = var.apprunner_existing_customer_confirmed
+      error_message = "Confirm target-account eligibility: AWS stopped accepting new App Runner customers on 2026-03-31."
+    }
+  }
+
   source_configuration {
     auto_deployments_enabled = false
     authentication_configuration {

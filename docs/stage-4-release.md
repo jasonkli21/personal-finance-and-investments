@@ -1,6 +1,6 @@
 # Stage 4 release evidence
 
-**Status:** S4.1–S4.5 production configuration, infrastructure, real-DSQL evidence machinery, cost controls and encrypted portable recovery prepared locally; no AWS resources provisioned and live DSQL/cloud recovery remain unverified
+**Status:** S4.1–S4.6 production configuration, infrastructure, real-DSQL evidence machinery, cost controls, encrypted portable recovery, and fail-closed release/operations tooling prepared locally; no AWS resources provisioned and live DSQL/cloud launch remain unverified
 **Updated:** 2026-10-03
 
 This record distinguishes locally implemented release machinery from credentialed launch evidence. A passed SQLite/PostgreSQL test or skipped AWS suite does not satisfy the real Aurora DSQL, bucket-policy, cost-approval, recovery, or HTTPS launch gates.
@@ -43,11 +43,11 @@ The synthetic auth tests cover RSA-signed ID-token acceptance, invalid-signature
 | Package | Prepared or delivered locally | Evidence still required |
 | --- | --- | --- |
 | S4.1 | Production configuration, auth, private storage adapter, and `0015` migration plan | Real DSQL migration/reconnect, scoped IAM and S3 policies, HTTPS synthetic journey |
-| S4.2 | Terraform lockfile, provider schema validation, static policy guardrails, and fake-input no-network plans prepared | Explicit account/region/domain/certificate/image/identity/budget inputs, target-specific reviewed plan, runtime smoke/benchmark, and approved apply |
+| S4.2 | Terraform lockfile, provider schema validation, static policy guardrails, and fake-input no-network plans prepared; App Runner deployment has a default-false existing-customer eligibility guard | Explicit account/region/domain/certificate/image/identity/budget inputs; confirm target-account App Runner eligibility or approve a replacement runtime; target-specific reviewed plan, runtime smoke/benchmark, and approved apply |
 | S4.3 | Nine-case real-DSQL suite and fail-closed evidence runner prepared; all nine cases skip without explicit opt-in | Execute against an approved isolated DSQL cluster and pass with zero skipped tests; separately close the populated-upgrade, interrupted-migration, token-expiry, and real DSQL OCC-gap evidence |
 | S4.4 | Bounded production workload settings, optional post-credit account budget alerts, and dated public-price register prepared on 2026-10-03; fake-input disabled/enabled plans succeeded and missing-recipient plan failed closed | Target account/Region and credit eligibility, region-specific whole-stack forecast, selected monthly threshold, verified recipients, and alert delivery test |
 | S4.5 | Versioned AES-GCM portable archive, scope-confirmed CLI, isolated loopback PostgreSQL restore, and synthetic interruption/tamper/idempotency drill | Approved isolated DSQL + private S3 export/restore drill, security/IAM/bucket audit, and explicit retention/RTO/RPO/budget approval |
-| S4.6 | Pending | Evidence-bound promotion gate, approved gated release, synthetic HTTPS launch, rollback/pause/teardown rehearsal, and retained-resource inventory |
+| S4.6 | Offline evidence-bound gate and release/operations runbook prepared; unit tests cover missing, stale, skipped, mismatched, and tampered evidence | All target-bound evidence, real DSQL/HTTPS/S3/recovery operations rehearsal, and separate production approval; App Runner eligibility or reviewed replacement runtime remains unresolved |
 
 The current published DSQL free tier is 100,000 DPUs plus 1 GB-month of storage per month, with billable overages; it is not a whole-stack cap. AWS account, target region, identity, alert recipient, monthly exposure, and deployment approval have not been supplied. No infrastructure apply, cloud test, data transfer, push, or deployment is authorized by this release record.
 
@@ -61,7 +61,7 @@ would create the ECR repository before an operator builds and pushes an image;
 the second reviewed plan would use its immutable digest and enable App Runner
 and CloudFront. No stage has been applied here.
 
-The current choice is App Runner for the existing containerized ASGI API,
+The prepared choice is App Runner for the existing containerized ASGI API,
 default public egress to DSQL, and no separate VPC/NAT/ALB/PrivateLink. It is a
 documented fit, not a measured result: one 0.25-vCPU/1-GB instance, concurrency
 10, and max/min 1 are provisional bounded settings, with smoke/benchmark and
@@ -192,16 +192,21 @@ retention policy and recovery plan are approved; no expiry rule silently
 deletes user records. ECR retains 20 immutable API images. App Runner generated
 logs have a 30-day post-create retention helper gate. Per-request bounds, one
 running instance, and disabled optional features reduce exposure but cannot cap
-aggregate DSQL, S3, CloudFront, egress, or log spend. Terraform syntax/contract
-checks and fake-input no-refresh plans pass locally; no budget amount, address,
-account query, real pricing-calculator estimate, or alert-delivery test was
-possible. Full budget/target forecast evidence remains launch-gated.
+aggregate DSQL, S3, CloudFront, egress, or log spend. No budget amount, alert
+recipient, account query, real pricing-calculator estimate, or alert-delivery
+test was possible.
+Full budget/target forecast evidence remains launch-gated.
 
 The 30 configuration tests pass, including the injected 1,000-row/file/page/
 parser/job limits and over-bound configuration rejection. Five Terraform
-contract tests pass. Terraform `1.16.5` formatting/schema validation passes.
+contract tests pass, including the App Runner eligibility precondition.
+Terraform 1.16.5 formatting, schema validation, and fake-input no-refresh plans
+passed before that precondition was added. No Terraform executable is available
+for a fresh format/validate/plan run after the edit.
 The fake `.invalid` recipient was used only to validate a no-refresh local plan;
 it is not an alert routing or recipient confirmation test.
+
+AWS's current [App Runner availability notice](https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html), checked 2026-10-03, says AWS stopped accepting new customers on 2026-03-31 while existing customers may continue. The target account's eligibility is unknown. Terraform now refuses to create its API service unless an operator explicitly confirms existing-customer eligibility. A new or ineligible account needs a separately reviewed runtime decision and updated whole-stack cost forecast; none has been selected here.
 
 ## S4.5 — Encrypted portable export and validated local recovery
 
@@ -245,3 +250,63 @@ production writes, retention, passphrase recovery, RTO/RPO, and a real
 DSQL-to-local restore remain unverified. There is no automated schedule,
 retention deletion, server export endpoint, or automatic local/cloud sync.
 Operational instructions and gates are in the [Stage 4 recovery runbook](stage-4-recovery-runbook.md).
+
+
+## S4.6 — Fail-closed release evidence and operations
+
+The new offline verifier, app.release.stage4_gate, checks eight required
+records: target configuration, immutable infrastructure plan, authenticated
+HTTPS/private-S3 journey, complete live DSQL suite, cost/budget approval,
+encrypted cloud recovery, operations rehearsal, and final production approval.
+It binds records to the committed source, build, schema, fixture, configuration
+contract, infrastructure source, and immutable image digest. Environment
+configuration is fingerprinted separately for the DSQL test, synthetic launch,
+and production review because those targets intentionally have distinct scoped
+roles and storage. Evidence older than 30 days, any missing record, any failure
+or skip, stale hash, changed artifact, path outside the evidence bundle, or
+mismatched configuration blocks the report. The report records evidence hashes,
+the DSQL test cluster hash, gate results, and that no deployment was performed.
+The DSQL configuration fingerprint includes its endpoint, roles, pool limits,
+and bounded runtime settings. It binds the OIDC client secret and private owner
+scope with an HMAC keyed by the session-signing secret without writing those
+values into evidence. The verifier never calls AWS or applies infrastructure.
+
+Non-DSQL evidence is a local JSON wrapper that references a hashed artifact.
+Automated evidence requires positive test counts, zero failure/error/skip, and
+no unverified gates. Approval evidence requires references to the actual review
+record and approver; the tool verifies hashes but does not authenticate that a
+person examined an artifact. The production approval remains a separate
+human-controlled decision. The template command creates only an empty blocked
+record; the check command never deploys. Run instructions and the evidence
+schema are in the [Stage 4 operations runbook](stage-4-operations-runbook.md).
+
+The focused release-gate, DSQL-evidence, and recovery tests passed 23 with one
+credential-gated skip. The full API suite passed 173 tests with 33 skips offline,
+and 195 tests with 11 skips against the disposable PostgreSQL 16 server. Tests
+cover complete hash-bound evidence and blocking on missing gates, skipped tests,
+stale release fingerprints, mismatched configuration, tampered artifacts,
+traversal paths, expired evidence, and incomplete DSQL matrix evidence. No
+release manifest was produced from actual cloud evidence because the required
+AWS target and approved synthetic environment are not available.
+
+### Current AWS service availability constraint
+
+AWS's official [App Runner availability notice](https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html),
+checked 2026-10-03, states that AWS stopped accepting new App Runner customers
+on 2026-03-31 and existing customers may continue. No target account has been
+provided, so App Runner eligibility is unknown. The prepared Terraform now
+requires a default-false explicit existing-customer confirmation before it
+creates App Runner. Its API service and cost examples are usable only if the
+target account is eligible. Otherwise, a separately reviewed runtime choice
+and fresh whole-stack cost review are required. No substitute architecture is
+selected. The prepared Terraform, earlier fake-input plans, and no-network
+counts do not resolve account eligibility.
+
+The operations runbook documents immutable builds, compatible app rollback,
+forward-only DSQL repair/resume, pause and incident handling, retained-resource
+inventory, and controlled exit. No HTTPS journey, cloud migration, App Runner
+pause/resume, rollback, backup restore, teardown, or billing rehearsal ran.
+AWS documents that App Runner pause reduces compute capacity to zero, loses
+ephemeral application state, and resumes the last deployed version; the service
+must be eligible and these behaviors still require a target-specific synthetic
+rehearsal. Workers and personal-AI remain disabled.

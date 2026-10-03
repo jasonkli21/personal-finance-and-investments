@@ -6,6 +6,21 @@ monthly spend envelope, or deployment approval has been supplied. Nothing in
 this directory has been applied. `terraform.tfvars.example` contains fake values
 for an offline plan only; never apply it.
 
+**Service-availability gate (checked 2026-10-03):** AWS stopped accepting new
+App Runner customers on 2026-03-31. Existing customers may continue using the
+service. Because this project's target account is not known, the App Runner
+topology below is prepared only for an eligible existing account. The API
+resource has a default-false apprunner_existing_customer_confirmed precondition.
+If the intended account is not eligible, do not set that confirmation or apply
+this plan; select and re-cost a supported runtime through a separately reviewed
+architecture decision. The [official availability notice](https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html)
+is authoritative.
+
+Before enabling the API service, verify that the target AWS account is an
+existing App Runner customer and record the source of that confirmation. Only
+then set apprunner_existing_customer_confirmed=true in the protected operator
+variables. The example keeps it false and cannot enable App Runner.
+
 ## Selection and tradeoffs
 
 Use one Aurora DSQL cluster and one AWS Region for the database, App Runner API,
@@ -37,7 +52,7 @@ operator inputs and are not a spending cap or an availability commitment.
 | Scope | Resources | Boundary |
 | --- | --- | --- |
 | Regional data | One deletion-protected Aurora DSQL cluster; separate private-files and static-assets S3 buckets | No multi-region DSQL, public bucket, user-data sync, or conventional RDS subnet topology |
-| API delivery | Immutable ECR repository; App Runner service and one-instance autoscaling config | Image is pinned by SHA-256 digest; auto-deployment is disabled; worker stays off |
+| API delivery | Immutable ECR repository; App Runner service and one-instance autoscaling config for eligible existing accounts | Image is pinned by SHA-256 digest; auto-deployment is disabled; worker stays off; deploy precondition requires an explicit existing-customer eligibility confirmation |
 | IAM | ECR image-pull role, scoped App Runner instance role, separate operator migration role | Runtime role has only DSQL `DbConnect`, private object reads/writes, configured secret reads, and bucket listing; migration role alone gets `DbConnectAdmin` on this cluster and trusts one exact supplied principal |
 | Web edge | CloudFront distribution, OAC, two small path functions, bounded cache/origin/response policies | Static origin is private; API behavior forwards cookies/OIDC query and CSRF headers and sets zero cache TTL |
 | Operator-owned prerequisites | DNS record, validated ACM certificate in `us-east-1`, identity-provider registration and two Secrets Manager values | Kept outside this stack because the owner's DNS/provider/identity choices are not known |
@@ -153,7 +168,7 @@ data, review backups/versions/logs/ECR/DNS/CloudFront, record retained-resource
 owners and continuing costs, and then deliberately remove guards in a reviewed
 change. Do not run `terraform destroy` as rollback. See Stage 4.6 operations.
 
-## Current source checks (2026-10-02)
+## Current source checks (AWS/DSQL 2026-10-02; App Runner availability 2026-10-03)
 
 - [AWS App Runner outbound networking](https://docs.aws.amazon.com/apprunner/latest/dg/network-vpc.html): default public endpoint egress; custom VPC egress requires network paths to public AWS APIs.
 - [AWS App Runner IAM roles](https://docs.aws.amazon.com/apprunner/latest/dg/security_iam_service-with-iam.html): `build.apprunner.amazonaws.com` for ECR access and `tasks.apprunner.amazonaws.com` for runtime; `ecr:GetAuthorizationToken` requires `Resource: *`.
@@ -162,6 +177,9 @@ change. Do not run `terraform destroy` as rollback. See Stage 4.6 operations.
 - [AWS App Runner logs](https://docs.aws.amazon.com/apprunner/latest/dg/monitor-cwl.html): generated service-ID log groups default to CloudWatch's indefinite retention unless an operator sets retention.
 - [HashiCorp AWS provider](https://github.com/hashicorp/terraform-provider-aws/releases): release `6.67.0` published 2026-09-30; `aws_dsql_cluster` supports deletion protection and optional multi-region configuration, which this stack omits.
 - [Terraform releases](https://releases.hashicorp.com/terraform/): stable `1.16.5` when checked.
+
+- [AWS App Runner availability](https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html): no new customers accepted beginning 2026-03-31; existing customers may continue. The target account must be confirmed eligible before this API resource is enabled.
+- [AWS App Runner pause/resume](https://docs.aws.amazon.com/apprunner/latest/dg/manage-pause.html): pause reduces compute capacity to zero and loses ephemeral state; resume deploys the last active version. These behaviors are documented for operations planning and have not been rehearsed in a target account.
 
 Recheck provider compatibility, AWS service availability and prices in the
 actual account before a plan is approved. No account API was queried and no

@@ -1,6 +1,6 @@
 # Security, privacy, portability and AWS deployment
 
-**Status:** Local Stage 1 controls implemented; Stage 4.1–4.5 config/auth/storage/infrastructure/cost/recovery tooling prepared locally; credentialed security, DSQL, and cloud recovery gates remain | **Updated:** 2026-10-03
+**Status:** Local Stage 1 controls implemented; Stage 4.1–4.6 config/auth/storage/infrastructure/cost/recovery/release tooling prepared locally; credentialed security, DSQL, account-availability, and cloud recovery gates remain | **Updated:** 2026-10-03
 **Deployment strategy:** PostgreSQL 16 runs locally indefinitely. Cloud deployment is optional in timing, but **Aurora DSQL is mandatory for production**. Its recurring database allowance is not a promise of free total cloud hosting. See [`07-aurora-dsql-compatibility.md`](07-aurora-dsql-compatibility.md).
 
 ## 1. Threat model and scope
@@ -107,6 +107,8 @@ Infrastructure injects bounded request settings: one 0.25-vCPU/1-GB App Runner i
 **Database allowance (AWS [official DSQL pricing](https://aws.amazon.com/rds/aurora/dsql/pricing/), checked 2026-10-02):** pricing states a recurring first **100,000 DPUs + 1 GB-month of Aurora DSQL storage per month**, with **billable overages**. This differs from time-limited new AWS account promotional credits and must not be confused with free hosting. AWS Compute, S3, CloudFront, data transfer, logging, AWS Backup, domain names and PrivateLink may still be charged. Eligibility and unit prices must be rechecked in the actual account; an allowance is not a spending cap. **Budgets/alerts are warnings, not hard spend caps.**
 
 ## 6. Cloud launch gate
+
+The Stage 4 release and recovery evidence requirements are detailed in the [release record](stage-4-release.md), [recovery runbook](stage-4-recovery-runbook.md), and [operations runbook](stage-4-operations-runbook.md). The prepared App Runner topology also requires proof that the target is an existing eligible customer; AWS stopped accepting new App Runner customers on 2026-03-31.
 
 Before using real financial records remotely:
 

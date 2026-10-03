@@ -8,9 +8,11 @@ from pathlib import Path
 import pytest
 
 from app.release.dsql_evidence import (
+    CONFIG_KEYS,
     FIXTURE_VERSION,
     REQUIRED_CASES,
     EvidenceError,
+    _configuration_fingerprint,
     _fingerprints,
     _parse_junit,
     validate_evidence,
@@ -109,3 +111,77 @@ def test_promotion_gate_rejects_stale_schema_fingerprint(tmp_path: Path) -> None
 
     with pytest.raises(EvidenceError, match="schema_sha256 changed"):
         validate_evidence(path)
+
+
+def test_configuration_fingerprint_hmac_binds_owner_scope_without_recording_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for key in CONFIG_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("AUTH_ENABLED", "true")
+    monkeypatch.setenv("AUTH_SESSION_SIGNING_KEY", "s" * 48)
+    monkeypatch.setenv("AUTH_CLIENT_SECRET", "private-client-secret")
+    monkeypatch.setenv("AUTH_ALLOWED_SUBJECT", "private-subject-value")
+    monkeypatch.setenv("AUTH_PERSONAL_SCOPE_ID", "private-scope-value")
+
+    original = _configuration_fingerprint()
+    monkeypatch.setenv("AUTH_PERSONAL_SCOPE_ID", "another-private-scope")
+    changed_scope = _configuration_fingerprint()
+    monkeypatch.setenv("AUTH_PERSONAL_SCOPE_ID", "private-scope-value")
+    monkeypatch.setenv("AUTH_CLIENT_SECRET", "another-private-client-secret")
+    changed_client_secret = _configuration_fingerprint()
+    monkeypatch.setenv("AUTH_CLIENT_SECRET", "private-client-secret")
+    monkeypatch.setenv("AUTH_SESSION_SIGNING_KEY", "r" * 48)
+    changed_key = _configuration_fingerprint()
+
+    assert original != changed_scope
+    assert original != changed_client_secret
+    assert original != changed_key
+    assert "private-subject-value" not in original
+    assert "private-scope-value" not in original
+    assert "private-client-secret" not in original
+
+
+def test_configuration_fingerprint_binds_dsql_target_and_runtime_limits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for key in CONFIG_KEYS:
+        monkeypatch.delenv(key, raising=False)
+    original = _configuration_fingerprint()
+
+    monkeypatch.setenv(
+        "AURORA_DSQL_CLUSTER_ENDPOINT", "cluster-a.dsql.us-east-1.on.aws"
+    )
+    changed_endpoint = _configuration_fingerprint()
+    monkeypatch.delenv("AURORA_DSQL_CLUSTER_ENDPOINT")
+    monkeypatch.setenv("JOB_LEASE_SECONDS", "60")
+    changed_lease = _configuration_fingerprint()
+
+    assert original != changed_endpoint
+    assert original != changed_lease
+
+
+def test_enabled_auth_cannot_create_evidence_without_identity_fingerprint_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AUTH_ENABLED", "true")
+    monkeypatch.delenv("AUTH_SESSION_SIGNING_KEY", raising=False)
+    monkeypatch.setenv("AUTH_CLIENT_SECRET", "private-client-secret")
+    monkeypatch.setenv("AUTH_ALLOWED_SUBJECT", "subject")
+    monkeypatch.setenv("AUTH_PERSONAL_SCOPE_ID", "scope")
+
+    with pytest.raises(EvidenceError, match="requires a signing key"):
+        _configuration_fingerprint()
+
+
+def test_enabled_auth_evidence_requires_oidc_client_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("AUTH_ENABLED", "true")
+    monkeypatch.setenv("AUTH_SESSION_SIGNING_KEY", "s" * 48)
+    monkeypatch.delenv("AUTH_CLIENT_SECRET", raising=False)
+    monkeypatch.setenv("AUTH_ALLOWED_SUBJECT", "subject")
+    monkeypatch.setenv("AUTH_PERSONAL_SCOPE_ID", "scope")
+
+    with pytest.raises(EvidenceError, match="OIDC secret"):
+        _configuration_fingerprint()

@@ -1,6 +1,6 @@
 # Stage 4 AWS cost register
 
-**Verified:** 2026-10-03 | **Status:** dated public list prices and bounded workload settings prepared; no target account, Region, workload measurement, monthly amount, or alert recipient selected
+**Verified:** 2026-10-03 | **Status:** dated public list prices and bounded workload settings prepared; App Runner examples apply only to eligible existing customers; no target account, Region, workload measurement, monthly amount, or alert recipient selected
 
 This register is a calculation worksheet, not a whole-stack forecast or spending approval. Prices, allowances, account eligibility, taxes, discounts, and credits must be checked in the target account and [AWS Pricing Calculator](https://calculator.aws/) before provisioning. Amounts below are public list-price examples from the linked official pages and may not apply to every Region or account.
 
@@ -9,7 +9,7 @@ This register is a calculation worksheet, not a whole-stack forecast or spending
 | Resource | Configured bound or usage driver | Cost treatment and control |
 | --- | --- | --- |
 | Aurora DSQL | One single-Region cluster; monthly DPUs and GB-month storage | AWS currently applies a monthly free tier of 100,000 DPUs and 1 GB-month, with billable overage. The US East (Ohio) page example lists $8 per million DPUs and $0.33/GB-month. Region and account eligibility must be confirmed; a free tier is not a cap. |
-| App Runner | 0.25 vCPU, 1 GB, min/max one instance, concurrency 10 | At the listed $0.007/GB-hour provisioned memory rate, 1 GB for 730 hours is about $5.11/month before active vCPU. Active vCPU is listed at $0.064/vCPU-hour: 0.25 vCPU adds about $0.016 per active instance-hour. 50/500/730 active hours yield illustrative totals of about $5.91/$13.11/$16.79, assuming one instance, 730 provisioned hours, listed rates, no additional memory, and one of the Regions with these unit prices. AWS bills a one-minute minimum for vCPU each time a provisioned instance begins active work. Pause the service during planned downtime; these calculations are not a measured forecast. |
+| App Runner | 0.25 vCPU, 1 GB, min/max one instance, concurrency 10; eligible existing accounts only | AWS stopped accepting new customers on 2026-03-31; confirm target-account eligibility before selecting this line item. For an eligible account, at the listed $0.007/GB-hour provisioned memory rate, 1 GB for 730 hours is about $5.11/month before active vCPU. Active vCPU is listed at $0.064/vCPU-hour: 0.25 vCPU adds about $0.016 per active instance-hour. 50/500/730 active hours yield illustrative totals of about $5.91/$13.11/$16.79, assuming one instance, 730 provisioned hours, listed rates, no additional memory, and one of the Regions with these unit prices. AWS bills a one-minute minimum for vCPU each time a provisioned instance begins active work. Pause the service during planned downtime; these calculations are not a measured forecast. |
 | S3 private files + static assets | Original documents, encrypted exports, static build, PUT/GET/LIST requests and transfer | Storage, request, retrieval, and internet-transfer prices depend on Region, storage class, and usage. No lifecycle expiry is set for originals or exports: user financial records are retained until an operator-approved retention policy exists. Estimate retained GB and monthly request/egress volume in the target Region. |
 | ECR | Last 20 immutable images retained by lifecycle policy; actual image sizes | AWS example lists $0.10/GB-month for private image storage and same-Region App Runner transfer at no cost. At 1 GB/image and all 20 retained, the illustrative storage component is $2/month; measure compressed stored size and recheck target Region. New-account credits are excluded from the forecast. |
 | CloudFront | Request count and viewer egress by edge geography | Price depends on request type, geography, and selected features. S3-to-CloudFront origin transfer is listed as free; viewer transfer and HTTPS requests remain usage costs. Fetch a target-profile estimate after test traffic is measured. |
@@ -40,10 +40,11 @@ The operator must provide the target AWS account and single data Region, confirm
 
 The optional Terraform budget intentionally defaults off because no alert amount or email recipient has been approved. Enabling it creates a whole-account USD cost budget through the `us-east-1` AWS Budgets control plane, independent of the selected data Region. A budget plan requires at least one valid email-shaped recipient (maximum 10). It excludes credits, sets actual thresholds at 50% and 100%, a forecast threshold at 80%, and creates no actions. AWS's 2026-09-30 change requires newly subscribed email recipients to verify delivery in the account. No recipient, budget amount, account query, or budget alert delivery test was supplied or run here.
 
-## Sources checked 2026-10-02
+## Pricing sources checked 2026-10-02; App Runner availability checked 2026-10-03
 
 - [Aurora DSQL pricing](https://aws.amazon.com/rds/aurora/dsql/pricing/) — monthly free allowance, metered DPU/storage, and Ohio list-price example.
-- [App Runner pricing](https://aws.amazon.com/apprunner/pricing/) — provisioned memory, active CPU/memory, and pause behavior.
+- [App Runner pricing](https://aws.amazon.com/apprunner/pricing/) — provisioned memory, active CPU/memory, and pause behavior; the prepared example is conditional on existing-customer eligibility.
+- [App Runner availability change](https://docs.aws.amazon.com/apprunner/latest/dg/apprunner-availability-change.html) — new customers are no longer accepted beginning 2026-03-31; existing customers may continue.
 - [Amazon S3 pricing](https://aws.amazon.com/s3/pricing/) — storage, requests, data retrieval, and transfer components.
 - [Amazon ECR pricing](https://aws.amazon.com/ecr/pricing/) — private image storage and same-Region transfer example.
 - [CloudFront pricing](https://aws.amazon.com/cloudfront/pricing/) — viewer transfer/request rates and usage-dependent pricing.
