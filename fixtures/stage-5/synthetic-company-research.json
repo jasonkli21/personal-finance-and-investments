@@ -1,0 +1,61 @@
+{
+  "notice": "Synthetic test data. The SEC-style URL and identifiers are deliberately non-resolving and were not fetched.",
+  "issuer": {
+    "normalized_name": "synthetic research inc",
+    "display_name": "Synthetic Research Inc"
+  },
+  "documents": [
+    {
+      "cik": "0000000001",
+      "accession_number": "0000000001-25-000001",
+      "form_type": "10-K",
+      "title": "Synthetic annual report for FY2024",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/1/000000000125000001/0000000001-25-000001-index.html",
+      "filing_date": "2025-02-15",
+      "period_start": "2024-01-01",
+      "period_end": "2024-12-31"
+    },
+    {
+      "cik": "1",
+      "accession_number": "0000000001-26-000001",
+      "form_type": "10-K",
+      "title": "Synthetic annual report for FY2025",
+      "source_url": "https://www.sec.gov/Archives/edgar/data/1/000000000126000001/0000000001-26-000001-index.html",
+      "filing_date": "2026-02-15",
+      "period_start": "2025-01-01",
+      "period_end": "2025-12-31"
+    }
+  ],
+  "facts": [
+    {
+      "taxonomy": "us-gaap",
+      "concept": "RevenueFromContractWithCustomerExcludingAssessedTax",
+      "raw_value": "100000000",
+      "normalized_value": "100000000",
+      "unit": "USD",
+      "currency": "USD",
+      "period_kind": "duration",
+      "period_start": "2024-01-01",
+      "period_end": "2024-12-31",
+      "fiscal_year": 2024,
+      "fiscal_period": "FY",
+      "context_ref": "synthetic-duration-context-fy2024",
+      "idempotency_key": "synthetic-revenue-fy2024"
+    },
+    {
+      "taxonomy": "us-gaap",
+      "concept": "RevenueFromContractWithCustomerExcludingAssessedTax",
+      "raw_value": "120000000",
+      "normalized_value": "120000000",
+      "unit": "USD",
+      "currency": "USD",
+      "period_kind": "duration",
+      "period_start": "2025-01-01",
+      "period_end": "2025-12-31",
+      "fiscal_year": 2025,
+      "fiscal_period": "FY",
+      "context_ref": "synthetic-duration-context-fy2025",
+      "idempotency_key": "synthetic-revenue-fy2025"
+    }
+  ]
+}

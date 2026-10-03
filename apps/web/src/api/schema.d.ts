@@ -706,6 +706,74 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/research/documents': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Register Document */
+    post: operations['register_document_v1_research_documents_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/research/documents/{document_id}/facts': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Document Facts */
+    get: operations['get_document_facts_v1_research_documents__document_id__facts_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/research/facts': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Register Fact */
+    post: operations['register_fact_v1_research_facts_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/research/issuers/{issuer_id}/documents': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Documents */
+    get: operations['get_documents_v1_research_issuers__issuer_id__documents_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/securities': {
     parameters: {
       query?: never
@@ -2985,6 +3053,259 @@ export interface components {
       valuation_at: string
       /** Warnings */
       warnings: string[]
+    }
+    /** ReportedFactCreate */
+    ReportedFactCreate: {
+      /** Concept */
+      concept: string
+      /** Context Ref */
+      context_ref?: string | null
+      /** Currency */
+      currency?: string | null
+      /**
+       * Document Id
+       * Format: uuid
+       */
+      document_id: string
+      /** Fiscal Period */
+      fiscal_period?: ('Q1' | 'Q2' | 'Q3' | 'Q4' | 'H1' | 'H2' | 'FY') | null
+      /** Fiscal Year */
+      fiscal_year?: number | null
+      /** Idempotency Key */
+      idempotency_key: string
+      /** Instant */
+      instant?: string | null
+      /** Normalized Value */
+      normalized_value?: string | null
+      /** Period End */
+      period_end?: string | null
+      /**
+       * Period Kind
+       * @enum {string}
+       */
+      period_kind: 'duration' | 'instant'
+      /** Period Start */
+      period_start?: string | null
+      /** Raw Value */
+      raw_value: string
+      /** Taxonomy */
+      taxonomy: string
+      /** Unit */
+      unit: string
+    }
+    /** ReportedFactCreated */
+    ReportedFactCreated: {
+      /** Concept */
+      concept: string
+      /** Context Ref */
+      context_ref: string | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Currency */
+      currency: string | null
+      /**
+       * Document Id
+       * Format: uuid
+       */
+      document_id: string
+      /** Duplicate */
+      duplicate: boolean
+      /** Fiscal Period */
+      fiscal_period: string | null
+      /** Fiscal Year */
+      fiscal_year: number | null
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Idempotency Key */
+      idempotency_key: string
+      /** Instant */
+      instant: string | null
+      /** Normalized Value */
+      normalized_value: string | null
+      /** Period End */
+      period_end: string | null
+      /**
+       * Period Kind
+       * @enum {string}
+       */
+      period_kind: 'duration' | 'instant'
+      /** Period Start */
+      period_start: string | null
+      /**
+       * Quality Status
+       * @constant
+       */
+      quality_status: 'user_supplied_unverified'
+      /** Raw Value */
+      raw_value: string
+      /** Taxonomy */
+      taxonomy: string
+      /** Unit */
+      unit: string
+    }
+    /** ReportedFactRead */
+    ReportedFactRead: {
+      /** Concept */
+      concept: string
+      /** Context Ref */
+      context_ref: string | null
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string
+      /** Currency */
+      currency: string | null
+      /**
+       * Document Id
+       * Format: uuid
+       */
+      document_id: string
+      /** Fiscal Period */
+      fiscal_period: string | null
+      /** Fiscal Year */
+      fiscal_year: number | null
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Idempotency Key */
+      idempotency_key: string
+      /** Instant */
+      instant: string | null
+      /** Normalized Value */
+      normalized_value: string | null
+      /** Period End */
+      period_end: string | null
+      /**
+       * Period Kind
+       * @enum {string}
+       */
+      period_kind: 'duration' | 'instant'
+      /** Period Start */
+      period_start: string | null
+      /**
+       * Quality Status
+       * @constant
+       */
+      quality_status: 'user_supplied_unverified'
+      /** Raw Value */
+      raw_value: string
+      /** Taxonomy */
+      taxonomy: string
+      /** Unit */
+      unit: string
+    }
+    /** ResearchDocumentCreate */
+    ResearchDocumentCreate: {
+      /** Accession Number */
+      accession_number: string
+      /** Cik */
+      cik: string
+      /** Filing Date */
+      filing_date?: string | null
+      /** Form Type */
+      form_type: string
+      /**
+       * Issuer Id
+       * Format: uuid
+       */
+      issuer_id: string
+      /** Period End */
+      period_end?: string | null
+      /** Period Start */
+      period_start?: string | null
+      /** Source Url */
+      source_url: string
+      /** Title */
+      title: string
+    }
+    /** ResearchDocumentCreated */
+    ResearchDocumentCreated: {
+      /** Accession Number */
+      accession_number: string
+      /** Cik */
+      cik: string
+      /** Duplicate */
+      duplicate: boolean
+      /** Filing Date */
+      filing_date: string | null
+      /** Form Type */
+      form_type: string
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /**
+       * Issuer Id
+       * Format: uuid
+       */
+      issuer_id: string
+      /** Period End */
+      period_end: string | null
+      /** Period Start */
+      period_start: string | null
+      /**
+       * Recorded At
+       * Format: date-time
+       */
+      recorded_at: string
+      /**
+       * Source Status
+       * @constant
+       */
+      source_status: 'user_supplied_unverified'
+      /** Source Url */
+      source_url: string
+      /** Title */
+      title: string
+    }
+    /** ResearchDocumentRead */
+    ResearchDocumentRead: {
+      /** Accession Number */
+      accession_number: string
+      /** Cik */
+      cik: string
+      /** Filing Date */
+      filing_date: string | null
+      /** Form Type */
+      form_type: string
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /**
+       * Issuer Id
+       * Format: uuid
+       */
+      issuer_id: string
+      /** Period End */
+      period_end: string | null
+      /** Period Start */
+      period_start: string | null
+      /**
+       * Recorded At
+       * Format: date-time
+       */
+      recorded_at: string
+      /**
+       * Source Status
+       * @constant
+       */
+      source_status: 'user_supplied_unverified'
+      /** Source Url */
+      source_url: string
+      /** Title */
+      title: string
     }
     /** SaleLotResultRead */
     SaleLotResultRead: {
@@ -6049,6 +6370,134 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ReportPage']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  register_document_v1_research_documents_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ResearchDocumentCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ResearchDocumentCreated']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_document_facts_v1_research_documents__document_id__facts_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        document_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReportedFactRead'][]
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  register_fact_v1_research_facts_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReportedFactCreate']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ReportedFactCreated']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  get_documents_v1_research_issuers__issuer_id__documents_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        issuer_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ResearchDocumentRead'][]
         }
       }
       /** @description Validation Error */

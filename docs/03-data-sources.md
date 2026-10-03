@@ -1,6 +1,6 @@
 # Data sources and free-tier strategy
 
-**Status:** Stage 1 upload-only issuer parsers implemented; other sources remain a research shortlist | **Provider pages checked:** 2026-09-25; Stage 1 issuer and Stage 3 tax sources checked: 2026-10-02; AWS/DSQL runtime and pricing checked: 2026-10-02
+**Status:** Stage 1 upload-only issuer parsers implemented; Stage 5 SEC contract checked: 2026-10-03; other sources remain a research shortlist | **Provider pages checked:** 2026-09-25; Stage 1 issuer and Stage 3 tax sources checked: 2026-10-02; Stage 5 SEC sources checked: 2026-10-03; AWS/DSQL runtime and pricing checked: 2026-10-02
 **Rule:** Prices, download shapes, terms of use, eligibility and quotas change. Reverify the official page before implementing or deploying a connector. Links here are evidence of published availability, **not** permission to scrape, redistribute, or automate a download.
 
 ## 1. Source-selection policy
@@ -58,6 +58,8 @@ The SEC provides documents and standardized reported facts, not a fully normaliz
 **Optional web search (upstream candidates):** [Tavily pricing](https://www.tavily.com/pricing) or [Brave Search API pricing](https://brave.com/search/api/). Evaluate whichever currently offers a viable no-cost quota. Do not assume either quota is permanent; do not make uncited model knowledge the source of financial news. Record full source URL, retrieval time and publication date when available.
 
 **Other possible sources:** official company IR pages, corporate earnings releases, user-supplied reports and publicly licensed datasets; each gets a separate provenance tag and rights review.
+
+**Stage 5 official SEC check — 2026-10-03:** The SEC's [EDGAR API documentation](https://www.sec.gov/search-filings/edgar-application-programming-interfaces) confirms public JSON submissions and XBRL `companyfacts` endpoints on `data.sec.gov`; those data endpoints require no API key, do not support browser CORS, and are republished in bulk ZIP archives nightly. SEC [access guidance](https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data) requires a descriptive `User-Agent`; the SEC [privacy/security policy](https://www.sec.gov/files/privacy.htm) caps aggregate automated access at 10 requests per second. These pages permit no assumption about source correctness, issuer-to-catalog identity, broad redistribution, or permission to download arbitrary linked filing content. Finance Stage 5 currently stores only SEC references and manually entered facts marked unverified; it makes no SEC requests, does not download filing bodies, and does not support IR sources. Any future SEC fetcher must run server-side, declare its user agent, obey the cap, retain accession/period/amendment lineage, and stay behind the reviewed source policy. Generic document retrieval remains upstream in personal-AI.
 
 ## 6. Shared AI service and upstream inference candidates — Stage 2 and Stage 5
 

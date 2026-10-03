@@ -1173,3 +1173,78 @@ class ActiveTransferTransaction(Base):
         ForeignKey("transfer_matches.id", ondelete="CASCADE"),
         nullable=False,
     )
+
+
+class ResearchDocument(Base):
+    """User-registered SEC filing reference; registration does not verify content."""
+
+    __tablename__ = "research_documents"
+    __table_args__ = (
+        UniqueConstraint(
+            "issuer_id", "accession_number", name="uq_research_document_accession"
+        ),
+        Index("ix_research_documents_issuer_filed", "issuer_id", "filing_date"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    issuer_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("issuers.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    cik: Mapped[str] = mapped_column(String(10), nullable=False)
+    accession_number: Mapped[str] = mapped_column(String(20), nullable=False)
+    form_type: Mapped[str] = mapped_column(String(12), nullable=False)
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    source_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    filing_date: Mapped[date | None] = mapped_column(Date)
+    period_start: Mapped[date | None] = mapped_column(Date)
+    period_end: Mapped[date | None] = mapped_column(Date)
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    source_status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="user_supplied_unverified"
+    )
+
+
+class ReportedFact(Base):
+    """A manually entered SEC-reported fact, retained separately from finance truth."""
+
+    __tablename__ = "reported_facts"
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_reported_fact_idempotency"),
+        Index(
+            "ix_reported_facts_document_concept",
+            "document_id",
+            "taxonomy",
+            "concept",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    document_id: Mapped[UUID] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("research_documents.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    taxonomy: Mapped[str] = mapped_column(String(40), nullable=False)
+    concept: Mapped[str] = mapped_column(String(100), nullable=False)
+    raw_value: Mapped[str] = mapped_column(Text, nullable=False)
+    normalized_value: Mapped[Decimal | None] = mapped_column(Numeric(28, 10))
+    unit: Mapped[str] = mapped_column(String(40), nullable=False)
+    currency: Mapped[str | None] = mapped_column(String(3))
+    period_kind: Mapped[str] = mapped_column(String(12), nullable=False)
+    period_start: Mapped[date | None] = mapped_column(Date)
+    period_end: Mapped[date | None] = mapped_column(Date)
+    instant: Mapped[date | None] = mapped_column(Date)
+    fiscal_year: Mapped[int | None] = mapped_column(Integer)
+    fiscal_period: Mapped[str | None] = mapped_column(String(3))
+    context_ref: Mapped[str | None] = mapped_column(String(100))
+    quality_status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="user_supplied_unverified"
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )

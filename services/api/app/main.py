@@ -17,6 +17,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import Response
 
 from app.api.routes import router as api_router
+from app.api.research_routes import router as research_router
 from app.api.transaction_routes import router as transaction_router
 from app.auth.oidc import OIDC_TRANSACTION_COOKIE, create_oidc_client
 from app.auth.routes import router as auth_router
@@ -88,6 +89,7 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
     app.state.personal_ai_client = DisabledPersonalAIClient()
     app.include_router(auth_router)
     app.include_router(api_router)
+    app.include_router(research_router)
     app.include_router(transaction_router)
     from app.api.finance_routes import router as finance_router
     from app.api.job_routes import router as job_router

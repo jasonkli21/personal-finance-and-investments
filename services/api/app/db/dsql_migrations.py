@@ -2392,6 +2392,62 @@ TABLE_COLUMNS["security_audit_events"] = (
 TABLE_CONSTRAINTS["security_audit_events"] = (
     ("security_audit_events_pkey", "PRIMARY KEY", ("primarykey(id)",)),
 )
+TABLE_COLUMNS["research_documents"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("issuer_id", "uuid", "NO", None, None, None),
+    ("cik", "character varying", "NO", 10, None, None),
+    ("accession_number", "character varying", "NO", 20, None, None),
+    ("form_type", "character varying", "NO", 12, None, None),
+    ("title", "character varying", "NO", 300, None, None),
+    ("source_url", "character varying", "NO", 2048, None, None),
+    ("filing_date", "date", "YES", None, None, None),
+    ("period_start", "date", "YES", None, None, None),
+    ("period_end", "date", "YES", None, None, None),
+    ("recorded_at", "timestamp with time zone", "NO", None, None, None),
+    ("source_status", "character varying", "NO", 32, None, None),
+)
+TABLE_CONSTRAINTS["research_documents"] = (
+    ("research_documents_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    (
+        "uq_research_document_accession",
+        "UNIQUE",
+        ("unique(issuer_id,accession_number)",),
+    ),
+    (
+        "research_documents_issuer_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(issuer_id)referencesissuers(id)ondeleterestrict",),
+    ),
+)
+TABLE_COLUMNS["reported_facts"] = (
+    ("id", "uuid", "NO", None, None, None),
+    ("document_id", "uuid", "NO", None, None, None),
+    ("taxonomy", "character varying", "NO", 40, None, None),
+    ("concept", "character varying", "NO", 100, None, None),
+    ("raw_value", "text", "NO", None, None, None),
+    ("normalized_value", "numeric", "YES", None, 28, 10),
+    ("unit", "character varying", "NO", 40, None, None),
+    ("currency", "character varying", "YES", 3, None, None),
+    ("period_kind", "character varying", "NO", 12, None, None),
+    ("period_start", "date", "YES", None, None, None),
+    ("period_end", "date", "YES", None, None, None),
+    ("instant", "date", "YES", None, None, None),
+    ("fiscal_year", "integer", "YES", None, None, None),
+    ("fiscal_period", "character varying", "YES", 3, None, None),
+    ("context_ref", "character varying", "YES", 100, None, None),
+    ("quality_status", "character varying", "NO", 32, None, None),
+    ("idempotency_key", "character varying", "NO", 128, None, None),
+    ("created_at", "timestamp with time zone", "NO", None, None, None),
+)
+TABLE_CONSTRAINTS["reported_facts"] = (
+    ("reported_facts_pkey", "PRIMARY KEY", ("primarykey(id)",)),
+    ("uq_reported_fact_idempotency", "UNIQUE", ("unique(idempotency_key)",)),
+    (
+        "reported_facts_document_id_fkey",
+        "FOREIGN KEY",
+        ("foreignkey(document_id)referencesresearch_documents(id)ondeleterestrict",),
+    ),
+)
 
 
 DSQL_MIGRATIONS = (
@@ -2874,6 +2930,89 @@ DSQL_MIGRATIONS = (
                 "SELECT true",
                 expected_index_table="security_audit_events",
                 expected_index_columns=("created_at",),
+            ),
+        ),
+    ),
+    DsqlMigration(
+        "0016_stage5_research_sources",
+        (
+            DsqlMigrationStep(
+                "create_research_documents",
+                "table",
+                """CREATE TABLE research_documents (
+                    id uuid NOT NULL,
+                    issuer_id uuid NOT NULL,
+                    cik varchar(10) NOT NULL,
+                    accession_number varchar(20) NOT NULL,
+                    form_type varchar(12) NOT NULL,
+                    title varchar(300) NOT NULL,
+                    source_url varchar(2048) NOT NULL,
+                    filing_date date,
+                    period_start date,
+                    period_end date,
+                    recorded_at timestamptz NOT NULL,
+                    source_status varchar(32) NOT NULL,
+                    CONSTRAINT research_documents_pkey PRIMARY KEY (id),
+                    CONSTRAINT uq_research_document_accession
+                        UNIQUE (issuer_id, accession_number),
+                    CONSTRAINT research_documents_issuer_id_fkey FOREIGN KEY
+                        (issuer_id) REFERENCES issuers(id) ON DELETE RESTRICT
+                )""",
+                "research_documents",
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = current_schema() AND table_name = :object_name)",
+            ),
+            DsqlMigrationStep(
+                "index_research_documents_issuer_filed",
+                "index",
+                "CREATE INDEX ASYNC ix_research_documents_issuer_filed "
+                "ON research_documents (issuer_id, filing_date)",
+                "ix_research_documents_issuer_filed",
+                "SELECT true",
+                expected_index_table="research_documents",
+                expected_index_columns=("issuer_id", "filing_date"),
+            ),
+            DsqlMigrationStep(
+                "create_reported_facts",
+                "table",
+                """CREATE TABLE reported_facts (
+                    id uuid NOT NULL,
+                    document_id uuid NOT NULL,
+                    taxonomy varchar(40) NOT NULL,
+                    concept varchar(100) NOT NULL,
+                    raw_value text NOT NULL,
+                    normalized_value numeric(28, 10),
+                    unit varchar(40) NOT NULL,
+                    currency varchar(3),
+                    period_kind varchar(12) NOT NULL,
+                    period_start date,
+                    period_end date,
+                    instant date,
+                    fiscal_year integer,
+                    fiscal_period varchar(3),
+                    context_ref varchar(100),
+                    quality_status varchar(32) NOT NULL,
+                    idempotency_key varchar(128) NOT NULL,
+                    created_at timestamptz NOT NULL,
+                    CONSTRAINT reported_facts_pkey PRIMARY KEY (id),
+                    CONSTRAINT uq_reported_fact_idempotency UNIQUE (idempotency_key),
+                    CONSTRAINT reported_facts_document_id_fkey FOREIGN KEY
+                        (document_id) REFERENCES research_documents(id)
+                        ON DELETE RESTRICT
+                )""",
+                "reported_facts",
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = current_schema() AND table_name = :object_name)",
+            ),
+            DsqlMigrationStep(
+                "index_reported_facts_document_concept",
+                "index",
+                "CREATE INDEX ASYNC ix_reported_facts_document_concept "
+                "ON reported_facts (document_id, taxonomy, concept)",
+                "ix_reported_facts_document_concept",
+                "SELECT true",
+                expected_index_table="reported_facts",
+                expected_index_columns=("document_id", "taxonomy", "concept"),
             ),
         ),
     ),
