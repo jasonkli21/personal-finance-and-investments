@@ -55,7 +55,7 @@ def extract_pdf_pages(
         raise PdfExtractionError("pdf_invalid")
     try:
         # Uploaded PDFs are untrusted parser input. Do not expose the API
-        # process's database/AWS credentials or other secrets to the parser
+        # process's database/cloud credentials or other secrets to the parser
         # subprocess. The worker needs only its page bound; Windows additionally
         # needs SystemRoot to start a child process reliably.
         child_environment = {"PDF_MAX_PAGES": str(max_pages)}

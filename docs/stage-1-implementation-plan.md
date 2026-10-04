@@ -1,10 +1,10 @@
 # Stage 1 implementation plan
 
-**Status:** Local Stage 1 implemented; see [release evidence](stage-1-release.md). Live DSQL remains unverified.
+**Status:** Local Stage 1 implemented; see [release evidence](stage-1-release.md). Live Neon remains unverified.
 **Updated:** 2026-10-02 — reviewed against Stage 0 commit `81b220e`
 **Roadmap coverage:** 1.1 Owned positions/valuation; 1.2 ETF composition; 1.3 Look-through/dashboard
 
-This is the execution plan for the first useful release: owned stocks, ETFs, and cash across accounts, plus a separate, reconciled company-exposure view. Read [the product specification](01-product-spec.md), [architecture](02-architecture.md), [data-source policy](03-data-sources.md), [ingestion rules](04-ingestion-and-ai.md), and [DSQL contract](07-aurora-dsql-compatibility.md). [Stage 0](stage-0-implementation-plan.md) supplies the local foundation; its real-DSQL gate remains required before production.
+This is the execution plan for the first useful release: owned stocks, ETFs, and cash across accounts, plus a separate, reconciled company-exposure view. Read [the product specification](01-product-spec.md), [architecture](02-architecture.md), [data-source policy](03-data-sources.md), [ingestion rules](04-ingestion-and-ai.md), and [PostgreSQL/Neon contract](07-postgres-neon.md). [Stage 0](stage-0-implementation-plan.md) supplies the local foundation; its real-Neon gate remains required before production.
 
 ## Scope boundary
 
@@ -12,7 +12,7 @@ Stage 1 includes account management, reviewed replacement position CSVs, dated m
 
 The smallest vertical slice is **manual stock + ETF positions → upload dated synthetic fund composition → inspect NVIDIA direct and ETF contributions → reconcile/export**. Affected domains are `accounts`, `securities`, `portfolio`, `prices`, `funds`, a minimal import service, and a pure exposure engine.
 
-PDF/OCR, AI, bank connections, transaction-based performance, tax lots, recursive fund-of-funds traversal, derivative valuation, trading, AWS application hosting, and general background queues are excluded. Nested funds, shorts, and unsupported instruments stay visible with explicit opaque/residual treatment.
+PDF/OCR, AI, bank connections, transaction-based performance, tax lots, recursive fund-of-funds traversal, derivative valuation, trading, cloud application hosting, and general background queues are excluded. Nested funds, shorts, and unsupported instruments stay visible with explicit opaque/residual treatment.
 
 The [shared-AI ADR](adr/0001-shared-personal-ai.md) adds a disabled extraction seam after Stage 1 without changing finance behavior. No PDF/AI/research consumer, HTTP adapter, schema migration or new UI is part of that reconciliation.
 
@@ -35,7 +35,7 @@ These decisions close ambiguities in the original backlog. They are implementati
 
 ### Prerequisite and major commit sequence
 
-The prerequisite local PostgreSQL 16 gate passed on 2026-10-02; Stage 1 is delivered through `0874f21`. The following commit sequence records the original delivery requirements, not pending tasks. [Release evidence](stage-1-release.md) identifies actual runs and limitations. Fresh install exercises 0001 through head; the populated upgrade fixture begins at 0002. Remote CI success is distinct from local results. DSQL remains a separate unverified production gate.
+The prerequisite local PostgreSQL 16 gate passed on 2026-10-02; Stage 1 is delivered through `0874f21`. The following commit sequence records the original delivery requirements, not pending tasks. [Release evidence](stage-1-release.md) identifies actual runs and limitations. Fresh install exercises 0001 through head; the populated upgrade fixture begins at 0002. Remote CI success is distinct from local results. Neon remains a separate unverified production gate.
 
 Implement and commit three major packages, rather than one commit per dotted subtask:
 
@@ -46,7 +46,7 @@ Implement and commit three major packages, rather than one commit per dotted sub
 | **S1.2 Fund composition and issuer formats** | S1.2.1–S1.2.2, history/review UI, source verification and permitted refresh/upload paths | Both official-format parser contracts, manual mapper, anomalous/raw preservation, PG16 batches/publication, generated contracts |
 | **S1.3 Reconciled exposure, dashboard and first release** | S1.3.1–S1.3.3, frozen reports, export, complete offline browser journey and release documentation | Golden math, report consistency, PG16 feature suite, Playwright and aggregate checks |
 
-Keep each package coherent; include its migrations, generated contracts and documentation in that commit. Existing applied Alembic files and recorded DSQL step checksums remain immutable. Maintain a release evidence record (for example `docs/stage-1-release.md`) listing package commit IDs, commands/results and unresolved live-provider/DSQL gates. A documentation-only evidence follow-up is acceptable if the final commit ID cannot be recorded within itself. Do not push, deploy, create paid resources, or implement later stages merely to complete Stage 1.
+Keep applied Alembic revisions immutable; new persistence changes append revisions and pass fresh/populated PostgreSQL upgrades. Cloud promotion requires separately recorded real Neon evidence.
 
 ### Deterministic selection and financial policy
 
@@ -73,7 +73,7 @@ Default stale thresholds must be explicit configuration, documented by provider 
 - Provide correction/remapping, explicit acknowledgement and cancellation API/UI actions, not only preview and commit. Corrections require the expected review revision, create audit history with a reason, and invalidate earlier approvals/batches. The client captures review and account revisions with the draft; background refetch cannot rebase them. Cancelled attempts cannot publish.
 - File/source/account-or-fund/effective-date identity identifies duplicate source input; parser version/mapping/review payload hashes identify attempts. Return an earlier accepted result for an unchanged duplicate **without moving a newer account pointer backward**. Changed interpretation of already-published bytes requires explicit correction/replacement and new immutable revision; never silently ignore or republish a revised mapping. A reused idempotency key with a different payload returns conflict.
 - All reads filter published lifecycle, not only the literal `accepted` status: superseded published history remains inspectable. Staging and final publication revalidate target identity, active account, review revision, exact row/batch hash counts and financial validation. The final DB-only transaction compares the captured account head/review revision and moves visibility once; stale conflicts return HTTP 409 without automatic rebase. Concurrent duplicate commits must return one canonical result.
-- Apply safe row **and byte** budgets to raw review rows, canonical lines, indexes and audit writes. Default batches should be at most 200 rows and comfortably below DSQL limits; test ≥ 500 lines across multiple commits and interruption/retry/cancel. Publication must update bounded metadata only, not all staged lines. Raw full-file evidence lives in private storage; bounded row evidence may live in SQL. A local cleanup CLI may remove orphaned unpublished batches/files after a documented grace period, never referenced accepted/history/report artifacts.
+- Apply safe row **and byte** budgets to raw review rows, canonical lines, indexes and audit writes. Default batches should be at most 200 rows and within measured memory/latency budgets; test ≥ 500 lines across multiple commits and interruption/retry/cancel. Publication must update bounded metadata only, not all staged lines. Raw full-file evidence lives in private storage; bounded row evidence may live in SQL. A local cleanup CLI may remove orphaned unpublished batches/files after a documented grace period, never referenced accepted/history/report artifacts.
 - Official format parsing is mandatory for two issuers, but automated network retrieval is conditional on verified permitted access. Default candidates are iShares IVV and SPDR SPY. If automation is restricted, finish the adapter using official-download upload plus current source/rights evidence and an explicit unavailable-refresh reason; this is the plan's permitted fallback, not permission to bypass restrictions. Do not claim automated refresh or live success from parser fixtures. New public downloads still require preview/accept unless a distinct trusted path is explicitly approved.
 
 ### Frozen report and private-input boundaries
@@ -89,7 +89,7 @@ Private uploads use generated keys, owner-only directories/files, atomic file wr
 | Area | Required fixtures / failure cases | Evidence |
 | --- | --- | --- |
 | Accounts/positions | Same security in two accounts, fractional/zero quantities, cash, account archive/position removal | Domain, API, PostgreSQL, browser |
-| Snapshot import | Duplicate file, 10→12 replacement, unresolved row, correction, conflicting revision, interrupted batch | PostgreSQL plus real DSQL before promotion |
+| Snapshot import | Duplicate file, 10→12 replacement, unresolved row, correction, conflicting revision, interrupted batch | PostgreSQL plus real Neon before promotion |
 | Review/catalog | Empty catalog, ambiguous scoped ID, duplicate position rows, mixed account/date, correction after approval, cancellation, duplicate after newer head | Domain/API/UI and PostgreSQL |
 | Quotes/FX | Missing/stale/manual/conflicting observations, unavailable FX, quota/outage | Offline fake-provider and selection tests |
 | Fund formats | Percent/decimal weights, missing date, unknown class, cash, nested fund, short, weight total anomaly | Synthetic parser contracts, changed-format rejection |
@@ -97,7 +97,7 @@ Private uploads use generated keys, owner-only directories/files, atomic file wr
 | Frozen report | New quote/fund/account head/issuer mapping after generation, server restart, pagination/search, missing artifact, text formula export vs signed numeric cells | PostgreSQL/API and browser |
 | Input limits | UTF-8 BOM/CRLF/quotes, invalid/binary/HTML content, excessive bytes/rows/fields, unsafe file name, disallowed redirect, cleanup of referenced artifacts | Offline parser/storage/fake-HTTP tests |
 | Release journey | Create/import → compositions → drill-down → CSV; no provider keys | Playwright offline smoke |
-| Production | Fresh/upgrade migrations, FKs/index readiness, 500-row import, OCC and publish concurrency | Gated real DSQL; skipped means unverified |
+| Production | Fresh/upgrade migrations, FKs/index readiness, 500-row import, OCC and publish concurrency | Gated real Neon; skipped means unverified |
 
 ## Required implementation artifacts
 
@@ -143,7 +143,7 @@ S1.1.1 + S1.1.3 shared publication ──────────────> S
 S1.1.2 + S1.2.1 ─> S1.3.1 Exposure engine ─> S1.3.2 Dashboard ─> S1.3.3 Export/release
 S1.1.3 + S1.2.2 ──────────────────────────────────────────────────────> S1.3.3
 S1.1.2 ─> S1.1.4 Optional quote adapter ───────────────────────────────> S1.3.3
-real DSQL schema/import/exposure suite ───────────────────────────────> production gate only
+real Neon schema/import/exposure suite ───────────────────────────────> production gate only
 ```
 
 Manual valuation supports the entire offline release path. The optional live quote adapter must not delay it.
@@ -326,14 +326,14 @@ Manual valuation supports the entire offline release path. The optional live quo
 1. Export owned/exposure rows including source dates, currency, calculation version/identity, accounts, residuals, and unavailable status; neutralize spreadsheet formula injection in textual cells.
 2. Run the offline Playwright journey: create accounts → enter/import positions → upload ETF fixtures → select NVIDIA → inspect contributions → export.
 3. Run PostgreSQL integration checks for duplicate imports, historical replacement, partial staging, concurrent publication, and deterministic report selection.
-4. Execute the real DSQL suite before any production promotion: fresh/upgrade schema, FK/index readiness, Decimal round-trips, 500-row fund batch publication, conflict retries, identical import, and golden exposure.
+4. Execute the real Neon suite before any production promotion: fresh/upgrade schema, FK/index correctness, Decimal round-trips, 500-row fund batch publication, conflict retries, identical import, and golden exposure.
 5. Document actual startup/client-generation/import/refresh/test commands, fixture results, supported funds, precision/tolerances, source verification, and known limitations.
 
-**Requirements:** ordinary CI stays offline; live provider and real DSQL checks are separately opt-in and report skipped status accurately. Exported totals and displayed totals share the same input revisions; no personal statements enter fixtures.
+**Requirements:** ordinary CI stays offline; live provider and real Neon checks are separately opt-in and report skipped status accurately. Exported totals and displayed totals share the same input revisions; no personal statements enter fixtures.
 
 **Acceptance criteria:** a clean local setup completes the journey with no API keys/model; exported golden result matches UI; retry/cancel/failure does not corrupt holdings; all local correctness gates pass; real-cloud gaps are explicit and prevent a production-ready claim.
 
-**Out of scope:** AWS provisioning, Stage 2 imports, and implementing future stages to make the MVP demo work.
+**Out of scope:** cloud provisioning, Stage 2 imports, and implementing future stages to make the MVP demo work.
 
 ## Stage 1 completion review
 
@@ -342,9 +342,12 @@ Manual valuation supports the entire offline release path. The optional live quo
 3. Do two issuer formats and manual fund CSV preserve all raw rows, dates, and discrepancies?
 4. Does the golden fixture produce $35,200/17.6% and preserve $200,000 owned NAV?
 5. Do every drill-down, residual, coverage metric, and export use the same source-traceable calculation?
-6. Does the full local journey work offline, with no PDF/OCR/AI/bank/AWS dependency?
-7. Are real DSQL feature checks passed before production, or explicitly unverified?
+6. Does the full local journey work offline, with no PDF/OCR/AI/bank/cloud dependency?
+7. Are real Neon feature checks passed before production, or explicitly unverified?
 
-Local completion permits Stage 2 or the optional [Stage 4 deployment track](stage-4-implementation-plan.md). Production remains gated on real DSQL and authenticated cloud launch checks.
+Local completion permits Stage 2 or the optional [Stage 4 deployment track](stage-4-implementation-plan.md). Production remains gated on real Neon and authenticated cloud launch checks.
 
-**Implementation handoff:** record routes/generated-client command, schema/index versions, supported adapters and verification dates, duplicate/revision policies, financial tolerances, golden fixtures, and separately labelled local/provider/DSQL results.
+The handoff retains the standard PostgreSQL boundary, private FileStore, deterministic calculations and reviewed publication semantics. Hosted auth, storage and recovery remain Stage 4 gates.
+
+
+Provider-specific dated delivery facts are preserved in [the pre-migration snapshot](history/pre-gcp-neon/stage-1-implementation-plan.md). [ADR 0002](adr/0002-gcp-neon.md) and the [migration record](gcp-neon-migration.md) define the current architecture; this plan does not claim additional product completion.

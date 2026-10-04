@@ -1,7 +1,7 @@
 # Staged implementation plan
 
-**Status:** Stage 0–1 locally complete; Stage 2 partial; Stage 3 locally complete; Stage 4 tooling prepared; Stage 5 offline baseline; live DSQL unverified | **Updated:** 2026-10-03
-**Sequencing:** Stage 0 → Stage 1 deliver the local MVP **with Aurora DSQL compatibility designed in from the start**. Stage 2 and Stage 3 enrich it. Stage 4 (AWS) may be scheduled after Stage 1, but any production deployment **must** use Aurora DSQL, not RDS. Stage 5 (research) builds on reliable portfolio data through the shared personal-AI service. See [`07-aurora-dsql-compatibility.md`](07-aurora-dsql-compatibility.md).
+**Status:** Stage 0–1 locally complete; Stage 2 partial; Stage 3 locally complete; Stage 4 tooling prepared; Stage 5 offline baseline; live Neon unverified | **Updated:** 2026-10-03
+**Sequencing:** Stage 0 → Stage 1 deliver the local MVP with the preserved PostgreSQL finance behavior. Stage 2 and Stage 3 enrich it. Stage 4 (GCP) may be scheduled after Stage 1, using the current Neon PostgreSQL target. Stage 5 (research) builds on reliable portfolio data behind the separately gated shared personal-AI boundary. See [`07-postgres-neon.md`](07-postgres-neon.md).
 
 The [shared-AI ADR](adr/0001-shared-personal-ai.md) governs later AI work: finance owns deterministic financial state/workflows; personal-AI owns reusable models, generic extraction, research/search, evidence retrieval and memory. The current disabled extraction seam does not implement Stage 2/5 or authorize service calls.
 
@@ -17,33 +17,27 @@ This roadmap defines stage scope, sequence, and exit gates. The companion plans 
 | 1 — Portfolio MVP | [Stage 1 implementation plan](stage-1-implementation-plan.md) |
 | 2 — Statement ingestion and personal finance | [Stage 2 implementation plan](stage-2-implementation-plan.md) |
 | 3 — Tax lots, history and decision support | [Stage 3 implementation plan](stage-3-implementation-plan.md) |
-| 4 — Optional AWS production deployment track | [Stage 4 implementation plan](stage-4-implementation-plan.md) |
+| 4 — Optional GCP production deployment track | [Stage 4 implementation plan](stage-4-implementation-plan.md) |
 | 5 — Portfolio-aware research and AI | [Stage 5 implementation plan](stage-5-implementation-plan.md) |
 
-Use the roadmap's work-package number when selecting a task, then follow its `S`-prefixed package/subtasks in the companion plan. Stage 0–1 remain the local MVP; real DSQL checks remain independently required before production. Provider facts in the requirements retain their original verification dates and must be rechecked during integration work.
+Use the roadmap's work-package number when selecting a task, then follow its `S`-prefixed package/subtasks in the companion plan. Stage 0–1 remain the local MVP; real Neon checks remain independently required before production. Provider facts in the requirements retain their original verification dates and must be rechecked during integration work.
 
 ## Stage 0 — Local foundation
 
-**Goal:** Reproducible React/FastAPI/PostgreSQL 16 local app, architected and documented for production DSQL; no paid services required to develop locally.
+**Goal:** Reproducible React/FastAPI/PostgreSQL 16 local app, architected and documented for production Neon PostgreSQL; no paid services required to develop locally.
 
 | Work package | Implementation tasks | Evidence of completion |
 | --- | --- | --- |
 | **0.1 Scaffold** | `apps/web` with React+TS+Vite; `services/api` with FastAPI and `uv`; Docker Compose PostgreSQL; `.env.example`; pinned lockfiles; basic run commands | `docker compose up` starts PostgreSQL/backend; Vite SPA loads; API `/health` returns success |
 | **0.2 Dev quality** | Ruff, formatting, mypy or pyright, TS strict mode, ESLint, pytest, Vitest; PostgreSQL 16 CI service; generated OpenAPI/TypeScript freshness check | One-command lint/typecheck/test/build, generated-contract drift fails CI, and a failing test fails CI |
-| **0.3 Schema core** | SQLAlchemy/Alembic migrations for accounts, securities/identifiers, issuer aliases, quotes and immutable position revisions; app UUID IDs, portable `NUMERIC`, DSQL-supported FKs/JSONB | Fresh and populated 0001 → head upgrades succeed on local PG16; fixture contains multiple accounts, effective dates, accepted/superseded snapshots and lines; DSQL plan/status are documented |
-| **0.4 DSQL readiness spike** | `DatabaseEngineFactory` and official AWS SQLAlchemy dialect; DSQL migration runner contract; IAM/TLS config; bounded transaction/OCC retry helper | Small **real DSQL test cluster** successfully connects, creates/reads/writes minimal schema, executes schema migration and retry test when AWS access is provided. Until then report **DSQL unverified**, not production-ready. |
+| **0.3 Schema core** | Accounts, scoped identifiers, immutable positions, dated quotes and provenance in Alembic | Fresh and populated PostgreSQL upgrades preserve history and constraints |
+| **0.4 Cloud database readiness** | Standard psycopg engine, verified Neon TLS, direct migration URL and bounded DB-only retries | Real Neon migration/reconnect/concurrency evidence required before production |
 | **0.5 First end-to-end slice** | Account create/edit, ticker lookup from local seeded fixture, manual position entry, API-generated TS client | SPA adds a holding to account and retrieves it after reload |
 | **0.6 Synthetic demo** | Fixture account, stocks, ETFs and cash; synthetic document fixtures for later import tests | A fresh clone demonstrates app entirely offline without secrets |
 
-**Stage 0 local exit gate:** documented setup, passing PostgreSQL 16 fresh-install and populated-upgrade migrations/tests, manual replacement plus rollback, generated-contract freshness in CI, local migrations and offline manual-stock workflow. The populated upgrade must begin at the previous accepted schema with realistic accepted data (at least two accounts, multiple dates, distinct lines, and revisions/counters), then verify preservation and continued writes at head. Define and implement the DSQL dialect/migration path as a separately gated work package. A local MVP can proceed without AWS credentials; **no production-readiness claim until a real DSQL smoke/migration test passes**. No market API, PDF extraction or AI model is required.
-
-**Stage 0.2 evidence (2026-10-01):** `pnpm check` runs lint, formatting, strict typechecks, 7 Vitest tests, 10 pytest tests, and the web production build. A temporary intentionally failing test caused the command to exit with status 1 and was removed afterward. The GitHub Actions workflow uses this same gate, but has not run remotely; Git initialization and a configured GitHub remote remain pending. DSQL remains unverified.
+Production follows the [PostgreSQL/Neon contract](07-postgres-neon.md) and [GCP deployment plan](stage-4-implementation-plan.md). Ordinary local tests do not establish hosted readiness; prior provider-specific facts are preserved in the historical snapshot.
 
 **Stage 0.3 implementation:** SQLAlchemy models and migrations `0001_core_portfolio_schema`–`0003_immutable_position_revisions_and_identifiers` define accounts, securities and scoped identifiers, issuers/aliases, dated quotes, and immutable position revisions with provenance. The opt-in PG16 suite now covers a fresh migration and populated `0002 → head` upgrade, legacy revision reconciliation, continued replacement, scoped identities and rollback. Original `0001`/`0002` files remain immutable. The updated migrations passed the real local PostgreSQL 16 gate on 2026-10-02; this is local evidence, not a remote CI run. See [release evidence](stage-1-release.md).
-
-**Stage 0.4 implementation (2026-10-02):** Added `DatabaseEngineFactory` for PostgreSQL and the official Aurora DSQL SQLAlchemy dialect, explicit scoped app/migration role settings, verified TLS and bounded pool settings, shared readiness probing, a checksummed 27-step DSQL migration plan across eight tables and seven asynchronous indexes, and bounded SQLSTATE/OCC retry in fresh sessions. The opt-in disposable-cluster suite covers migration, synthetic persistence, UUID/NUMERIC/JSONB/FK behavior, conflicting writes, immutable manual replacement/history/rollback, and scoped identities. The local suite passes; live populated-upgrade preservation and IAM reconnection after token expiry remain pending, so DSQL is unverified and production remains blocked. See `07-aurora-dsql-compatibility.md` for checked AWS/PyPI versions, limits and the migration/test commands.
-
-**Stage 0.5 implementation (2026-10-02):** Added revision-aware account and dated manual-position API routes, local bounded security search, Pydantic validation and safe error responses, OpenAPI export plus generated TypeScript schema, and a keyboard-accessible TanStack Query entry/reload screen. Review follow-up adds immutable published position revisions, draft-bound base revisions, bounded arithmetic validation and PostgreSQL-backed CI. A background refresh must never advance a dirty draft's base revision. Same-date replacement appends a new snapshot and retains prior lines; an account pointer identifies the selected accepted revision. The original quality run had three database skips; offline Alembic SQL generation did not verify PostgreSQL runtime behavior. DSQL remains unverified.
 
 ## Stage 1 — Portfolio MVP (primary milestone)
 
@@ -62,7 +56,7 @@ Use the roadmap's work-package number when selecting a task, then follow its `S`
 - Build import adapter interface (`fund identity`, `source`, `as_of`, `lines`, `completeness`).
 - Implement **manual fund-CSV upload first**, then 2 official issuer full-holdings formats (suggest iShares IVV and SPDR SPY; Vanguard VOO after validation) using permitted access routes.
 - Normalize CUSIP/ISIN/ticker-with-exchange and mark ambiguities; curate issuer mapping for share-class rollup.
-- Persist immutable snapshots, source links, effective dates, parsing warnings and raw hashes. Use DSQL-compatible bounded batches, unpublished staging revisions and an atomic publication marker; test on both backends before cloud deployment.
+- Persist immutable snapshots, source links, effective dates, parsing warnings and raw hashes. Use bounded PostgreSQL batches, unpublished staging revisions and an atomic publication marker; test locally and on Neon before cloud deployment.
 - Add on-demand/daily-or-provider-appropriate refresh with cached fallback, rate awareness and parser regression fixtures.
 
 **Test:** An issuer sample with one unmapped constituent must produce recognized and residual weights, not silently renormalize or drop that constituent.
@@ -88,7 +82,7 @@ Use the roadmap's work-package number when selecting a task, then follow its `S`
 
 Expected NVDA look-through: `$30,000 + ($50,000 × 0.08) + ($20,000 × 0.06) = $35,200`, or `17.6% of NAV`. **Owned NAV remains $200,000**; no ETF constituents create new positions. An ETF with no current composition still counts toward NAV and appears in unclassified exposure.
 
-**Stage 1 local exit gate / first release:** From a fresh local install, a user imports/enters ETFs plus direct stocks, refreshes/uploads dated compositions, and sees correct source-traceable consolidated exposure. Offline use works from cached/manual data. **Stage 1 production gate additionally requires real DSQL tests** for imports, same snapshot idempotency, schema, FK/index readiness, numeric math and concurrency retries.
+**Stage 1 local exit gate / first release:** From a fresh local install, a user imports/enters ETFs plus direct stocks, refreshes/uploads dated compositions, and sees correct source-traceable consolidated exposure. Offline use works from cached/manual data. **Stage 1 production gate additionally requires real Neon tests** for imports, same snapshot idempotency, schema, FK/index correctness, numeric math and concurrency retries.
 
 The reviewed [Stage 1 plan](stage-1-implementation-plan.md#review-decisions-and-implementation-handoff) fixes selection, review, financial and safety policies and groups delivery into one coherent commit for each major package **1.1, 1.2 and 1.3**. Prerequisite Stage 0 gate fixes may have their own commit. Two official-format parsers remain mandatory; an official-download/upload route is acceptable when current evidence does not permit automatic retrieval. Optional quote integration and unexecuted cloud checks must be documented honestly rather than silently promoted to release dependencies.
 
@@ -101,7 +95,7 @@ The reviewed [Stage 1 plan](stage-1-implementation-plan.md#review-decisions-and-
 | **2.3 Transactions** | Credit-card and bank transaction schemas, merchant/category rules, splits, refunds, transfers and duplicate handling | Credit-card payment and brokerage deposit are not double-counted as spending |
 | **2.4 Finance dashboards** | Monthly income/spending, category trends, manual off-card expenses, balances and unified net worth | Reconcile category subtotals against canonical transaction total |
 | **2.5 Optional account sync** | Evaluate Plaid sandbox, eligibility and institution coverage; read-only consent and encrypted token handling; no dependency on paid tiers | Manual/PDF workflow continues to function with sync disabled/expired |
-| **2.6 Background jobs** | `JobStore`/`JobRunner` abstraction, local single-worker polling, optional SQS or tested optimistic DSQL lease in AWS; async document processing, retry/backoff, cancellation and status UI | At-least-once idempotent processing, DSQL OCC retry and safe failure recovery; no untested `SKIP LOCKED` dependency |
+| **2.6 Background jobs** | Durable DB rows, leases, cancellation and fencing; bounded Cloud Run execution in cloud | Idempotency, reclaim, stale-worker rejection and recovery tested; hosted execution separately gated |
 
 **Stage 2 exit gate:** Upload at least one synthetic brokerage statement and one synthetic bank/card statement, review extraction and reconcile holdings/spending; demonstrate a local-only/no-AI fallback. Keep OCR accuracy benchmark results with test fixtures.
 
@@ -117,25 +111,25 @@ The reviewed [Stage 1 plan](stage-1-implementation-plan.md#review-decisions-and-
 
 **Stage 3 exit gate:** With synthetic purchase lots of varying bases, compare two hypothetical share-sale selections and see different realized gains, unchanged actual owned holdings, and resulting hypothetical post-trade exposure. Flag missing lots and cross-account wash-sale risks without asserting tax certainty.
 
-## Stage 4 — AWS production deployment track (Aurora DSQL required)
+## Stage 4 — Optional GCP / Neon deployment
 
-**Schedule optional after Stage 1, production database not optional.** Retain the full local PostgreSQL personal app. Do not deploy production against RDS PostgreSQL; DSQL compatibility tests start in Stage 0. The monthly DSQL free allowance does **not** cover the rest of the AWS stack.
+The local application remains usable indefinitely. Production uses Neon PostgreSQL via the same SQLAlchemy/psycopg and Alembic path.
 
-- **4.1 Portable configuration:** same models/services; `DATABASE_BACKEND=postgres|aurora_dsql`; official DSQL SQLAlchemy dialect/connector, scoped IAM-based token-on-connect, `sslmode=verify-full`; PostgreSQL login stays local. Versioned migrations with one DSQL DDL statement per transaction and asynchronous index readiness checks. Use `FileStore(local|s3)`.
-- **4.2 Infrastructure as code:** Terraform or AWS CDK. One single-region Aurora DSQL cluster (no multi-region replication); private S3 bucket for statement artifacts; S3+CloudFront for static React; low-cost FastAPI runtime (e.g., single EC2 or Lambda if measured compatible); least-privilege IAM and authenticated HTTPS app. Production's DSQL endpoint uses IAM+TLS, with optional separately billed PrivateLink if required. Avoid expensive default NAT/ALB/interface endpoints without a reason.
-- **4.3 DSQL release gates:** Run real DSQL integration tests for migrations/FKs/index creation, UUID/NUMERIC/JSONB, IAM token refresh/pooled reconnect, portfolio aggregation, snapshot import batching and idempotency, optimistic-concurrency retry and job handling. Never label production-compatible based on PG-only tests.
-- **4.4 Cost policy:** Track 100,000 free DPUs + 1 GB-month DSQL database storage (terms checked 2026-09-25), then **separately** forecast and budget API hosting, S3/CloudFront, logging, data transfer, optional SQS/PrivateLink, backup and storage overages. Budgets are not hard caps; confirm AWS account/region and eligibility.
-- **4.5 Security and backups:** Fully authenticated application, private document storage, IAM non-admin DB user, TLS host verification, redacted logs, AWS Backup if budgeted, plus encrypted portable exports and tested local restore.
-- **4.6 CI/CD:** Gate production promotion on the real DSQL test workflow and manual infrastructure/backup/budget approval. Keep routine PR tests local/offline to control cost.
+- **4.1 Configuration/storage/auth:** runtime DATABASE_URL, optional direct MIGRATION_DATABASE_URL, verified TLS and bounded pools; FileStore(local|gcs). Preserve OIDC/PKCE, revocable sessions, HTTPS cookies and origin/CSRF checks.
+- **4.2 Infrastructure:** Cloud Run API and bounded worker Job, Firebase Hosting SPA and same-origin /api routing, private GCS, Artifact Registry, Secret Manager and scoped service identities. No automatic provisioning.
+- **4.3 Real cloud gate:** fresh/populated Alembic migration, runtime reconnect and concurrent publication/retry using a disposable Neon branch; authenticated HTTPS and private GCS evidence.
+- **4.4 Costs:** review target GCP and separate Neon billing, scaling/connections/storage/log retention and alerts. Alerts are not hard spending caps.
+- **4.5 Recovery:** encrypted portable export from Neon/GCS and isolated PostgreSQL restore; scope, tamper, retention and RPO/RTO evidence.
+- **4.6 Release:** immutable image/source/schema/configuration-bound evidence, operations rehearsal and explicit production approval. Ordinary CI remains local/offline.
 
-**Stage 4 exit gate:** Securely access the app over HTTPS, import a synthetic statement to private S3, read and query **Aurora DSQL**, demonstrate an OCC retry and complete import without double-counting, restore/export data to local PG and shut down app resources cleanly. Confirm costs after promotional credits expire. Production uses DSQL, not RDS.
+Tooling is prepared; no credentialed hosted result or deployed real-data safety is claimed. See the [Stage 4 plan](stage-4-implementation-plan.md), [release](stage-4-release.md), and [migration audit](gcp-neon-migration.md).
 
 ## Stage 5 — Portfolio-aware research and AI
 
 - **5.1 Public data:** SEC/IR research observations via shared evidence capabilities; finance validates issuer/period/unit and retains dated source references. Add only necessary finance-specific deterministic fact adapters.
 - **5.2 Research UI:** shared cited research via `PersonalAIClient`, finance citation/result checks and deterministic period-over-period metrics; generic search/provider orchestration stays upstream.
 - **5.3 Context:** calculate owned issuer exposure, account/fund sources, earnings/report history, user-written thesis and watchlist.
-- **5.4 Retrieval:** agree bounded company/filing/date/evidence eligibility through the shared service; finance checks returned provenance and freshness. No duplicate `ResearchIndex`, vector database or DSQL SQL-extension dependency.
+- Use the PostgreSQL/Neon contract and GCP deployment gates; retain bounded, idempotent writes and all finance review/provenance invariants.
 - **5.5 Monitoring:** optional scheduled *public* developments and saved research snapshots; user chooses notifications, no order execution.
 - **5.6 Evaluate:** synthetic and public-company test set for citation fidelity, stale news, irrelevant retrieval, unsupported claims and model/provider outages.
 
@@ -158,8 +152,11 @@ The reviewed [Stage 1 plan](stage-1-implementation-plan.md#review-decisions-and-
 | --- | --- |
 | Manual positions, CSV importer, cached quote/manual price, 2 ETF adapters, derived exposure | Brokerage-link onboarding and unsupported instruments |
 | SQL + FastAPI REST and generated TS client | Microservices, a second operational datastore or general event bus |
-| Simple scheduling / provider-neutral job interface when needed | Untested DSQL locking assumptions, managed Redis, streaming architecture, Kubernetes |
+| Durable Finance job rows and bounded same-codebase workers | New queue or scheduling infrastructure only after a demonstrated requirement |
 | Document parsing rules and local review | Always-on remote AI, autonomous trading, wholesale agent frameworks |
 | Verifiable source dates and residual exposure | Perfect breadth of ETFs, real-time quote promises, speculative classification |
 
-**Next work:** Preserve the delivered Stage 0–1 local MVP and Stage 3 workflows. Stage 2 remains partial; Stage 4.1–4.6 tooling and local recovery checks are prepared, while live DSQL, account-specific cost approval, private HTTPS/S3 and cloud recovery gates remain. Stage 5 provides manual source-linked research, frozen local portfolio context, thesis notes and a provisional evidence validator; live retrieval, synthesis and monitoring are not delivered. No cloud resources have been provisioned. The [maintainability review](maintainability-review.md) records contained corrections and the remaining acceptance gaps. Keep deployed real data disabled until user/service authorization and data handling are verified; DSQL requires the real disposable-cluster suite.
+Production follows the [PostgreSQL/Neon contract](07-postgres-neon.md) and [GCP deployment plan](stage-4-implementation-plan.md). Ordinary local tests do not establish hosted readiness; prior provider-specific facts are preserved in the historical snapshot.
+
+
+Provider-specific dated delivery facts are preserved in [the pre-migration snapshot](history/pre-gcp-neon/05-roadmap.md). [ADR 0002](adr/0002-gcp-neon.md) and the [migration record](gcp-neon-migration.md) define the current architecture; this plan does not claim additional product completion.

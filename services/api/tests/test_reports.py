@@ -344,7 +344,7 @@ def test_concurrent_import_publication_and_old_duplicate_do_not_move_head(
 
     browser, engine = client
     if engine.dialect.name == "sqlite":
-        pytest.skip("Concurrent publication requires PostgreSQL or real DSQL")
+        pytest.skip("Concurrent publication requires PostgreSQL")
     s = catalog(browser, "CONCURRENT", "equity")
     a = account(browser, "Concurrent")
     attempts = []

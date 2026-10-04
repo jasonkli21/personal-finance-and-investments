@@ -1,10 +1,10 @@
 # Stage 3 implementation plan
 
-**Status:** S3.1–S3.5 and S3.R complete locally; live Aurora DSQL verification remains
+**Status:** S3.1–S3.5 and S3.R complete locally; live Neon PostgreSQL verification remains
 **Updated:** 2026-10-02
 **Roadmap coverage:** Work packages 3.1–3.5
 
-This is the execution plan for historical investment analysis, source-backed tax lots, and hypothetical decision support. It consumes reliable [Stage 1 portfolio](stage-1-implementation-plan.md) and [Stage 2 transaction](stage-2-implementation-plan.md) records. Read [the product specification](01-product-spec.md), [architecture](02-architecture.md), [source policy](03-data-sources.md), and [DSQL contract](07-aurora-dsql-compatibility.md) first.
+This is the execution plan for historical investment analysis, source-backed tax lots, and hypothetical decision support. It consumes reliable [Stage 1 portfolio](stage-1-implementation-plan.md) and [Stage 2 transaction](stage-2-implementation-plan.md) records. Read [the product specification](01-product-spec.md), [architecture](02-architecture.md), [source policy](03-data-sources.md), and [PostgreSQL/Neon contract](07-postgres-neon.md) first.
 
 ## Scope boundary
 
@@ -24,7 +24,7 @@ Order submission, recommendations to trade, tax preparation/filing, tax-certaint
 - Version performance and simulation methodologies; disclose fees, timing, FX, price, valuation, and lot-selection assumptions.
 - Before implementing tax classification/warning rules, verify applicable official guidance and record jurisdiction, effective period, sources, and limitations. This plan selects no tax rate or legal holding-period threshold.
 - Reuse reviewed import publication and bounded retries. Historical recomputation runs outside write transactions; cached results are keyed to evidence and methodology versions.
-- PostgreSQL and DSQL share domain formulas; schema/repository/migration behavior needs real DSQL evidence before cloud promotion.
+- Use the PostgreSQL/Neon contract and GCP deployment gates; retain bounded, idempotent writes and all finance review/provenance invariants.
 
 ## Required verification matrix
 
@@ -37,7 +37,7 @@ Order submission, recommendations to trade, tax preparation/filing, tax-certaint
 | Warnings | Potential related purchases across accounts, absent coverage, missing dates | Potential/unknown warning, never certified compliance |
 | Portfolio scenarios | ETF buy/sell, cash, opaque/overlapping funds, insufficient cash, stale FX | Before/after NAV decomposition reconciles |
 | Planning | Empty income history, one-time purchase, variable expense/income, missing dividends | Assumptions and uncertainty visible |
-| Persistence | New migrations, scenario save retries, history batches, concurrent edits | PG tests; real DSQL before production |
+| Persistence | New migrations, scenario save retries, history batches, concurrent edits | PG tests; real Neon before production |
 | UI | Baseline changes, input errors, comparison/export | Stable frozen inputs and clear hypothetical labels |
 
 ## Required implementation artifacts
@@ -227,13 +227,13 @@ Tax-lot simulation can proceed with reviewed lots without waiting for complete p
 
 **Goal:** prove meaningful comparisons and safe separation from actual records.
 
-**Work:** run the two-lot golden comparison and before/after exposure journey; record performance/solver/rounding tolerances and missing-data behavior; execute migration/repository/idempotency/concurrency tests on PostgreSQL and separately on real DSQL before cloud release; verify canonical read-only simulation boundaries; document lot import, methodology/rule sources, scenario retention, client-generation and actual test commands.
+**Work:** run the two-lot golden comparison and before/after exposure journey; record performance/solver/rounding tolerances and missing-data behavior; execute migration/repository/idempotency/concurrency tests on PostgreSQL and separately on real Neon before cloud release; verify canonical read-only simulation boundaries; document lot import, methodology/rule sources, scenario retention, client-generation and actual test commands.
 
 **Requirements:** evaluation records identify fixture, schema, calculation and policy versions; authoritative numerical inputs/results stay Decimal. Legal/provider verification is dated at implementation, not assumed from this plan. No private lots/statements enter fixtures.
 
-**Acceptance criteria:** two selections show different gains and reproducible hypothetical exposure with unchanged real holdings; deposits never become market gains; unknown lots/history/FX/warning coverage stay visible; all local tests pass and skipped DSQL checks are reported unverified; regressions cannot be hidden by silently updating expected fixtures.
+**Acceptance criteria:** two selections show different gains and reproducible hypothetical exposure with unchanged real holdings; deposits never become market gains; unknown lots/history/FX/warning coverage stay visible; all local tests pass and skipped Neon checks are reported unverified; regressions cannot be hidden by silently updating expected fixtures.
 
-**Out of scope:** making incomplete source records appear complete or launching AWS resources to declare local completion.
+**Out of scope:** making incomplete source records appear complete or launching cloud resources to declare local completion.
 
 ## Stage 3 completion review
 
@@ -243,6 +243,9 @@ Tax-lot simulation can proceed with reviewed lots without waiting for complete p
 4. Are tax classifications/warnings officially sourced, versioned and appropriately uncertain?
 5. Do hypothetical cash/positions/exposure/overlap reconcile and preserve opaque portions?
 6. Are planning assumptions, liquidity restrictions, dates and missing coverage visible?
-7. Are migrations/retries tested locally and on real DSQL before production?
+7. Are migrations/retries tested locally and on real Neon before production?
 
 **Implementation handoff:** publish calculation/rounding/solver policies, event and lot import contracts, rule-source verification, frozen scenario schemas, golden comparisons, client/verification commands, and local versus cloud results. [Stage 5](stage-5-implementation-plan.md) may consume reliable portfolio context without requiring every optional Stage 3 metric.
+
+
+Provider-specific dated delivery facts are preserved in [the pre-migration snapshot](history/pre-gcp-neon/stage-3-implementation-plan.md). [ADR 0002](adr/0002-gcp-neon.md) and the [migration record](gcp-neon-migration.md) define the current architecture; this plan does not claim additional product completion.

@@ -17,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 def _migrate(database_url: str, revision: str = "head") -> None:
     api_dir = Path(__file__).parents[1]
     migration_env = environ.copy()
+    migration_env.pop("MIGRATION_DATABASE_URL", None)
     migration_env["DATABASE_URL"] = database_url
     migration_env["DATABASE_BACKEND"] = "postgres"
     subprocess.run(
@@ -698,4 +699,57 @@ def test_populated_0002_upgrade_reconciles_revisions_and_preserves_manual_histor
                 ).scalar_one()
                 == 1
             )
+    engine.dispose()
+
+
+def test_populated_transaction_description_upgrade_preserves_source_values() -> None:
+    database_url = environ.get("TEST_DATABASE_URL")
+    if database_url is None:
+        pytest.skip("set TEST_DATABASE_URL to a disposable PostgreSQL 16 database")
+    engine = create_engine(database_url)
+    _reset_schema(engine)
+    _migrate(database_url, "0010_stage2_durable_jobs")
+    account_id, transaction_id = uuid4(), uuid4()
+    now = datetime(2026, 10, 1, tzinfo=UTC)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO accounts (id,name,account_type,base_currency,active,"
+                "source_type,created_at,updated_at,current_position_revision) "
+                "VALUES (:id,'Synthetic upgrade','cash','USD',true,'manual',"
+                ":now,:now,0)"
+            ),
+            {"id": account_id, "now": now},
+        )
+        conn.execute(
+            text(
+                "INSERT INTO financial_transactions (id,account_id,source_label,"
+                "raw_description,normalized_merchant,raw_payload,fingerprint,"
+                "status,classification,category_source,revision,diagnostics,"
+                "created_at,updated_at,amount,currency,posted_date) VALUES "
+                "(:id,:account,'synthetic','Original source text','original',"
+                "'{}'::jsonb,:fingerprint,'published','expense','manual',1,"
+                "'[]'::jsonb,:now,:now,-12.3456789012,'USD','2026-10-01')"
+            ),
+            {
+                "id": transaction_id,
+                "account": account_id,
+                "fingerprint": "a" * 64,
+                "now": now,
+            },
+        )
+    _migrate(database_url)
+    _migrate(database_url)
+    with engine.connect() as conn:
+        row = conn.execute(
+            text(
+                "SELECT raw_description, description, amount, currency "
+                "FROM financial_transactions WHERE id=:id"
+            ),
+            {"id": transaction_id},
+        ).one()
+        assert row.raw_description == row.description == "Original source text"
+        assert row.amount == Decimal("-12.3456789012")
+        assert row.currency == "USD"
+        assert conn.scalar(text("SELECT count(*) FROM financial_transactions")) == 1
     engine.dispose()

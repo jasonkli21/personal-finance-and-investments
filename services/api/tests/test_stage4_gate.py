@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from app.release import dsql_evidence
+from app.release import neon_evidence
 from app.release.stage4_gate import (
     REQUIRED_GATES,
     GateError,
@@ -27,7 +27,7 @@ RELEASE = {
 CONTEXTS = {
     "production": "7" * 64,
     "synthetic_launch": "8" * 64,
-    "dsql_test": "9" * 64,
+    "neon_test": "9" * 64,
 }
 
 
@@ -40,29 +40,29 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
     path.write_text(json.dumps(value, sort_keys=True))
 
 
-def _dsql_evidence() -> dict[str, Any]:
+def _neon_evidence() -> dict[str, Any]:
     return {
-        "evidence_version": dsql_evidence.EVIDENCE_VERSION,
-        "suite": "aurora-dsql-stage4-release",
+        "evidence_version": neon_evidence.EVIDENCE_VERSION,
+        "suite": "neon-postgres-stage4-release",
         "result": "passed",
         "executed_at_utc": _now(),
         "git_commit": RELEASE["git_commit"],
-        "backend": "aurora_dsql",
+        "backend": "postgres",
         "image_digest": RELEASE["image_digest"],
-        "cluster_identity_sha256": "c" * 64,
-        "configuration_sha256": CONTEXTS["dsql_test"],
-        "fixture_version": dsql_evidence.FIXTURE_VERSION,
+        "database_identity_sha256": "c" * 64,
+        "configuration_sha256": CONTEXTS["neon_test"],
+        "fixture_version": neon_evidence.FIXTURE_VERSION,
         "build_sha256": RELEASE["build_sha256"],
         "schema_sha256": RELEASE["schema_sha256"],
         "fixture_sha256": RELEASE["fixture_sha256"],
         "tests": {
-            "tests": len(dsql_evidence.REQUIRED_CASES),
-            "passed": len(dsql_evidence.REQUIRED_CASES),
+            "tests": len(neon_evidence.REQUIRED_CASES),
+            "passed": len(neon_evidence.REQUIRED_CASES),
             "failed": 0,
             "errors": 0,
             "skipped": 0,
         },
-        "executed_cases": sorted(dsql_evidence.REQUIRED_CASES),
+        "executed_cases": sorted(neon_evidence.REQUIRED_CASES),
         "missing_required_cases": [],
         "unverified_release_gates": [],
         "credentials_recorded": False,
@@ -78,12 +78,12 @@ def _bundle(tmp_path: Path) -> Path:
     evidence_dir = tmp_path / "evidence"
     evidence_dir.mkdir()
     gate_paths: dict[str, str] = {}
-    dsql_path = evidence_dir / "dsql.json"
-    _write_json(dsql_path, _dsql_evidence())
-    gate_paths["real_dsql_release_suite"] = "evidence/dsql.json"
+    neon_path = evidence_dir / "neon.json"
+    _write_json(neon_path, _neon_evidence())
+    gate_paths["real_neon_release_suite"] = "evidence/neon.json"
 
     for gate_id, (kind, context) in REQUIRED_GATES.items():
-        if kind == "dsql":
+        if kind == "neon":
             continue
         artifact_path = "artifacts/proof.txt"
         evidence: dict[str, Any] = {
@@ -136,7 +136,7 @@ def test_release_gate_accepts_complete_fresh_hash_bound_bundle(tmp_path: Path) -
         manifest,
         current_release=RELEASE,
         expected_context_configurations=_expected_configs(),
-        validate_dsql_runtime=False,
+        validate_neon_runtime=False,
     )
 
     assert report["result"] == "passed"
@@ -144,7 +144,7 @@ def test_release_gate_accepts_complete_fresh_hash_bound_bundle(tmp_path: Path) -
     assert report["deployment_performed"] is False
     assert set(report["gates"]) == set(REQUIRED_GATES)
     assert (
-        report["gates"]["real_dsql_release_suite"]["cluster_identity_sha256"]
+        report["gates"]["real_neon_release_suite"]["database_identity_sha256"]
         == "c" * 64
     )
 
@@ -152,7 +152,7 @@ def test_release_gate_accepts_complete_fresh_hash_bound_bundle(tmp_path: Path) -
 @pytest.mark.parametrize(
     ("mutation", "blocked_gate"),
     [
-        ("skip", "authenticated_https_private_s3"),
+        ("skip", "authenticated_https_private_gcs"),
         ("stale-release", "target_configuration"),
         ("tamper-artifact", "immutable_infrastructure_plan"),
         ("path-traversal", "cost_and_budget_approval"),
@@ -183,7 +183,7 @@ def test_release_gate_blocks_bad_or_stale_evidence(
         manifest,
         current_release=RELEASE,
         expected_context_configurations=_expected_configs(),
-        validate_dsql_runtime=False,
+        validate_neon_runtime=False,
     )
 
     assert report["result"] == "blocked"
@@ -201,7 +201,7 @@ def test_release_gate_rejects_missing_gate_inventory(tmp_path: Path) -> None:
             manifest,
             current_release=RELEASE,
             expected_context_configurations=_expected_configs(),
-            validate_dsql_runtime=False,
+            validate_neon_runtime=False,
         )
 
 
@@ -211,38 +211,38 @@ def test_release_gate_requires_independent_well_formed_target_configs(
     manifest = _bundle(tmp_path)
     with pytest.raises(GateError, match="Independent current target"):
         evaluate_manifest(
-            manifest, current_release=RELEASE, validate_dsql_runtime=False
+            manifest, current_release=RELEASE, validate_neon_runtime=False
         )
     with pytest.raises(GateError, match="incomplete or malformed"):
         evaluate_manifest(
             manifest,
             current_release=RELEASE,
             expected_context_configurations=[],  # type: ignore[arg-type]
-            validate_dsql_runtime=False,
+            validate_neon_runtime=False,
         )
 
 
-def test_dsql_skip_and_missing_matrix_evidence_block_release(
+def test_neon_skip_and_missing_matrix_evidence_block_release(
     tmp_path: Path,
 ) -> None:
     manifest = _bundle(tmp_path)
     data = json.loads(manifest.read_text())
-    dsql_path = tmp_path / data["gates"]["real_dsql_release_suite"]
-    evidence = json.loads(dsql_path.read_text())
+    neon_path = tmp_path / data["gates"]["real_neon_release_suite"]
+    evidence = json.loads(neon_path.read_text())
     evidence["tests"]["skipped"] = 1
     evidence["tests"]["passed"] -= 1
     evidence["unverified_release_gates"] = ["mid_migration_interruption_resume"]
-    _write_json(dsql_path, evidence)
+    _write_json(neon_path, evidence)
 
     report = evaluate_manifest(
         manifest,
         current_release=RELEASE,
         expected_context_configurations=_expected_configs(),
-        validate_dsql_runtime=False,
+        validate_neon_runtime=False,
     )
 
     assert report["result"] == "blocked"
-    assert "real_dsql_release_suite" in report["blocked_gates"]
+    assert "real_neon_release_suite" in report["blocked_gates"]
 
 
 def test_different_configuration_hash_within_one_context_blocks(
@@ -259,7 +259,7 @@ def test_different_configuration_hash_within_one_context_blocks(
         manifest,
         current_release=RELEASE,
         expected_context_configurations=_expected_configs(),
-        validate_dsql_runtime=False,
+        validate_neon_runtime=False,
     )
 
     assert report["result"] == "blocked"
@@ -273,8 +273,8 @@ def test_unanimous_stale_production_configuration_cannot_pass(tmp_path: Path) ->
     for gate_id, relative in data["gates"].items():
         path = tmp_path / relative
         evidence = json.loads(path.read_text())
-        if gate_id == "real_dsql_release_suite":
-            evidence["configuration_sha256"] = CONTEXTS["dsql_test"]
+        if gate_id == "real_neon_release_suite":
+            evidence["configuration_sha256"] = CONTEXTS["neon_test"]
         else:
             context = evidence["configuration_context"]
             if context == "production":
@@ -285,7 +285,7 @@ def test_unanimous_stale_production_configuration_cannot_pass(tmp_path: Path) ->
         manifest,
         current_release=RELEASE,
         expected_context_configurations=_expected_configs(),
-        validate_dsql_runtime=False,
+        validate_neon_runtime=False,
     )
     assert report["result"] == "blocked"
     assert "target_configuration" in report["blocked_gates"]

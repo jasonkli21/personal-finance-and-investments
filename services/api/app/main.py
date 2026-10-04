@@ -113,7 +113,9 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
     app.state.max_import_rows = settings.max_import_rows
     app.state.max_pdf_pages = settings.max_pdf_pages
     app.state.pdf_parser_timeout_seconds = settings.pdf_parser_timeout_seconds
-    app.state.job_worker_enabled = settings.job_worker_enabled
+    app.state.job_worker_enabled = settings.job_worker_enabled or bool(
+        settings.cloud_run_job
+    )
     app.state.job_poll_interval_seconds = settings.job_poll_interval_seconds
     app.state.job_lease_seconds = settings.job_lease_seconds
     app.state.job_max_attempts = settings.job_max_attempts
@@ -229,6 +231,15 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
             raise HTTPException(status_code=503, detail="Database unavailable") from exc
         return HealthResponse(status="ready")
 
+    from app.auth.firebase_transport import ApiPrefixTransport, FirebaseCookieTransport
+
+    if settings.app_env == "production" and settings.auth_enabled:
+        app.add_middleware(
+            FirebaseCookieTransport,
+            secret_key=settings.auth_session_signing_key or "",
+            max_age=settings.auth_session_ttl_seconds,
+        )
+    app.add_middleware(ApiPrefixTransport)
     return app
 
 

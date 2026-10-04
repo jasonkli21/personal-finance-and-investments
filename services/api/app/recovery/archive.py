@@ -56,7 +56,6 @@ from sqlalchemy.engine import Connection, Engine, make_url
 from sqlalchemy.pool import NullPool
 from sqlalchemy.sql.schema import Table
 
-from app.db.dsql_migrations import DSQL_MIGRATIONS
 from app.db.models import Base, Calculation, PrivateFile
 from app.storage.file_store import FileStore, PrivateFileStore
 
@@ -175,31 +174,10 @@ def _postgres_revision(connection: Connection) -> str:
     return expected
 
 
-def _dsql_revision(connection: Connection) -> str:
-    expected = {
-        (migration.revision, step.key): step.checksum
-        for migration in DSQL_MIGRATIONS
-        for step in migration.steps
-    }
-    if not inspect(connection).has_table("dsql_schema_migration_steps"):
-        raise RecoveryError("DSQL database is missing its migration ledger")
-    actual = {
-        (str(revision), str(step)): str(checksum)
-        for revision, step, checksum in connection.execute(
-            text("SELECT revision, step_key, checksum FROM dsql_schema_migration_steps")
-        )
-    }
-    if actual != expected:
-        raise RecoveryError("DSQL migration ledger is incomplete or has drifted")
-    return DSQL_MIGRATIONS[-1].revision
-
-
 def _schema_revision(connection: Connection, backend: str) -> str:
-    if backend == "postgres":
-        return _postgres_revision(connection)
-    if backend == "aurora_dsql":
-        return _dsql_revision(connection)
-    raise RecoveryError("Recovery source backend is unsupported")
+    if backend != "postgres":
+        raise RecoveryError("Recovery source backend is unsupported")
+    return _postgres_revision(connection)
 
 
 def _json_tree(value: Any, *, depth: int = 0) -> dict[str, Any]:
@@ -882,9 +860,6 @@ def _validate_manifest(manifest: Any) -> dict[str, Any]:
     if backend == "postgres":
         if revision != _alembic_head():
             raise RecoveryError("Archive PostgreSQL schema revision is incompatible")
-    elif backend == "aurora_dsql":
-        if revision != DSQL_MIGRATIONS[-1].revision:
-            raise RecoveryError("Archive DSQL schema revision is incompatible")
     else:
         raise RecoveryError("Archive source database backend is unsupported")
     for field in ("created_at", "source_snapshot_at"):

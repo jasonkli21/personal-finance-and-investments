@@ -316,6 +316,19 @@ async def post_brokerage_pdf_preview(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except jobs.JobError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    resource = request.app.state.settings.cloud_run_job
+    if resource and job_result["status"] in {"pending", "running"}:
+        from app.jobs.cloud import trigger_job
+
+        try:
+            await asyncio.to_thread(trigger_job, resource)
+        except OSError as exc:
+            # The durable row survives. Repeating the same upload reuses its
+            # identity and safely attempts another execution trigger.
+            raise HTTPException(
+                status_code=503,
+                detail="Worker invocation unavailable; retry the same upload.",
+            ) from exc
     return JobRead.model_validate(job_result)
 
 

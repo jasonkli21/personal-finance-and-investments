@@ -1,31 +1,6 @@
-# ADR 0001 — Shared personal-AI capabilities, finance authority
+# ADR 0001 — Shared Personal AI, Finance authority
 
-Status: Accepted architecture; live service integration deferred
-
-Date: 2026-10-02
-
-## Context and reconciliation
-
-The [integration handoff](../../personal-finance-ai-integration-handoff/README.md) proposes incremental service integration. Current finance code/OpenAPI and [Stage 1 release evidence](../stage-1-release.md) are authoritative for delivered behavior; handoff examples are intended direction, not verified upstream APIs.
-
-Reviewed baseline: `0874f21` (Stage 1.3), preceded by `f75e101` and `9053d1f`. The app has React/TypeScript/Vite, TanStack Query/Table, Tailwind, generated OpenAPI types, FastAPI/Pydantic, SQLAlchemy/Alembic, local PostgreSQL 16, a separate IAM/TLS DSQL engine/migration runner and private content-addressed files. Stage 1 includes reviewed position CSVs, generic/iShares fund CSVs and SPDR XLSX, manual/cached quotes, pure Decimal exposure and durable frozen report/drill-down/export. Live quote/issuer fetching, PDF/OCR, AI, research, memory, durable jobs, hosted authentication and S3 deployment are not delivered. shadcn/ui and ECharts remain optional planned additions, not installed components.
-
-No existing AI code needs moving or replacing. Finance domain functions already separate calculations/publication from FastAPI and provider formats; they receive SQLAlchemy sessions directly. A new repository abstraction or domain/package split has no current justification.
-
-| Component / conflict | Classification and resolution |
-| --- | --- |
-| `domains/portfolio.py`, `exposure.py`, `reports.py` | **Keep in finance:** exact arithmetic, source selection, frozen reports and reconciliation |
-| `domains/imports.py`, `funds.py`, API contracts, private FileStore | **Keep in finance:** raw evidence, deterministic mapping/validation, duplicate detection, revision review and atomic bounded publication |
-| `providers/quotes.py`, `fund_formats.py` | **Keep in finance:** non-AI financial observations and deterministic issuer parsing; uploads do not imply live issuer access |
-| Planned `StructuredModelProvider`, Ollama/cloud adapters | **Replace planned ownership:** personal-AI owns reusable model/prompt/extraction infrastructure; finance consumes candidates |
-| Planned `ResearchIndex`, search/ranking/evidence runtime | **Replace planned ownership:** shared research infrastructure lives upstream; finance retains necessary dated references/results and verifies finance semantics |
-| AI preference memory versus finance data/settings/thesis | **Separate:** attributable cross-task preferences upstream; canonical holdings/transactions/lots, product settings and user thesis records in finance |
-| Handoff `extract`/`research` endpoint examples | **Defer transport:** provisional contract; no finance document-extraction endpoint was found in the adjacent upstream API surface |
-| Handoff's optional extraction review | **Resolve to repo gate:** financial candidates must pass finance validation and reviewed publication; no new trusted auto-commit path |
-| “Not implemented” headers / restart Stage 0/1 prompt | **Correct stale status:** Stage 1 local MVP delivered; source live-fetch, remote CI and DSQL evidence remain separately qualified |
-| Cloud/database choices | **Preserve:** local PG16, AWS production DSQL, private local/S3 originals, separate migrations and real-cluster promotion gate |
-
-Read-only inspection of adjacent `personal-ai-system` on this date found provider/context/memory and local Phase 5 research code, with research session/run endpoints and SSE rather than the handoff's hypothetical JSON `research()` contract. Its README and `api/dependencies.py` still use a fixed `local` owner without authentication. That is inspection evidence, not a live deployment/security audit or a claim that generic finance extraction is available. No upstream files were changed.
+Accepted ownership decision, 2026-10-02; live transport remains deferred. Deployment choices are superseded by [ADR 0002](0002-gcp-neon.md), 2026-10-03. The original baseline inspection and dated provider context remain in [the historical ADR](../history/pre-gcp-neon/adr/0001-shared-personal-ai.md).
 
 ## Decision
 
@@ -34,8 +9,6 @@ Finance remains a standalone product and authoritative owner of financial record
 Personal-AI owns model/provider routing, generic structured extraction/OCR runtime, research/search/retrieval/ranking, generic evidence lifecycle, attributable AI memory and general AI evaluation/orchestration. Finance keeps institution-specific deterministic templates, canonical schemas, field-evidence checks, source/as-of/quality metadata, hard constraints, arithmetic, user acceptance and persistence. Shared reusable entity resolution may propose matches; finance validates/reviews identifiers and issuer mappings. Model conclusions cannot become canonical positions, quotes, transactions or tax lots without finance's validated workflow.
 
 Portfolio truth, AI preference memory and external evidence remain distinct. Finance may store saved research sessions, approved result/evidence snapshots, app settings and user-authored thesis notes. These do not require another model memory or generic index here.
-
-The SQL/AWS design is unchanged. Cross-cloud authenticated HTTPS is possible when reviewed; it does not require shared VPCs, databases or moving finance to GCP/Firestore. No new persistent schema, migration, UI, finance endpoint or calculation change is justified for this reconciliation.
 
 ## Current implementation seam
 
@@ -59,7 +32,7 @@ Before one real extraction feature in Stage 2:
 3. For deployed private data, authenticate finance users and calling services; propagate only server-verified owner/scope and verify authorization upstream. Test absent/expired/wrong-audience credentials and wrong-owner denial. A fixed `local` owner or API key alone is insufficient.
 4. Keep candidate normalization/evidence/arithmetic validation, duplicate detection, user review and bounded atomic publication in finance. External extraction completes outside transactions; save reusable output so OCC retry cannot repeat AI calls.
 
-Current code enforces the disabled gate only; it does not implement or verify these future auth/transport/retention controls. Real-data deployment additionally requires the existing authenticated AWS/private-S3 and real-DSQL gates. DSQL remains unverified.
+Current code enforces the disabled gate only; it does not implement or verify these future auth/transport/retention controls. Real-data deployment additionally requires the authenticated GCP/private-GCS and real-Neon gates in ADR 0002.
 
 ## Consequences and deferred sequence
 
@@ -67,4 +40,4 @@ This change preserves offline Stage 1 behavior and avoids duplicating infrastruc
 
 Next, only when requested: integrate one reviewed extraction slice after the contract/security review; then shared research in Stage 5. Memory integration and deterministic read-only finance tools require separate concrete use cases and authorization contracts. Do not add mutation tools, a generic agent/plugin framework, speculative migrations or AI memory backfills now. No direct-provider code was removed because none exists.
 
-Rejected alternatives: duplicate finance model/research/memory stack; moving deterministic arithmetic into prompts; sharing the AI database or moving finance to Firestore/GCP; broad domain/repository rewrites; live adapters against guessed endpoints; treating AI candidates as approved records.
+Rejected alternatives: duplicate finance model/research/memory stack; moving deterministic arithmetic into prompts; sharing the AI database or replacing relational finance authority with Firestore; broad domain/repository rewrites; live adapters against guessed endpoints; treating AI candidates as approved records.

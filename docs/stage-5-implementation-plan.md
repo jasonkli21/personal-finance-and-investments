@@ -4,7 +4,7 @@
 **Updated:** 2026-10-03
 **Roadmap coverage:** Work packages 5.1–5.6
 
-This is the execution plan for source-grounded, portfolio-aware research. Read [the product specification](01-product-spec.md), [source policy](03-data-sources.md), [research/AI boundaries](04-ingestion-and-ai.md), [security](06-security-and-deployment.md), and [DSQL contract](07-aurora-dsql-compatibility.md) first. Research consumes the reliable [Stage 1 exposure contract](stage-1-implementation-plan.md); optional history/lots come from Stage 3 only if implemented. Hosted execution additionally requires [Stage 4](stage-4-implementation-plan.md).
+This is the execution plan for source-grounded, portfolio-aware research. Read [the product specification](01-product-spec.md), [source policy](03-data-sources.md), [research/AI boundaries](04-ingestion-and-ai.md), [security](06-security-and-deployment.md), and [PostgreSQL/Neon contract](07-postgres-neon.md) first. Research consumes the reliable [Stage 1 exposure contract](stage-1-implementation-plan.md); optional history/lots come from Stage 3 only if implemented. Hosted execution additionally requires [Stage 4](stage-4-implementation-plan.md).
 
 ## Scope boundary
 
@@ -38,7 +38,7 @@ Research never mutates canonical holdings, quotes, prices, lots, or transactions
 | Context/privacy | Direct/ETF exposure, account filters, stale baseline, sensitive notes, remote disabled | No canonical writes; blocked unauthorized egress |
 | Model/search | Disabled/outage/invalid JSON/quota, unsafe URL/redirect, prompt injection | Fake-provider and safety bounds |
 | Monitoring | Duplicate filings/reruns, amendment, unchanged state, lease loss/cancel, notification failure | Idempotent jobs and explicit notification policy |
-| Persistence | Document/run/note schema, bounded writes, retries, immutable lineage | PG integration; actual DSQL before hosted promotion |
+| Persistence | Document/run/note schema, bounded writes, retries, immutable lineage | PG integration; actual Neon before hosted promotion |
 | Release journey | Company → cited summary/exposure → thesis; all APIs disabled | Browser smoke and deterministic offline fallback |
 
 ## Required implementation artifacts
@@ -79,7 +79,7 @@ Stage 1 exposure ─> S5.1.1 Fixtures/contracts ─> S5.1.2 Public sources ─> 
                           └─> S5.4 Retrieval <── S5.1.2
 S5.2.1 + S5.3 + S5.4 ─> S5.2.2 Cited synthesis/UI ─> S5.6 Evaluation/release
 S5.1.2 + existing Stage 2 job contract ─> S5.5 Optional monitoring ─> S5.6 if enabled
-Stage 4 + applicable real DSQL research suite ────────────────────────> hosted gate
+Stage 4 + applicable real Neon research suite ────────────────────────> hosted gate
 ```
 
 Neither optional tax/performance history nor cloud hosting is required for local research. Until the durable Stage 2 job contract is available, monitoring stays manual/disabled rather than adding a second untested queue design.
@@ -171,7 +171,7 @@ Neither optional tax/performance history nor cloud hosting is required for local
 
 **Requirements:** no finance-owned `ResearchIndex`, embeddings, vector database or SQL-extension dependency. Finance's retained source references and citation checks complement upstream provenance; they are not a second generic evidence engine.
 
-**Acceptance criteria:** fake/HTTP contract fixtures reject wrong issuer, stale/out-of-scope/unattributed/nontraceable excerpts and oversized results; conflicts and insufficient evidence remain visible. Finance PG/DSQL result persistence is tested independently of upstream index storage. Cached/manual company views work when the service is disabled.
+Retain only bounded source/evidence references and validated finance snapshots through standard PostgreSQL/Alembic. Generic retrieval and any real service transport remain gated upstream.
 
 **Out of scope:** rebuilding shared chunking/ranking/retrieval, local pgvector experiments in this repo, general knowledge graphs and autonomous search loops.
 
@@ -208,7 +208,7 @@ Neither optional tax/performance history nor cloud hosting is required for local
 
 **Requirements:** scheduled refresh is opt-in, not implied by a one-time research request. Duplicate jobs cannot repeatedly fetch/infer/notify on unchanged data. Delivery failure is retried independently of source/model work; ambiguous send outcomes follow documented dedup semantics rather than a false exactly-once promise.
 
-**Acceptance criteria:** unchanged source produces no repeat alert under change-only policy; new/amended filing is distinct; duplicate delivery/lease expiry/cancel/quota and notification failure preserve one saved observation/run and documented alert behavior; disabling jobs/notifications leaves on-demand research intact; provider and DSQL work budgets remain enforced.
+Use Finance’s durable job/lease/fencing contract and separately reviewed bounded Cloud Run execution for any future monitoring. Scheduling and notifications remain unimplemented and require their own authorization and release evidence.
 
 **Out of scope:** trading alerts that imply recommendations, undeclared messaging channels, always-on cloud models, and new queue infrastructure outside the approved job/deployment track.
 
@@ -219,7 +219,7 @@ Neither optional tax/performance history nor cloud hosting is required for local
 
 **Goal:** prove source-grounded usefulness without making research authoritative financial state.
 
-**Work:** run synthetic/public-company evaluation for citation resolution and semantic support, exact quotation traceability, period/unit accuracy, stale/irrelevant/conflicting sources, unsupported claims, prompt injection, privacy and outage; compare deterministic finance baseline to shared research results; reuse upstream generic-model evaluation evidence; execute company → cited report/exposure → user thesis journey; run PG finance-result persistence and separately real DSQL migrations/idempotency/job cases before hosted promotion; document provider/model/policy/fixture versions and commands.
+**Work:** run synthetic/public-company evaluation for citation resolution and semantic support, exact quotation traceability, period/unit accuracy, stale/irrelevant/conflicting sources, unsupported claims, prompt injection, privacy and outage; compare deterministic finance baseline to shared research results; reuse upstream generic-model evaluation evidence; execute company → cited report/exposure → user thesis journey; run PG finance-result persistence and separately real Neon migrations/idempotency/job cases before hosted promotion; document provider/model/policy/fixture versions and commands.
 
 **Requirements:** report citation validity separately from claim support; perfect URLs cannot hide hallucinated claims. Distinguish deterministic CI from credentialed provider/cluster tests. Model/search-disabled parity includes existing holdings, imports, finance and simulations, not merely an error screen.
 
@@ -236,6 +236,9 @@ Neither optional tax/performance history nor cloud hosting is required for local
 5. Does private context stay local unless its transmission is separately approved?
 6. Does shared retrieval satisfy scope/provenance bounds without finance SQL-extension or duplicate-index dependencies?
 7. Are optional monitors bounded/idempotent and governed by explicit notification preferences?
-8. Does the complete app remain usable with all model/search APIs disabled, with hosted behavior gated on real DSQL/security tests?
+8. Does the complete app remain usable with all model/search APIs disabled, with hosted behavior gated on real Neon/security tests?
 
-**Implementation handoff:** publish routes/generated-client procedure, source/service/result contracts and settings, privacy/terms verification dates, corpus/freshness/context policies, citation/metric evaluation results, notification semantics, reproducible fixture commands, and local/provider/DSQL evidence separately.
+**Implementation handoff:** publish routes/generated-client procedure, source/service/result contracts and settings, privacy/terms verification dates, corpus/freshness/context policies, citation/metric evaluation results, notification semantics, reproducible fixture commands, and local/provider/Neon evidence separately.
+
+
+Provider-specific dated delivery facts are preserved in [the pre-migration snapshot](history/pre-gcp-neon/stage-5-implementation-plan.md). [ADR 0002](adr/0002-gcp-neon.md) and the [migration record](gcp-neon-migration.md) define the current architecture; this plan does not claim additional product completion.

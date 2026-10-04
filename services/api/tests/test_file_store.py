@@ -1,69 +1,53 @@
-"""Private local/S3 storage contract tests using synthetic object bytes."""
+"""Private local/GCS storage contract with synthetic objects only."""
 
-from __future__ import annotations
-
-import base64
 import hashlib
 from io import BytesIO
 from pathlib import Path
 from typing import Any
 
 import pytest
-from botocore.exceptions import ClientError  # type: ignore[import-untyped]
+from google.api_core.exceptions import PreconditionFailed
 
 from app.storage.file_store import PrivateFileStore
-from app.storage.s3_file_store import S3FileStore
+from app.storage.gcs_file_store import GCSFileStore
 
 
-class MemoryS3:
+class MemoryBlob:
+    def __init__(self, client: "MemoryGCS", key: str) -> None:
+        self.client = client
+        self.key = key
+        self.metadata: dict[str, str] = {}
+        self.size: Any = None
+        self.generation: int | None = None
+
+    def upload_from_string(self, content: bytes, **kwargs: Any) -> None:
+        assert kwargs["if_generation_match"] == 0
+        assert kwargs["checksum"] == "crc32c"
+        assert kwargs["content_type"] == "application/octet-stream"
+        if self.key in self.client.objects:
+            raise PreconditionFailed("exists")  # type: ignore[no-untyped-call]
+        self.client.objects[self.key] = (content, len(content), dict(self.metadata))
+
+    def reload(self, **_kwargs: Any) -> None:
+        content, self.size, self.metadata = self.client.objects[self.key]
+        self.generation = 7
+
+    def open(self, _mode: str, **_kwargs: Any) -> BytesIO:
+        assert self.generation == 7
+        self.client.stream = BytesIO(self.client.objects[self.key][0])
+        return self.client.stream
+
+
+class MemoryGCS:
     def __init__(self) -> None:
-        self.objects: dict[str, dict[str, Any]] = {}
-        self.put_calls: list[dict[str, Any]] = []
+        self.objects: dict[str, tuple[bytes, Any, dict[str, str]]] = {}
+        self.stream: BytesIO | None = None
 
-    def put_object(self, **kwargs: Any) -> None:
-        self.put_calls.append(kwargs)
-        if kwargs["Key"] in self.objects:
-            raise ClientError(
-                {
-                    "Error": {"Code": "PreconditionFailed"},
-                    "ResponseMetadata": {"HTTPStatusCode": 412},
-                },
-                "PutObject",
-            )
-        body = kwargs["Body"]
-        self.objects[kwargs["Key"]] = {
-            "Body": body,
-            "ContentLength": len(body),
-            "Metadata": kwargs["Metadata"],
-        }
+    def bucket(self, _name: str) -> "MemoryGCS":
+        return self
 
-    def head_object(self, *, Bucket: str, Key: str) -> dict[str, Any]:
-        assert Bucket == "synthetic-private-bucket"
-        obj = self.objects[Key]
-        return {"ContentLength": obj["ContentLength"], "Metadata": obj["Metadata"]}
-
-    def get_object(self, *, Bucket: str, Key: str) -> dict[str, Any]:
-        assert Bucket == "synthetic-private-bucket"
-        obj = self.objects[Key]
-        return {
-            "Body": BytesIO(obj["Body"]),
-            "ContentLength": obj["ContentLength"],
-            "Metadata": obj["Metadata"],
-        }
-
-
-class ConflictOnceS3(MemoryS3):
-    def put_object(self, **kwargs: Any) -> None:
-        if not self.put_calls:
-            self.put_calls.append(kwargs)
-            raise ClientError(
-                {
-                    "Error": {"Code": "ConditionalRequestConflict"},
-                    "ResponseMetadata": {"HTTPStatusCode": 409},
-                },
-                "PutObject",
-            )
-        super().put_object(**kwargs)
+    def blob(self, key: str) -> MemoryBlob:
+        return MemoryBlob(self, key)
 
 
 def test_local_store_bounds_hashes_and_rejects_tampering(tmp_path: Path) -> None:
@@ -75,7 +59,6 @@ def test_local_store_bounds_hashes_and_rejects_tampering(tmp_path: Path) -> None
         store.put(b"too large")
     with pytest.raises(ValueError, match="read limit"):
         store.read(key, max_bytes=3)
-
     (tmp_path / "private" / key).write_bytes(b"evil")
     with pytest.raises(OSError, match="hash mismatch"):
         store.read(key)
@@ -93,124 +76,62 @@ def test_local_store_bounds_existing_content_addressed_object_hash(
         store.put(b"safe")
 
 
-def test_s3_store_closes_streaming_body_when_read_raises() -> None:
-    class BrokenBody:
-        closed = False
-
-        def read(self, _size: int) -> bytes:
-            raise OSError("synthetic stream failure")
-
-        def close(self) -> None:
-            self.closed = True
-
-    class BrokenReadS3(MemoryS3):
-        def __init__(self) -> None:
-            super().__init__()
-            self.body = BrokenBody()
-
-        def get_object(self, *, Bucket: str, Key: str) -> dict[str, Any]:
-            return {
-                "Body": self.body,
-                "ContentLength": 1,
-                "Metadata": {"sha256": Key.removesuffix(".blob")},
-            }
-
-    client = BrokenReadS3()
-    store = S3FileStore("synthetic-private-bucket", "us-east-1", client=client)
-    key = f"{hashlib.sha256(b'x').hexdigest()}.blob"
-    with pytest.raises(OSError, match="synthetic stream failure"):
-        store.read(key)
-    assert client.body.closed is True
-
-
-def test_s3_store_uses_conditional_encrypted_content_addressed_objects() -> None:
-    client = MemoryS3()
-    store = S3FileStore(
-        "synthetic-private-bucket", "us-east-1", client=client, max_object_bytes=19
-    )
-    key, digest = store.put(b"synthetic statement")
-    assert key == f"{digest}.blob"
-    request = client.put_calls[0]
-    assert request["IfNoneMatch"] == "*"
-    assert request["ChecksumSHA256"] == base64.b64encode(bytes.fromhex(digest)).decode(
-        "ascii"
-    )
-    assert request["ServerSideEncryption"] == "AES256"
-    assert request["ContentType"] == "application/octet-stream"
-    assert store.put(b"synthetic statement") == (key, digest)
-    assert len(client.put_calls) == 2
-    assert store.read(key) == b"synthetic statement"
-    with pytest.raises(ValueError, match="write limit"):
-        store.put(b"this statement is too large")
-    with pytest.raises(ValueError, match="read limit"):
-        store.read(key, max_bytes=5)
-
-
-def test_s3_store_rejects_invalid_keys_and_object_identity_mismatch() -> None:
-    client = MemoryS3()
-    store = S3FileStore("synthetic-private-bucket", "us-east-1", client=client)
-    with pytest.raises(ValueError, match="Invalid private file key"):
-        store.read("folder/statement.pdf")
-    key, _ = store.put(b"synthetic")
-    client.objects[key]["Metadata"] = {"sha256": "0" * 64}
-    with pytest.raises(OSError, match="hash mismatch"):
-        store.read(key)
-
-
-def test_s3_kms_selection_is_explicit() -> None:
-    client = MemoryS3()
-    store = S3FileStore(
-        "synthetic-private-bucket",
-        "us-east-1",
-        client=client,
-        kms_key_id="arn:aws:kms:us-east-1:111122223333:key/synthetic",
-    )
-    store.put(b"synthetic")
-    request = client.put_calls[0]
-    assert request["ServerSideEncryption"] == "aws:kms"
-    assert request["SSEKMSKeyId"].endswith("key/synthetic")
-
-
-def test_s3_store_retries_one_conditional_conflict() -> None:
-    client = ConflictOnceS3()
-    store = S3FileStore("synthetic-private-bucket", "us-east-1", client=client)
-    key, digest = store.put(b"retry-safe synthetic")
-    assert len(client.put_calls) == 2
-    assert store.read(key) == b"retry-safe synthetic"
-    assert key == f"{digest}.blob"
-
-
-def test_duplicate_s3_write_verifies_bytes_before_reusing_original() -> None:
-    client = MemoryS3()
-    store = S3FileStore("synthetic-private-bucket", "us-east-1", client=client)
-    key, _digest = store.put(b"safe")
-    # Same metadata and byte count, different actual bytes.
-    client.objects[key]["Body"] = b"evil"
+def test_gcs_create_only_duplicate_integrity_and_stream_cleanup() -> None:
+    client = MemoryGCS()
+    store = GCSFileStore("private-fixture", client=client, max_object_bytes=4)
+    key, digest = store.put(b"safe")
+    assert key == digest + ".blob"
+    assert store.put(b"safe") == (key, digest)
+    assert store.read(key) == b"safe"
+    assert client.stream is not None and client.stream.closed
+    client.objects[key] = (b"evil", 4, {"sha256": digest})
     with pytest.raises(OSError, match="hash mismatch"):
         store.put(b"safe")
+    assert client.stream.closed
 
 
-@pytest.mark.parametrize("size", ["invalid", None])
-def test_s3_stream_closes_when_size_metadata_is_malformed(size: Any) -> None:
-    client = MemoryS3()
-    store = S3FileStore("synthetic-private-bucket", "us-east-1", client=client)
-    key, _digest = store.put(b"safe")
-    body = BytesIO(b"safe")
-    client.get_object = lambda **_kwargs: {  # type: ignore[method-assign]
-        "ContentLength": size,
-        "Body": body,
-    }
-    with pytest.raises((ValueError, TypeError)):
+@pytest.mark.parametrize("size", [5, -1, "invalid", None])
+def test_gcs_rejects_invalid_or_oversized_metadata(size: Any) -> None:
+    client = MemoryGCS()
+    store = GCSFileStore("private-fixture", client=client, max_object_bytes=4)
+    key, digest = store.put(b"safe")
+    client.objects[key] = (b"safe", size, {"sha256": digest})
+    with pytest.raises((ValueError, OSError)):
         store.read(key)
-    assert body.closed
+    assert client.stream is None
 
 
-def test_storage_read_limits_cannot_be_negative(tmp_path: Path) -> None:
-    stores = (
-        PrivateFileStore(tmp_path / "private"),
-        S3FileStore("synthetic-private-bucket", "us-east-1", client=MemoryS3()),
-    )
-    for store in stores:
-        key, _digest = store.put(b"safe")
-        with pytest.raises(ValueError, match="cannot be negative"):
-            store.read(key, max_bytes=-2)
+def test_gcs_rejects_size_hash_key_and_read_write_bounds() -> None:
+    client = MemoryGCS()
+    store = GCSFileStore("private-fixture", client=client, max_object_bytes=4)
+    with pytest.raises(ValueError, match="write limit"):
+        store.put(b"large")
+    with pytest.raises(ValueError, match="Invalid"):
+        store.read("../outside")
+    key, digest = store.put(b"safe")
+    with pytest.raises(ValueError, match="read limit"):
+        store.read(key, max_bytes=3)
+    with pytest.raises(ValueError, match="negative"):
+        store.read(key, max_bytes=-1)
+    client.objects[key] = (b"shorter", 4, {"sha256": digest})
+    with pytest.raises(OSError, match="size mismatch"):
+        store.read(key)
+    assert client.stream is not None and client.stream.closed
+    client.objects[key] = (b"safe", 4, {"sha256": "0" * 64})
+    with pytest.raises(OSError, match="hash mismatch"):
+        store.read(key)
+
+
+def test_gcs_stream_closes_on_download_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    class BrokenStream(BytesIO):
+        def read(self, _size: int | None = -1) -> bytes:
+            raise OSError("synthetic download failure")
+
+    stream = BrokenStream()
+    monkeypatch.setattr(MemoryBlob, "open", lambda *_args, **_kwargs: stream)
+    client = MemoryGCS()
+    store = GCSFileStore("private-fixture", client=client)
+    key, _ = store.put(b"safe")
+    with pytest.raises(OSError, match="read unavailable"):
+        store.read(key)
+    assert stream.closed

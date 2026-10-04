@@ -1,7 +1,7 @@
-"""Run the explicitly gated DSQL release suite and emit secret-free evidence.
+"""Run the explicitly gated Neon release suite and emit secret-free evidence.
 
 This tool deliberately treats skipped tests as a blocked result. It records
-hashes of the build inputs, schema plan, fixture suite and sanitized DSQL
+hashes of the build inputs, schema plan, fixture suite and sanitized Neon
 configuration; raw endpoints, role names, credentials, pytest output, and
 JUnit XML are never written to the evidence record.
 """
@@ -25,22 +25,18 @@ from xml.etree import ElementTree
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 API_ROOT = REPOSITORY_ROOT / "services" / "api"
 EVIDENCE_VERSION = 1
-FIXTURE_VERSION = "stage4-release-suite-v2"
+FIXTURE_VERSION = "stage4-neon-release-suite-v1"
 REQUIRED_CASES = frozenset(
     {
-        "test_real_dsql_populated_previous_schema_upgrade",
-        "test_real_dsql_mid_migration_interruption_resume",
-        "test_real_dsql_application_role_reconnects_after_iam_token_expiry",
-        "test_real_dsql_migration_and_synthetic_persistence",
-        "test_real_dsql_occ_conflict_uses_bounded_database_retry",
-        "test_real_dsql_manual_replacement_history_and_scoped_identity",
-        "test_real_dsql_auth_schema_and_session_round_trip",
-        "test_real_dsql_application_role_reconnects_with_verified_tls",
-        "test_real_dsql_stage1_golden_and_frozen_report",
-        "test_real_dsql_stage1_502_rows_duplicate_and_history",
-        "test_real_dsql_stage1_partial_staging_recovery",
-        "test_real_dsql_stage1_concurrent_publication",
-        "test_real_dsql_configured_safe_batch_limit_rejects_extra_row",
+        "test_real_neon_fresh_alembic_schema",
+        "test_real_neon_populated_upgrade",
+        "test_real_neon_reconnect",
+        "test_real_neon_transaction_retry",
+        "test_real_neon_stage1_golden_and_frozen_report",
+        "test_real_neon_stage1_502_rows_duplicate_and_history",
+        "test_real_neon_stage1_partial_staging_recovery",
+        "test_real_neon_stage1_concurrent_publication",
+        "test_real_neon_configured_safe_batch_limit_rejects_extra_row",
     }
 )
 UNVERIFIED_RELEASE_GATES: tuple[str, ...] = ()
@@ -53,14 +49,10 @@ CONFIG_KEYS = (
     "AUTH_COOKIE_SECURE",
     "AUTH_SESSION_TTL_SECONDS",
     "FILE_STORAGE_BACKEND",
-    "PRIVATE_S3_BUCKET",
-    "PRIVATE_S3_KMS_KEY_ID",
-    "STATIC_ASSETS_BUCKET",
+    "PRIVATE_GCS_BUCKET",
     "DATABASE_BACKEND",
-    "AWS_REGION",
-    "AURORA_DSQL_CLUSTER_ENDPOINT",
-    "AURORA_DSQL_DB_USER",
-    "AURORA_DSQL_MIGRATION_DB_USER",
+    "GCP_PROJECT",
+    "CLOUD_RUN_JOB",
     "DATABASE_POOL_SIZE",
     "DATABASE_MAX_OVERFLOW",
     "DATABASE_POOL_RECYCLE_SECONDS",
@@ -125,7 +117,6 @@ def _source_paths() -> tuple[list[Path], list[Path], list[Path]]:
         if path.is_file()
     )
     schema_files = [
-        API_ROOT / "app" / "db" / "dsql_migrations.py",
         API_ROOT / "app" / "db" / "models.py",
         API_ROOT / "alembic.ini",
         API_ROOT / "alembic" / "env.py",
@@ -226,48 +217,60 @@ def _configuration_fingerprint() -> str:
         ).hexdigest()
     else:
         safe_values["AUTH_PRIVATE_INPUTS_HMAC_SHA256"] = None
+    connection_inputs = {
+        key: os.environ.get(key)
+        for key in (
+            "DATABASE_URL",
+            "MIGRATION_DATABASE_URL",
+            "NEON_TEST_DATABASE_URL",
+            "NEON_TEST_MIGRATION_DATABASE_URL",
+        )
+    }
+    if any(connection_inputs.values()):
+        key = os.environ.get("EVIDENCE_CONFIGURATION_KEY", "")
+        if len(key) < 32:
+            raise EvidenceError(
+                "Connection evidence requires EVIDENCE_CONFIGURATION_KEY"
+            )
+        safe_values["CONNECTION_INPUTS_HMAC_SHA256"] = hmac.new(
+            key.encode(),
+            json.dumps(connection_inputs, sort_keys=True).encode(),
+            hashlib.sha256,
+        ).hexdigest()
     return _sha256(
         json.dumps(safe_values, sort_keys=True, separators=(",", ":")).encode()
     )
 
 
-def _cluster_fingerprint() -> str:
-    endpoint = os.environ.get("AURORA_DSQL_CLUSTER_ENDPOINT", "").strip().casefold()
-    if not endpoint or ".dsql." not in endpoint or not endpoint.endswith(".on.aws"):
-        raise EvidenceError("A configured Aurora DSQL endpoint is required")
-    return _sha256(endpoint.encode("utf-8"))
+def _database_fingerprint() -> str:
+    from app.db.urls import postgres_url
+
+    value = os.environ.get("NEON_TEST_DATABASE_URL", "")
+    url = postgres_url(value, production=True, setting="NEON_TEST_DATABASE_URL")
+    return _sha256(f"{url.host}/{url.database}".encode())
 
 
 def _preflight() -> None:
-    required_values = {
-        "RUN_DSQL_INTEGRATION": "1",
-        "DSQL_TEST_CLUSTER": "disposable",
-        "DATABASE_BACKEND": "aurora_dsql",
-    }
-    for key, expected in required_values.items():
-        if os.environ.get(key) != expected:
-            raise EvidenceError("Explicit disposable Aurora DSQL opt-in is required")
-    for key in (
-        "AWS_REGION",
-        "AURORA_DSQL_DB_USER",
-        "AURORA_DSQL_MIGRATION_DB_USER",
+    if (
+        os.environ.get("RUN_NEON_INTEGRATION") != "1"
+        or os.environ.get("NEON_TEST_DATABASE") != "disposable"
     ):
-        if not os.environ.get(key):
-            raise EvidenceError("Both scoped DSQL roles and AWS region are required")
-    if os.environ["AURORA_DSQL_DB_USER"].casefold() == "admin":
-        raise EvidenceError("The release suite must use the scoped application role")
-    if os.environ["AURORA_DSQL_DB_USER"] == os.environ["AURORA_DSQL_MIGRATION_DB_USER"]:
-        raise EvidenceError("Application and migration roles must be distinct")
-    if os.environ.get("RUN_DSQL_TOKEN_EXPIRY_TEST") != "1":
-        raise EvidenceError(
-            "Explicit 16-minute IAM token expiry reconnect test opt-in is required"
-        )
+        raise EvidenceError("Explicit disposable Neon opt-in is required")
+    if not os.environ.get("NEON_TEST_MIGRATION_DATABASE_URL"):
+        raise EvidenceError("A direct Neon test migration connection is required")
+    from app.db.urls import postgres_url
+
+    postgres_url(
+        os.environ["NEON_TEST_MIGRATION_DATABASE_URL"],
+        production=True,
+        setting="NEON_TEST_MIGRATION_DATABASE_URL",
+    )
     if not re.fullmatch(
         r"sha256:[0-9a-f]{64}", os.environ.get("RELEASE_IMAGE_DIGEST", "")
     ):
         raise EvidenceError("A source-matched immutable OCI image digest is required")
     _require_committed_api_source()
-    _cluster_fingerprint()
+    _database_fingerprint()
     _configuration_fingerprint()
 
 
@@ -305,11 +308,11 @@ def _atomic_json(path: Path, payload: dict[str, Any]) -> None:
 def _run_suite(evidence_path: Path) -> int:
     try:
         _preflight()
-    except EvidenceError as exc:
-        print(f"DSQL release suite blocked: {exc}", file=sys.stderr)
+    except (EvidenceError, ValueError) as exc:
+        print(f"Neon release suite blocked: {exc}", file=sys.stderr)
         return 2
 
-    with tempfile.TemporaryDirectory(prefix="finance-dsql-release-") as temp_dir:
+    with tempfile.TemporaryDirectory(prefix="finance-neon-release-") as temp_dir:
         junit_path = Path(temp_dir) / "results.xml"
         command = [
             sys.executable,
@@ -318,8 +321,8 @@ def _run_suite(evidence_path: Path) -> int:
             "-q",
             "--junitxml",
             str(junit_path),
-            "tests/test_dsql_integration.py",
-            "tests/test_stage1_dsql_integration.py",
+            "tests/test_neon_integration.py",
+            "tests/test_stage1_neon_integration.py",
         ]
         # Keep pytest's raw output and XML in a private temporary location. A
         # connector exception can contain an endpoint or request details.
@@ -332,12 +335,12 @@ def _run_suite(evidence_path: Path) -> int:
             timeout=1800,
         )
         if not junit_path.exists():
-            print("DSQL release suite failed before producing test evidence")
+            print("Neon release suite failed before producing test evidence")
             return 1
         try:
             counts, case_names = _parse_junit(junit_path)
         except (ElementTree.ParseError, OSError, EvidenceError):
-            print("DSQL release suite produced invalid test evidence")
+            print("Neon release suite produced invalid test evidence")
             return 1
 
     missing_cases = sorted(REQUIRED_CASES - case_names)
@@ -354,13 +357,13 @@ def _run_suite(evidence_path: Path) -> int:
     fingerprints = _fingerprints()
     payload: dict[str, Any] = {
         "evidence_version": EVIDENCE_VERSION,
-        "suite": "aurora-dsql-stage4-release",
+        "suite": "neon-postgres-stage4-release",
         "result": result,
         "executed_at_utc": now,
         "git_commit": _git_commit(),
-        "backend": "aurora_dsql",
+        "backend": "postgres",
         "image_digest": os.environ["RELEASE_IMAGE_DIGEST"],
-        "cluster_identity_sha256": _cluster_fingerprint(),
+        "database_identity_sha256": _database_fingerprint(),
         "configuration_sha256": _configuration_fingerprint(),
         "fixture_version": FIXTURE_VERSION,
         **fingerprints,
@@ -373,7 +376,7 @@ def _run_suite(evidence_path: Path) -> int:
     }
     _atomic_json(evidence_path, payload)
     print(
-        f"DSQL suite {result}: {counts['passed']} passed, "
+        f"Neon suite {result}: {counts['passed']} passed, "
         f"{counts['failed'] + counts['errors']} failed, "
         f"{counts['skipped']} skipped; evidence written without endpoint or secrets"
     )
@@ -391,33 +394,33 @@ def validate_evidence(
         not isinstance(evidence, dict)
         or evidence.get("evidence_version") != EVIDENCE_VERSION
     ):
-        raise EvidenceError("Unsupported DSQL evidence format")
+        raise EvidenceError("Unsupported Neon evidence format")
     if evidence.get("result") != "passed":
-        raise EvidenceError("DSQL evidence did not pass")
-    if evidence.get("backend") != "aurora_dsql":
-        raise EvidenceError("Evidence was not produced by Aurora DSQL")
-    if evidence.get("suite") != "aurora-dsql-stage4-release":
+        raise EvidenceError("Neon evidence did not pass")
+    if evidence.get("backend") != "postgres":
+        raise EvidenceError("Evidence was not produced by Neon PostgreSQL")
+    if evidence.get("suite") != "neon-postgres-stage4-release":
         raise EvidenceError("Evidence was not produced by the required Stage 4 suite")
     if not isinstance(evidence.get("image_digest"), str) or not re.fullmatch(
         r"sha256:[0-9a-f]{64}", evidence["image_digest"]
     ):
         raise EvidenceError("Evidence is missing an immutable OCI image digest")
     if evidence.get("fixture_version") != FIXTURE_VERSION:
-        raise EvidenceError("DSQL synthetic fixture version changed")
+        raise EvidenceError("Neon synthetic fixture version changed")
     tests = evidence.get("tests")
     count_keys = ("tests", "passed", "failed", "errors", "skipped")
     if not isinstance(tests, dict) or any(
         not isinstance(tests.get(key), int) or isinstance(tests.get(key), bool)
         for key in count_keys
     ):
-        raise EvidenceError("DSQL test counts are malformed")
+        raise EvidenceError("Neon test counts are malformed")
     if any(tests[key] < 0 for key in count_keys) or any(
         tests[key] != value
         for key, value in {"failed": 0, "errors": 0, "skipped": 0}.items()
     ):
         raise EvidenceError("Failed, errored or skipped checks cannot pass the gate")
     if tests["tests"] <= 0 or tests["passed"] != tests["tests"]:
-        raise EvidenceError("DSQL suite is incomplete")
+        raise EvidenceError("Neon suite is incomplete")
     if evidence.get("missing_required_cases") != []:
         raise EvidenceError("Required release tests are missing")
     executed_cases = evidence.get("executed_cases")
@@ -429,37 +432,37 @@ def validate_evidence(
     ):
         raise EvidenceError("Evidence does not list every required release test")
     if evidence.get("unverified_release_gates") != []:
-        raise EvidenceError("Required live DSQL matrix evidence is still outstanding")
+        raise EvidenceError("Required live Neon matrix evidence is still outstanding")
     fingerprints = _fingerprints()
     for key, current in fingerprints.items():
         if evidence.get(key) != current:
-            raise EvidenceError(f"Stale DSQL evidence: {key} changed")
+            raise EvidenceError(f"Stale Neon evidence: {key} changed")
     if evidence.get("git_commit") != _git_commit():
-        raise EvidenceError("DSQL evidence belongs to a different source revision")
-    for key in ("cluster_identity_sha256", "configuration_sha256"):
+        raise EvidenceError("Neon evidence belongs to a different source revision")
+    for key in ("database_identity_sha256", "configuration_sha256"):
         value = evidence.get(key)
         if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
-            raise EvidenceError("DSQL evidence metadata is incomplete")
+            raise EvidenceError("Neon evidence metadata is incomplete")
     if require_current_runtime:
         _preflight()
         if evidence["image_digest"] != os.environ["RELEASE_IMAGE_DIGEST"]:
-            raise EvidenceError("DSQL evidence names a different immutable image")
+            raise EvidenceError("Neon evidence names a different immutable image")
         if evidence["configuration_sha256"] != _configuration_fingerprint():
-            raise EvidenceError("DSQL evidence configuration does not match this run")
-        if evidence["cluster_identity_sha256"] != _cluster_fingerprint():
-            raise EvidenceError("DSQL evidence belongs to a different cluster")
+            raise EvidenceError("Neon evidence configuration does not match this run")
+        if evidence["database_identity_sha256"] != _database_fingerprint():
+            raise EvidenceError("Neon evidence belongs to a different database")
     if (
         evidence.get("credentials_recorded") is not False
         or evidence.get("raw_junit_recorded") is not False
     ):
-        raise EvidenceError("DSQL evidence must not contain credentials or raw tests")
+        raise EvidenceError("Neon evidence must not contain credentials or raw tests")
     return evidence
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
-    run_parser = subparsers.add_parser("run", help="run the gated real-cluster suite")
+    run_parser = subparsers.add_parser("run", help="run the gated real-Neon suite")
     run_parser.add_argument("--evidence", type=Path, required=True)
     check_parser = subparsers.add_parser(
         "check", help="validate passed evidence against the current build inputs"
@@ -470,11 +473,11 @@ def main() -> int:
         return _run_suite(args.evidence)
     try:
         evidence = validate_evidence(args.evidence, require_current_runtime=True)
-    except EvidenceError as exc:
-        print(f"DSQL release gate blocked: {exc}", file=sys.stderr)
+    except (EvidenceError, ValueError) as exc:
+        print(f"Neon release gate blocked: {exc}", file=sys.stderr)
         return 1
     print(
-        "DSQL release gate passed for immutable build "
+        "Neon release gate passed for immutable build "
         f"{evidence['git_commit'][:12]} with {evidence['tests']['passed']} tests"
     )
     return 0

@@ -1,3 +1,5 @@
+> Dated historical evaluation. Provider assumptions are superseded by [ADR 0002](adr/0002-gcp-neon.md); current validation is in [the migration record](gcp-neon-migration.md).
+
 # Stage 5 offline evaluation report
 
 **Evaluation date:** 2026-10-03

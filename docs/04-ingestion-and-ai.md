@@ -3,9 +3,9 @@
 **Status:** Stage 1 deterministic imports delivered; Stage 2 text-PDF jobs and reviewed transaction CSVs partially delivered; Stage 5 offline research baseline delivered; AI/OCR/transport remain gated | **Updated:** 2026-10-03
 
 **Stage 1:** reviewed position CSV, generic/iShares fund CSV and SPDR XLSX; no AI consumer.
-**Stage 2:** A supported text-layer brokerage PDF can be privately previewed through the existing reviewed position-import workflow. Scanned PDFs, screenshots, transaction imports, optional AI and bank connectivity remain pending or gated; see [Stage 2 release status](stage-2-release.md).
+**Stage 2:** A supported text-layer brokerage PDF can be privately previewed through the existing reviewed position-import workflow. Reviewed transaction CSVs are also delivered. Scanned PDFs, screenshots, broad institution coverage, optional AI and bank connectivity remain pending or gated; see [Stage 2 release status](stage-2-release.md).
 **Stage 5:** retrieval and portfolio-aware investment research.  
-**Central rule:** extraction is probabilistic; financial records and calculations must be validated and deterministic. Both the local PostgreSQL and production Aurora DSQL implementations must preserve identical import semantics; see [`07-aurora-dsql-compatibility.md`](07-aurora-dsql-compatibility.md).
+**Central rule:** extraction is probabilistic; financial records and calculations must be validated and deterministic. Both the local PostgreSQL and production Neon PostgreSQL implementations must preserve identical import semantics; see [`07-postgres-neon.md`](07-postgres-neon.md).
 
 Finance owns private originals, source lineage, institution-specific deterministic parsing/mapping, numeric validation, deduplication, review and publication. `personal-ai-system` owns reusable extraction/OCR/model execution, research/search/evidence retrieval and attributable AI memory. Source provenance still accompanies every finance record; shared evidence infrastructure does not transfer canonical ownership. See [ADR 0001](adr/0001-shared-personal-ai.md).
 
@@ -86,7 +86,7 @@ Research, preference-memory retrieval and read-only finance tools are later capa
 
 ## 7. UI review and reconciliation
 
-The import wizard shows: input file and detected type; extracted account/date; recognized positions/transactions; unresolved tickers, weak classifications, arithmetic discrepancies; source evidence; and before/after diff. The **Commit** action publishes only after bounded, idempotent staging batches complete; one short final transaction changes the visible revision. DSQL limits each write transaction to 3,000 modified rows, 10 MiB of changed data and five minutes, so never hold a single transaction across an entire large PDF or ETF import. Provide cancel, reprocess with a different parser, explicit overwrite/merge settings, and a per-record correction mechanism. Never hide rows solely because the model cannot parse them.
+The import wizard shows: input file and detected type; extracted account/date; recognized positions/transactions; unresolved tickers, weak classifications, arithmetic discrepancies; source evidence; and before/after diff. The **Commit** action publishes only after bounded, idempotent staging batches complete; one short final transaction changes the visible revision. Bound rows/bytes and transaction duration to protect memory, latency, retry cost and review usability; never hold a transaction across external parsing or an entire large import. Provide cancel, reprocess with a different parser, explicit overwrite/merge settings, and a per-record correction mechanism. Never hide rows solely because the model cannot parse them.
 
 ## 8. Evaluation plan (required before trusting AI)
 
@@ -113,3 +113,6 @@ Finance UI selects company/question
 ```
 
 Generic SEC/IR research ingestion, search, passage indexing, ranking, synthesis and evidence/memory lifecycle live upstream. Finance may retain source references, approved evidence excerpts, returned result snapshots and finance-specific reported-fact validation; this is not a shared database or second research engine. When the service is disabled, finance retains core holdings/import/report functionality and later cached source views/manual notes. AI cannot overwrite canonical holdings, quantities, prices, transactions or tax lots. A research result is separate from a confirmed market observation and attributable preference memory.
+
+
+Provider-specific dated delivery facts are preserved in [the pre-migration snapshot](history/pre-gcp-neon/04-ingestion-and-ai.md). [ADR 0002](adr/0002-gcp-neon.md) and the [migration record](gcp-neon-migration.md) define the current architecture; this plan does not claim additional product completion.

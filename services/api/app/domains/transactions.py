@@ -345,7 +345,7 @@ def create_csv_import(
     if not parsed_rows:
         raise TransactionError("CSV contains no transaction rows.")
     # These rows are committed together. UTF-8 upload size does not bound the
-    # escaped JSON write size; leave ample room below DSQL's 10 MiB changed-data
+    # escaped JSON write size; bound memory and persistence latency for the import
     # limit for normalized columns, audit records, identities, and index writes.
     review_bytes = sum(
         len(json.dumps(row, ensure_ascii=True, default=str).encode("utf-8"))

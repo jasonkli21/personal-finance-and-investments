@@ -11,6 +11,8 @@ def clear_database_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "DEMO_MODE",
         "PERSONAL_AI_ENABLED",
         "DATABASE_URL",
+        "MIGRATION_DATABASE_URL",
+        "CLOUD_RUN_JOB",
         "DATABASE_HOST",
         "DATABASE_PORT",
         "DATABASE_USER",
@@ -20,10 +22,6 @@ def clear_database_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "POSTGRES_USER",
         "POSTGRES_PASSWORD",
         "POSTGRES_DB",
-        "AWS_REGION",
-        "AURORA_DSQL_CLUSTER_ENDPOINT",
-        "AURORA_DSQL_DB_USER",
-        "AURORA_DSQL_MIGRATION_DB_USER",
         "DATABASE_POOL_SIZE",
         "DATABASE_MAX_OVERFLOW",
         "DATABASE_POOL_RECYCLE_SECONDS",
@@ -31,9 +29,8 @@ def clear_database_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "APP_ENV",
         "APP_PUBLIC_ORIGIN",
         "FILE_STORAGE_BACKEND",
-        "PRIVATE_S3_BUCKET",
-        "PRIVATE_S3_KMS_KEY_ID",
-        "STATIC_ASSETS_BUCKET",
+        "PRIVATE_GCS_BUCKET",
+        "GCP_PROJECT",
         "MAX_PRIVATE_FILE_BYTES",
         "MAX_IMPORT_FILE_BYTES",
         "MAX_IMPORT_ROWS",
@@ -53,15 +50,6 @@ def clear_database_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "JOB_WORKER_ENABLED",
     ):
         monkeypatch.delenv(key, raising=False)
-
-
-def test_dsql_backend_is_explicitly_unavailable(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    clear_database_env(monkeypatch)
-    monkeypatch.setenv("DATABASE_BACKEND", "aurora_dsql")
-    with pytest.raises(ValueError, match="AURORA_DSQL_CLUSTER_ENDPOINT"):
-        load_settings()
 
 
 def test_unknown_database_backend_fails_configuration(
@@ -84,8 +72,8 @@ def test_demo_mode_requires_explicit_local_postgres(
     monkeypatch.setenv("DEMO_MODE", "true")
     assert load_settings().demo_mode is True
 
-    monkeypatch.setenv("DATABASE_BACKEND", "aurora_dsql")
-    with pytest.raises(ValueError, match="local PostgreSQL"):
+    monkeypatch.setenv("DATABASE_BACKEND", "mysql")
+    with pytest.raises(ValueError, match="DATABASE_BACKEND"):
         load_settings()
 
 
@@ -149,48 +137,6 @@ def test_stage4_request_settings_reject_unbounded_values(
     monkeypatch.setenv(setting, value)
 
     with pytest.raises(ValueError, match=setting):
-        load_settings()
-
-
-def test_dsql_requires_scoped_application_and_distinct_migration_roles(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    clear_database_env(monkeypatch)
-    monkeypatch.setenv("DATABASE_BACKEND", "aurora_dsql")
-    monkeypatch.setenv("AWS_REGION", "us-east-1")
-    monkeypatch.setenv("AURORA_DSQL_CLUSTER_ENDPOINT", "cluster.dsql.us-east-1.on.aws")
-    monkeypatch.setenv("AURORA_DSQL_DB_USER", "portfolio_app")
-    monkeypatch.setenv("AURORA_DSQL_MIGRATION_DB_USER", "portfolio_app")
-
-    with pytest.raises(ValueError, match="must differ"):
-        load_settings()
-
-
-def test_dsql_rejects_password_bearing_database_url(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    clear_database_env(monkeypatch)
-    monkeypatch.setenv("DATABASE_BACKEND", "aurora_dsql")
-    monkeypatch.setenv("AWS_REGION", "us-east-1")
-    monkeypatch.setenv("AURORA_DSQL_CLUSTER_ENDPOINT", "cluster.dsql.us-east-1.on.aws")
-    monkeypatch.setenv("AURORA_DSQL_DB_USER", "portfolio_app")
-    monkeypatch.setenv("DATABASE_URL", "postgresql://user:secret@example/db")
-
-    with pytest.raises(ValueError, match="DATABASE_URL"):
-        load_settings()
-
-
-@pytest.mark.parametrize("value", ["admin", "ADMIN"])
-def test_dsql_rejects_admin_application_role(
-    monkeypatch: pytest.MonkeyPatch, value: str
-) -> None:
-    clear_database_env(monkeypatch)
-    monkeypatch.setenv("DATABASE_BACKEND", "aurora_dsql")
-    monkeypatch.setenv("AWS_REGION", "us-east-1")
-    monkeypatch.setenv("AURORA_DSQL_CLUSTER_ENDPOINT", "cluster.dsql.us-east-1.on.aws")
-    monkeypatch.setenv("AURORA_DSQL_DB_USER", value)
-
-    with pytest.raises(ValueError, match="scoped application role"):
         load_settings()
 
 
@@ -262,7 +208,7 @@ def configure_valid_production(monkeypatch: pytest.MonkeyPatch) -> None:
         "APP_ENV",
         "APP_PUBLIC_ORIGIN",
         "FILE_STORAGE_BACKEND",
-        "PRIVATE_S3_BUCKET",
+        "PRIVATE_GCS_BUCKET",
         "AUTH_ENABLED",
         "AUTH_ISSUER_URL",
         "AUTH_CLIENT_ID",
@@ -271,17 +217,13 @@ def configure_valid_production(monkeypatch: pytest.MonkeyPatch) -> None:
         "AUTH_ALLOWED_SUBJECT",
         "AUTH_PERSONAL_SCOPE_ID",
         "AUTH_COOKIE_SECURE",
-        "AWS_REGION",
-        "AURORA_DSQL_CLUSTER_ENDPOINT",
-        "AURORA_DSQL_DB_USER",
-        "AURORA_DSQL_MIGRATION_DB_USER",
     ):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("APP_PUBLIC_ORIGIN", "https://finance.example.test")
-    monkeypatch.setenv("FILE_STORAGE_BACKEND", "s3")
-    monkeypatch.setenv("PRIVATE_S3_BUCKET", "finance-private-example")
-    monkeypatch.setenv("STATIC_ASSETS_BUCKET", "finance-static-example")
+    monkeypatch.setenv("FILE_STORAGE_BACKEND", "gcs")
+    monkeypatch.setenv("PRIVATE_GCS_BUCKET", "finance-private-example")
+    monkeypatch.setenv("GCP_PROJECT", "finance-static-example")
     monkeypatch.setenv("AUTH_ENABLED", "true")
     monkeypatch.setenv("AUTH_ISSUER_URL", "https://identity.example.test")
     monkeypatch.setenv("AUTH_CLIENT_ID", "finance-client")
@@ -292,15 +234,15 @@ def configure_valid_production(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AUTH_ALLOWED_SUBJECT", "local-owner")
     monkeypatch.setenv("AUTH_PERSONAL_SCOPE_ID", "personal-finance")
     monkeypatch.setenv("AUTH_COOKIE_SECURE", "true")
-    monkeypatch.setenv("AWS_REGION", "us-east-1")
-    monkeypatch.setenv("AURORA_DSQL_CLUSTER_ENDPOINT", "cluster.dsql.us-east-1.on.aws")
-    monkeypatch.setenv("AURORA_DSQL_DB_USER", "portfolio_app")
-    monkeypatch.setenv("AURORA_DSQL_MIGRATION_DB_USER", "portfolio_migrator")
-    monkeypatch.setenv("DATABASE_BACKEND", "aurora_dsql")
+    monkeypatch.setenv("DATABASE_BACKEND", "postgres")
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        "postgresql://finance:synthetic@ep-fixture.us-central1.gcp.neon.tech/neondb?sslmode=verify-full&sslrootcert=system",
+    )
     monkeypatch.setenv("JOB_WORKER_ENABLED", "false")
 
 
-def test_production_requires_private_authenticated_dsql_configuration(
+def test_production_requires_private_authenticated_neon_configuration(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     clear_database_env(monkeypatch)
@@ -311,8 +253,8 @@ def test_production_requires_private_authenticated_dsql_configuration(
     configure_valid_production(monkeypatch)
     settings = load_settings()
     assert settings.app_env == "production"
-    assert settings.database_backend == "aurora_dsql"
-    assert settings.file_storage_backend == "s3"
+    assert settings.database_backend == "postgres"
+    assert settings.file_storage_backend == "gcs"
     assert settings.auth_enabled is True
     assert settings.auth_cookie_secure is True
 
@@ -326,7 +268,7 @@ def test_production_worker_flag_uses_one_fail_closed_effective_default(
     monkeypatch.setenv("JOB_WORKER_ENABLED", "false")
     assert load_settings().job_worker_enabled is False
     monkeypatch.setenv("JOB_WORKER_ENABLED", "true")
-    with pytest.raises(ValueError, match="lease gate"):
+    with pytest.raises(ValueError, match="bounded Cloud Run Job"):
         load_settings()
     monkeypatch.setenv("JOB_WORKER_ENABLED", "sometimes")
     with pytest.raises(ValueError, match="must be 'true' or 'false'"):
@@ -363,10 +305,10 @@ def test_production_requires_secure_oidc_settings(
     ("variable", "value", "message"),
     [
         ("AUTH_COOKIE_SECURE", "false", "Secure"),
-        ("DATABASE_BACKEND", "postgres", "aurora_dsql"),
-        ("FILE_STORAGE_BACKEND", "local", "private S3"),
-        ("STATIC_ASSETS_BUCKET", "", "static assets bucket"),
-        ("JOB_WORKER_ENABLED", "true", "lease gate"),
+        ("DATABASE_URL", "", "DATABASE_URL"),
+        ("FILE_STORAGE_BACKEND", "local", "private GCS"),
+        ("GCP_PROJECT", "", "GCP_PROJECT"),
+        ("JOB_WORKER_ENABLED", "true", "bounded Cloud Run Job"),
         ("DEMO_MODE", "true", "DEMO_MODE"),
     ],
 )
@@ -376,4 +318,32 @@ def test_production_rejects_unsafe_runtime_modes(
     configure_valid_production(monkeypatch)
     monkeypatch.setenv(variable, value)
     with pytest.raises(ValueError, match=message):
+        load_settings()
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "postgresql://user:secret@localhost/db?sslmode=verify-full&sslrootcert=system",
+        "postgresql://user:secret@ep-fixture.gcp.neon.tech/db?sslmode=require",
+        "sqlite:///private.db",
+        "postgresql://user:secret@ep-fixture.gcp.neon.tech/db?sslmode=verify-full&sslrootcert=system&host=localhost",
+        "postgresql://user:secret@ep-fixture.gcp.neon.tech/db?sslmode=verify-full&sslrootcert=system&service=override",
+    ],
+)
+def test_production_database_requires_verified_neon_tls(
+    monkeypatch: pytest.MonkeyPatch, url: str
+) -> None:
+    configure_valid_production(monkeypatch)
+    monkeypatch.setenv("DATABASE_URL", url)
+    with pytest.raises(ValueError, match="DATABASE_URL"):
+        load_settings()
+
+
+def test_migration_url_is_independently_validated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configure_valid_production(monkeypatch)
+    monkeypatch.setenv("MIGRATION_DATABASE_URL", "postgresql://secret@remote/db")
+    with pytest.raises(ValueError, match="MIGRATION_DATABASE_URL"):
         load_settings()

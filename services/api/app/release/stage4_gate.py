@@ -1,6 +1,6 @@
 """Verify a hash-bound Stage 4 release evidence bundle without deploying it.
 
-The gate only reads local evidence artifacts. It never contacts AWS or changes
+The gate only reads local evidence artifacts. It never contacts GCP or changes
 infrastructure. Missing, skipped, failed, stale, or mismatched evidence blocks
 promotion. Operator approvals remain attestations whose referenced artifacts
 must be reviewed through the organization's chosen approval process.
@@ -18,7 +18,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from app.release import dsql_evidence
+from app.release import neon_evidence
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 EVIDENCE_VERSION = 1
@@ -28,8 +28,8 @@ MAX_EVIDENCE_AGE = timedelta(days=30)
 REQUIRED_GATES = {
     "target_configuration": ("approval", "production"),
     "immutable_infrastructure_plan": ("approval", "production"),
-    "authenticated_https_private_s3": ("tests", "synthetic_launch"),
-    "real_dsql_release_suite": ("dsql", "dsql_test"),
+    "authenticated_https_private_gcs": ("tests", "synthetic_launch"),
+    "real_neon_release_suite": ("neon", "neon_test"),
     "cost_and_budget_approval": ("approval", "production"),
     "encrypted_cloud_recovery": ("tests", "synthetic_launch"),
     "operations_rehearsal": ("tests", "synthetic_launch"),
@@ -67,11 +67,13 @@ def _sha256_paths(paths: list[Path]) -> str:
 
 
 def _release_sources() -> tuple[list[Path], list[Path]]:
-    infra = REPOSITORY_ROOT / "infra" / "terraform"
+    infra = REPOSITORY_ROOT / "infra"
     infra_paths = sorted(
         path
         for path in infra.rglob("*")
-        if path.is_file() and path.suffix in {".tf", ".hcl"}
+        if path.is_file()
+        and ".terraform" not in path.parts
+        and path.suffix in {".tf", ".hcl"}
     )
     infra_paths.extend(
         path
@@ -95,7 +97,7 @@ def _require_committed_release_sources() -> None:
             "--",
             "services/api",
             "apps/web",
-            "infra/terraform",
+            "infra",
             "scripts/stage4",
             "tests/infra",
             "fixtures",
@@ -122,8 +124,8 @@ def _current_release(image_digest: str | None = None) -> dict[str, str]:
         raise GateError("A source-matched immutable OCI image digest is required")
     infrastructure, config = _release_sources()
     release = {
-        "git_commit": dsql_evidence._git_commit(),
-        **dsql_evidence._fingerprints(),
+        "git_commit": neon_evidence._git_commit(),
+        **neon_evidence._fingerprints(),
         "infrastructure_sha256": _sha256_paths(infrastructure),
         "configuration_sha256": _sha256_paths(config),
         "image_digest": image,
@@ -340,19 +342,19 @@ def _validate_manual_evidence(
     return result
 
 
-def _validate_dsql_evidence(
+def _validate_neon_evidence(
     path: Path,
     *,
     expected_release: dict[str, str],
     context_configurations: dict[str, str],
     expected_context_configurations: dict[str, str],
 ) -> dict[str, Any]:
-    evidence = dsql_evidence.validate_evidence(path, require_current_runtime=True)
+    evidence = neon_evidence.validate_evidence(path, require_current_runtime=True)
     _parse_timestamp(evidence.get("executed_at_utc"))
     if not isinstance(
-        evidence.get("cluster_identity_sha256"), str
-    ) or not SHA256_RE.fullmatch(evidence["cluster_identity_sha256"]):
-        raise GateError("DSQL evidence is missing its cluster identity hash")
+        evidence.get("database_identity_sha256"), str
+    ) or not SHA256_RE.fullmatch(evidence["database_identity_sha256"]):
+        raise GateError("Neon evidence is missing its cluster identity hash")
     for key in (
         "git_commit",
         "build_sha256",
@@ -361,25 +363,25 @@ def _validate_dsql_evidence(
         "image_digest",
     ):
         if evidence.get(key) != expected_release[key]:
-            raise GateError("DSQL evidence is bound to a different release")
+            raise GateError("Neon evidence is bound to a different release")
     config_hash = evidence.get("configuration_sha256")
     if not isinstance(config_hash, str) or not SHA256_RE.fullmatch(config_hash):
-        raise GateError("DSQL environment configuration fingerprint is missing")
-    if expected_context_configurations.get("dsql_test") != config_hash:
+        raise GateError("Neon environment configuration fingerprint is missing")
+    if expected_context_configurations.get("neon_test") != config_hash:
         raise GateError(
-            "DSQL configuration does not match the independent current test "
+            "Neon configuration does not match the independent current test "
             "target configuration"
         )
-    previous = context_configurations.get("dsql_test")
+    previous = context_configurations.get("neon_test")
     if previous is not None and previous != config_hash:
-        raise GateError("DSQL test configuration fingerprints do not match")
-    context_configurations["dsql_test"] = config_hash
+        raise GateError("Neon test configuration fingerprints do not match")
+    context_configurations["neon_test"] = config_hash
     return {
         "result": "passed",
         "artifact_sha256": _file_sha256(path),
         "evidence_record_sha256": _file_sha256(path),
         "environment_configuration_sha256": config_hash,
-        "cluster_identity_sha256": evidence["cluster_identity_sha256"],
+        "database_identity_sha256": evidence["database_identity_sha256"],
         "verified_at_utc": evidence["executed_at_utc"],
         "tests": evidence["tests"],
     }
@@ -390,7 +392,7 @@ def evaluate_manifest(
     *,
     current_release: dict[str, str] | None = None,
     expected_context_configurations: dict[str, str] | None = None,
-    validate_dsql_runtime: bool = True,
+    validate_neon_runtime: bool = True,
 ) -> dict[str, Any]:
     manifest = _read_json(manifest_path)
     if manifest.get("evidence_version") != EVIDENCE_VERSION:
@@ -427,16 +429,16 @@ def evaluate_manifest(
         relative_path = gates.get(gate_id)
         try:
             evidence_path = _bundle_path(bundle_root, relative_path)
-            if kind == "dsql":
+            if kind == "neon":
                 outcome = (
-                    _validate_dsql_evidence(
+                    _validate_neon_evidence(
                         evidence_path,
                         expected_release=release,
                         context_configurations=contexts,
                         expected_context_configurations=expected_configs,
                     )
-                    if validate_dsql_runtime
-                    else _validate_dsql_structure(
+                    if validate_neon_runtime
+                    else _validate_neon_structure(
                         evidence_path,
                         expected_release=release,
                         context_configurations=contexts,
@@ -457,7 +459,7 @@ def evaluate_manifest(
             checked[gate_id] = outcome
         except (
             GateError,
-            dsql_evidence.EvidenceError,
+            neon_evidence.EvidenceError,
             OSError,
             ValueError,
             TypeError,
@@ -481,25 +483,25 @@ def evaluate_manifest(
     }
 
 
-def _validate_dsql_structure(
+def _validate_neon_structure(
     path: Path,
     *,
     expected_release: dict[str, str],
     context_configurations: dict[str, str],
     expected_context_configurations: dict[str, str],
 ) -> dict[str, Any]:
-    """Validate the DSQL record structure in offline unit tests only."""
+    """Validate the Neon record structure in offline unit tests only."""
     evidence = _read_json(path)
     if (
-        evidence.get("evidence_version") != dsql_evidence.EVIDENCE_VERSION
-        or evidence.get("suite") != "aurora-dsql-stage4-release"
+        evidence.get("evidence_version") != neon_evidence.EVIDENCE_VERSION
+        or evidence.get("suite") != "neon-postgres-stage4-release"
         or evidence.get("result") != "passed"
-        or evidence.get("backend") != "aurora_dsql"
-        or evidence.get("fixture_version") != dsql_evidence.FIXTURE_VERSION
+        or evidence.get("backend") != "postgres"
+        or evidence.get("fixture_version") != neon_evidence.FIXTURE_VERSION
         or evidence.get("unverified_release_gates") != []
         or evidence.get("missing_required_cases") != []
     ):
-        raise GateError("DSQL suite is not complete")
+        raise GateError("Neon suite is not complete")
     for key in (
         "git_commit",
         "build_sha256",
@@ -508,7 +510,7 @@ def _validate_dsql_structure(
         "image_digest",
     ):
         if evidence.get(key) != expected_release[key]:
-            raise GateError("DSQL evidence is bound to a different release")
+            raise GateError("Neon evidence is bound to a different release")
     counts = evidence.get("tests")
     _validate_tests(counts)
     cases = evidence.get("executed_cases")
@@ -516,36 +518,36 @@ def _validate_dsql_structure(
         not isinstance(cases, list)
         or not all(isinstance(case, str) for case in cases)
         or len(cases) != len(set(cases))
-        or not dsql_evidence.REQUIRED_CASES.issubset(set(cases))
+        or not neon_evidence.REQUIRED_CASES.issubset(set(cases))
     ):
-        raise GateError("DSQL suite did not execute every required test")
+        raise GateError("Neon suite did not execute every required test")
     _parse_timestamp(evidence.get("executed_at_utc"))
-    cluster_hash = evidence.get("cluster_identity_sha256")
+    cluster_hash = evidence.get("database_identity_sha256")
     if not isinstance(cluster_hash, str) or not SHA256_RE.fullmatch(cluster_hash):
-        raise GateError("DSQL evidence is missing its cluster identity hash")
+        raise GateError("Neon evidence is missing its cluster identity hash")
     if (
         evidence.get("credentials_recorded") is not False
         or evidence.get("raw_junit_recorded") is not False
     ):
-        raise GateError("DSQL evidence must not record credentials or raw tests")
+        raise GateError("Neon evidence must not record credentials or raw tests")
     config_hash = evidence.get("configuration_sha256")
     if not isinstance(config_hash, str) or not SHA256_RE.fullmatch(config_hash):
-        raise GateError("DSQL test configuration fingerprint is missing")
-    if expected_context_configurations.get("dsql_test") != config_hash:
+        raise GateError("Neon test configuration fingerprint is missing")
+    if expected_context_configurations.get("neon_test") != config_hash:
         raise GateError(
-            "DSQL configuration does not match the independent current test "
+            "Neon configuration does not match the independent current test "
             "target configuration"
         )
-    previous = context_configurations.get("dsql_test")
+    previous = context_configurations.get("neon_test")
     if previous is not None and previous != config_hash:
-        raise GateError("DSQL test configuration fingerprints do not match")
-    context_configurations["dsql_test"] = config_hash
+        raise GateError("Neon test configuration fingerprints do not match")
+    context_configurations["neon_test"] = config_hash
     return {
         "result": "passed",
         "artifact_sha256": _file_sha256(path),
         "evidence_record_sha256": _file_sha256(path),
         "environment_configuration_sha256": config_hash,
-        "cluster_identity_sha256": cluster_hash,
+        "database_identity_sha256": cluster_hash,
         "verified_at_utc": evidence.get("executed_at_utc"),
         "tests": counts,
     }
@@ -586,7 +588,7 @@ def main() -> int:
         _write_json(args.report, report, exclusive=False)
     except (
         GateError,
-        dsql_evidence.EvidenceError,
+        neon_evidence.EvidenceError,
         OSError,
         subprocess.SubprocessError,
         TypeError,

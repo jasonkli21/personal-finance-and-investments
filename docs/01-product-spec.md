@@ -26,9 +26,9 @@ The initial user is a single, technically comfortable investor using the app pri
 | Spending | Not in MVP | Statement import, categories, edits, transfer matching, cash flow | Runway and large-purchase scenarios | Optional research-generated explanations |
 | Tax lots | Not in MVP | Import schema can preserve provided lot fields | Lot view, sale planning, holding period, estimated gains, warnings | Optional event context |
 | AI | Not required | Optional candidate extraction via personal-AI; deterministic/manual fallback | None required | Cited research, monitoring, searchable notes |
-| Deployment | Local PostgreSQL 16 | Local PostgreSQL 16 | Local PostgreSQL 16 | Local PostgreSQL or production Aurora DSQL |
+| Deployment | Local PostgreSQL 16 | Local PostgreSQL 16 | Local PostgreSQL 16 | Local PostgreSQL or production Neon PostgreSQL |
 
-Stage 4 is an **optional deployment track** in timing, but the production database choice is **Aurora DSQL**, not RDS PostgreSQL. Database-compatible modeling and smoke tests begin in Stage 0; the complete product remains available locally with PostgreSQL. See [`07-aurora-dsql-compatibility.md`](07-aurora-dsql-compatibility.md).
+Stage 4 is an **optional deployment track** in timing, but the production database choice is **Neon PostgreSQL**, not RDS PostgreSQL. Database-compatible modeling and smoke tests begin in Stage 0; the complete product remains available locally with PostgreSQL. See [`07-postgres-neon.md`](07-postgres-neon.md).
 
 ## 3. Stage 1 user stories and acceptance criteria
 
@@ -123,7 +123,7 @@ Incomplete USD valuation reports the included valued subtotal and exclusions; to
 - Company profile with SEC filings, financial metrics, sourced summaries and links to original documents.
 - Portfolio-aware research: holdings and exposure contextualize company news; maintain an investment-thesis journal.
 - User-invoked research with cited excerpts and visible retrieval dates; optional monitored reports/alerts later.
-- Generic search, evidence retrieval and synthesis through `PersonalAIClient` to `personal-ai-system`. Finance retains source references, dated results, citation checks, thesis/workflow records and deterministic metric validation; it does not build its own model routing, memory or research index. DSQL remains the finance store without vector/full-text extension dependencies.
+- Generic search, evidence retrieval and synthesis through `PersonalAIClient` to `personal-ai-system`. Finance retains source references, dated results, citation checks, thesis/workflow records and deterministic metric validation; it does not build its own model routing, memory or research index. Neon remains the finance store without vector/full-text extension dependencies.
 - AI outputs are explicitly research aids, not authoritative data sources, estimates of tax liability, or execution instructions.
 
 ## 7. Explicit non-goals and deferred functionality
@@ -149,3 +149,6 @@ Incomplete USD valuation reports the included valued subtotal and exclusions; to
 3. At what threshold an ETF holdings snapshot is labeled stale (configurable per provider, not universal).
 4. Whether non-USD conversion is needed before or after the first usable dashboard.
 5. Whether the long-term product should remain single-user or support a household.
+
+
+Provider-specific dated delivery facts are preserved in [the pre-migration snapshot](history/pre-gcp-neon/01-product-spec.md). [ADR 0002](adr/0002-gcp-neon.md) and the [migration record](gcp-neon-migration.md) define the current architecture; this plan does not claim additional product completion.

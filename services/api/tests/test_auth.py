@@ -344,8 +344,9 @@ def test_discovery_requires_configured_issuer_and_https_endpoints(
             load(invalid)
 
 
+@pytest.mark.parametrize("firebase", [False, True])
 def test_oidc_callback_verifies_jwt_binds_server_scope_and_revokes_session(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, firebase: bool
 ) -> None:
     configure_auth(monkeypatch, tmp_path)
     engine = create_engine(
@@ -368,6 +369,15 @@ def test_oidc_callback_verifies_jwt_binds_server_scope_and_revokes_session(
         session.commit()
 
     app = create_app(engine=engine)
+    prefix = "/api" if firebase else ""
+    if firebase:
+        from app.auth.firebase_transport import FirebaseCookieTransport
+
+        app.add_middleware(
+            FirebaseCookieTransport,
+            secret_key=app.state.settings.auth_session_signing_key,
+            max_age=28800,
+        )
     oidc_client = app.state.oidc_client
     signing_key = jwk.generate_key("RSA", 2048, private=True, auto_kid=True)
     public_key = signing_key.as_dict(private=False)
@@ -394,10 +404,10 @@ def test_oidc_callback_verifies_jwt_binds_server_scope_and_revokes_session(
     client = TestClient(app, base_url="https://finance.example.test")
 
     def begin_login() -> tuple[str, str]:
-        login = client.get("/v1/auth/login", follow_redirects=False)
+        login = client.get(prefix + "/v1/auth/login", follow_redirects=False)
         assert login.status_code == 302
         cookie_header = login.headers["set-cookie"].casefold()
-        assert "pf_oidc_transaction" in cookie_header
+        assert ("__session" if firebase else "pf_oidc_transaction") in cookie_header
         assert "httponly" in cookie_header
         assert "secure" in cookie_header
         assert "samesite=lax" in cookie_header
@@ -410,7 +420,7 @@ def test_oidc_callback_verifies_jwt_binds_server_scope_and_revokes_session(
 
     def callback(state: str) -> Any:
         return client.get(
-            "/v1/auth/callback",
+            prefix + "/v1/auth/callback",
             params={"code": "synthetic-code", "state": state},
             follow_redirects=False,
         )
@@ -431,12 +441,23 @@ def test_oidc_callback_verifies_jwt_binds_server_scope_and_revokes_session(
     assert success.headers["location"] == "https://finance.example.test"
     assert "httponly" in success.headers["set-cookie"].casefold()
     assert "secure" in success.headers["set-cookie"].casefold()
-    assert client.get("/v1/accounts").status_code == 200
+    assert client.get(prefix + "/v1/accounts").status_code == 200
 
     with Session(engine) as session:
         stored = session.scalar(select(AuthSession))
         assert stored is not None
         browser_cookie = client.cookies.get(SESSION_COOKIE)
+        if firebase:
+            from itsdangerous import URLSafeTimedSerializer
+
+            wrapped = client.cookies.get("__session")
+            assert wrapped is not None
+            browser_cookie = URLSafeTimedSerializer(
+                app.state.settings.auth_session_signing_key,
+                salt="firebase-auth-transport-v1",
+            ).loads(wrapped)[SESSION_COOKIE]
+            assert client.get("/v1/accounts").status_code == 200
+            assert len(client.cookies) == 1
         assert browser_cookie is not None
         assert stored.token_hash != browser_cookie
         assert len(stored.token_hash) == 64
@@ -457,9 +478,22 @@ def test_oidc_callback_verifies_jwt_binds_server_scope_and_revokes_session(
         is None
     )
 
+    if firebase:
+        # The cloud edge accepts only the signed transport. Direct internal
+        # cookies and tampered/expired transport cannot bypass DB authorization.
+        wrapped_cookie = client.cookies.get("__session")
+        assert wrapped_cookie is not None
+        attacker = TestClient(app, base_url="https://finance.example.test")
+        attacker.cookies.set(SESSION_COOKIE, browser_cookie)
+        assert attacker.get(prefix + "/v1/accounts").status_code == 401
+        attacker.cookies.set("__session", wrapped_cookie + "tampered")
+        assert attacker.get(prefix + "/v1/accounts").status_code == 401
+        attacker.close()
+        assert client.get(prefix + "/v1/accounts").status_code == 200
+
     assert (
         client.post(
-            "/v1/accounts",
+            prefix + "/v1/accounts",
             headers={
                 "Origin": "https://finance.example.test",
                 "Sec-Fetch-Site": "cross-site",
@@ -469,10 +503,10 @@ def test_oidc_callback_verifies_jwt_binds_server_scope_and_revokes_session(
         == 403
     )
     logout = client.post(
-        "/v1/auth/logout", headers={"Origin": "https://finance.example.test"}
+        prefix + "/v1/auth/logout", headers={"Origin": "https://finance.example.test"}
     )
     assert logout.status_code == 204
-    assert client.get("/v1/accounts").status_code == 401
+    assert client.get(prefix + "/v1/accounts").status_code == 401
     with Session(engine) as session:
         stored = session.scalar(select(AuthSession))
         assert stored is not None and stored.revoked_at is not None

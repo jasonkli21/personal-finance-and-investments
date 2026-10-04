@@ -4,7 +4,7 @@
 **Updated:** 2026-10-02
 **Roadmap coverage:** Work packages 2.1–2.6
 
-This is the execution plan for reviewed document-assisted holdings and personal finance. It extends [Stage 1](stage-1-implementation-plan.md) without changing snapshot semantics or making AI/account connections mandatory. Read [ingestion and AI](04-ingestion-and-ai.md), [the product specification](01-product-spec.md), [source policy](03-data-sources.md), [security](06-security-and-deployment.md), and [DSQL contract](07-aurora-dsql-compatibility.md) first.
+This is the execution plan for reviewed document-assisted holdings and personal finance. It extends [Stage 1](stage-1-implementation-plan.md) without changing snapshot semantics or making AI/account connections mandatory. Read [ingestion and AI](04-ingestion-and-ai.md), [the product specification](01-product-spec.md), [source policy](03-data-sources.md), [security](06-security-and-deployment.md), and [PostgreSQL/Neon contract](07-postgres-neon.md) first.
 
 ## Scope boundary
 
@@ -12,7 +12,7 @@ Stage 2 extends Stage 1 private document storage with deterministic institution-
 
 The smallest vertical slice is **upload synthetic brokerage text PDF and bank/card CSV → inspect row evidence and discrepancies → accept revision → view reconciled holdings/spending**. Modules are `ingestion`, `spending`, `portfolio`, `securities`, storage, the personal-AI service boundary, account-provider adapters, and `jobs`.
 
-Tax-lot accounting/performance/sale planning, trading, general agents, mandatory remote inference, password scraping, automatic trusted imports, and new AWS application infrastructure are excluded. Preserve provided lot fields as source evidence for Stage 3; do not infer them.
+Tax-lot accounting/performance/sale planning, trading, general agents, mandatory remote inference, password scraping, automatic trusted imports, and new cloud application infrastructure are excluded. Preserve provided lot fields as source evidence for Stage 3; do not infer them.
 
 Per [ADR 0001](adr/0001-shared-personal-ai.md), models, generic extraction/OCR runtime, research, AI memory and evaluation infrastructure belong in personal-AI. Finance owns institution-specific mappings, domain schemas, source evidence, validation, review and publication. Stage 1 supplies only a disabled extraction seam; add one real capability after agreeing upstream transport/versions and reviewing consent, retention and authorization. Do not introduce a second `StructuredModelProvider` or local model stack here.
 
@@ -38,9 +38,9 @@ Per [ADR 0001](adr/0001-shared-personal-ai.md), models, generic extraction/OCR r
 | Transactions | Native-ID updates, fingerprint collision, identical recurring purchases, refunds/splits | Domain/repository tests |
 | Transfers | Two owned accounts, card payment, partial match, fees, ambiguous match | Reconciliation fixtures; no double spending |
 | Models | Disabled, unavailable, invalid JSON, invented values, unconsented cloud attempt | Fakes, schema/evidence validation, privacy tests |
-| Jobs | Duplicate delivery, expired lease, stale worker, retry exhaustion, cancellation | Local plus real chosen DSQL/SQS contract before cloud use |
+| Jobs | Durable DB claims, cancellation, expiry and fenced publication | Local lifecycle tests plus real bounded Cloud Run execution before hosting |
 | Optional sync | No connection, expired token, permission/quota, disconnect, repeated pages | Fake/sandbox opt-in; no production dependency |
-| Release | Brokerage + bank/card review journey, no AI, clean local setup | Browser smoke, OCR benchmark report, real DSQL gate separately |
+| Release | Brokerage + bank/card review journey, no AI, clean local setup | Browser smoke, OCR benchmark report, real Neon gate separately |
 
 ## Required implementation artifacts
 
@@ -109,7 +109,7 @@ S2.5 is optional; no exit gate for the local document workflow depends on produc
 
 **Acceptance criteria:** storage tests cover duplicate bytes, safe key generation, invalid MIME/path, upload/parse bounds, and cleanup without canonical changes; schema tests reject evidence references outside the document; disabled optional tools do not prevent file review/manual import.
 
-**Out of scope:** S3 provisioning, OCR/model integration, and publicly accessible previews.
+**Out of scope:** cloud object provisioning, OCR/model integration, and publicly accessible previews.
 
 ### S2.1.2 — Implement deterministic extraction and review-to-publish
 
@@ -200,8 +200,6 @@ S2.5 is optional; no exit gate for the local document workflow depends on produc
 
 **Out of scope:** AI-required categorization, tax deductibility, and automatic inferred transactions.
 
-**Implementation status (2026-10-02):** A local CSV review workflow now preserves source rows, stages signed amounts, resolves native-ID and fingerprint ambiguity, and publishes with idempotent identity handling. Manual transactions, deterministic exact-merchant rules, audited classification corrections, exact signed splits, and explicit exact-match transfer confirmation/unlink are available through the API and spending workspace. This is a partial implementation: live PostgreSQL/browser journeys, collision/retry behavior under concurrent writes, and real DSQL integration remain unverified; refunds rely on the imported sign and user's classification.
-
 ### S2.4 — Deliver reconciled finance and net-worth views
 
 **Dependencies:** S2.3.1, S2.3.2; Stage 1 owned valuation.  
@@ -216,8 +214,6 @@ S2.5 is optional; no exit gate for the local document workflow depends on produc
 **Acceptance criteria:** category subtotals equal canonical categorized/uncategorized spending under the documented transfer/refund policy; cash flow matches accepted transactions; card liability and payment treatment do not inflate net worth; account/date filters reproduce drill-down; stale/missing balances are labelled; zero/empty months render meaningfully.
 
 **Out of scope:** forward planning, tax estimates, guaranteed complete finances, and investment returns.
-
-**Implementation status (2026-10-02):** Monthly cash-flow and category totals use posted dates, preserve imported signs, and exclude confirmed transfers and card-payment classifications. Exact split lines feed the category summary. Dated manual balance observations preserve source, quality, currency, and revision; net worth uses those observations or owned-position valuations, excludes a balance when a position snapshot is available, and presents currencies separately. Missing, stale, estimated, unreviewed, and unpriced values remain visible as gaps. This partial slice does not convert currencies or provide historical returns; database/browser acceptance and live DSQL remain unverified.
 
 ### S2.5 — Evaluate optional read-only account synchronization
 
@@ -244,15 +240,13 @@ S2.5 is optional; no exit gate for the local document workflow depends on produc
 
 **Goal:** process documents asynchronously with explicit ownership and recovery.
 
-**Work:** define `enqueue`, `claim`, `renew`, `complete`, `fail`, cancel/status and idempotency contracts; persist bounded payload references/attempts/lease fencing; implement local single-worker polling; isolate production SQS or optimistic DSQL lease strategy behind the interface; define retryable versus terminal failures, capped backoff, lease expiry, and progress states.
+Finance job rows are authoritative: persist idempotent enqueue, attempts, lease owner/expiry, cancellation and completion fencing. Claim and publish in bounded database-only transactions; extraction and storage finish outside retry callbacks.
 
-**Requirements:** duplicate deliveries may run but cannot duplicate publication. A stale worker must fail fenced writes after another worker claims the job. Do not assume `FOR UPDATE SKIP LOCKED` works on DSQL; do not introduce Redis or another service for local polling.
+Locally use the existing polling runner. In cloud, invoke the same code through a bounded Cloud Run Job after durable enqueue; an invocation failure leaves the row retryable. Rehearse backlog draining and interrupted-worker recovery before launch.
 
-**Acceptance criteria:** fake-clock/repository tests prove duplicate enqueue, exclusive claim, expiry/reclaim, stale completion rejection, bounded retries, poison-job failure, and cancellation; migrations are versioned for both targets; chosen cloud strategy has a real-test requirement and documented cost implications.
+**Acceptance criteria:** fake-clock/repository tests prove duplicate enqueue, exclusive claim, expiry/reclaim, stale completion rejection, bounded retries, poison-job failure, and cancellation; the same Alembic history serves local and cloud; chosen cloud strategy has a real-test requirement and documented cost implications.
 
 **Out of scope:** general workflow engines, queue microservices, and cloud infrastructure provisioning.
-
-**Implementation status (2026-10-02):** A durable `jobs` table records bounded file references, idempotency, attempts, run-after time, progress, cancellation, lease owner/expiry, and a monotonically increasing lease generation. The in-process local worker claims by conditional update and fences progress/completion by owner and generation; no `SKIP LOCKED` assumption is used. PDF jobs retry transient worker failures with capped exponential backoff. The optimistic lease contract is not verified on a real DSQL cluster and is not approved for production use.
 
 ### S2.6.2 — Integrate safe worker processing and progress UI
 
@@ -265,11 +259,9 @@ S2.5 is optional; no exit gate for the local document workflow depends on produc
 
 **Requirements:** database OCC retry never repeats OCR/AI/account fetches; any deliberate external retry is a separately recorded adapter attempt under its own policy. Cancellation before final publish preserves canonical data; after publication return committed state rather than claiming reversal.
 
-**Acceptance criteria:** worker crash/restart, duplicate delivery, model failure, lease loss, cancelled parse, cancelled staging, and OCC publish conflict leave one accepted output or none; progress after browser reload is durable; stale workers cannot publish; logs contain no personal content. Real DSQL lease or SQS delivery tests are required before cloud operation.
+Test parser timeouts, bounded retries, cancellation during work and stale-worker publication rejection. Cloud readiness additionally requires real execution/identity/private-object evidence; local tests do not establish it.
 
 **Out of scope:** partial publication, cancellation that deletes accepted history, and unbounded cleanup.
-
-**Implementation status (2026-10-02):** Brokerage PDF preview now runs through the local worker. The original file is persisted before enqueueing; after completion the user reviews the existing position import before publication. Job IDs survive browser reload in local storage, progress is polled from the API, and cancellation preserves the original and cancels any newly staged unpublished import. Transaction CSV preview remains synchronous, parsed PDF output is not persisted as a reusable retry artifact, and cleanup/reprocessing controls beyond retrying a failed source are not complete. Browser, restart, lease-race, and live DSQL acceptance remain unverified.
 
 ### S2.6.3 — Evaluate and release the document-finance slice
 
@@ -278,15 +270,13 @@ S2.5 is optional; no exit gate for the local document workflow depends on produc
 
 **Goal:** prove that automation remains reviewable, accurate, and optional.
 
-**Work:** run the synthetic brokerage + bank/card journey; compare deterministic/no-model extraction with shared extraction candidates; record exact numeric/date/identifier matches, row coverage, false matches/duplicates, reconciliation errors, review rate/correction effort, latency/resources; execute local and separately gated real DSQL publication/job checks; document actual worker/parser/benchmark commands and fallback steps.
+**Work:** run the synthetic brokerage + bank/card journey; compare deterministic/no-model extraction with shared extraction candidates; record exact numeric/date/identifier matches, row coverage, false matches/duplicates, reconciliation errors, review rate/correction effort, latency/resources; execute local and separately gated real Neon publication/job checks; document actual worker/parser/benchmark commands and fallback steps.
 
 **Requirements:** record fixture/parser/schema/model/hardware versions. Critical numerical errors cannot pass through a model-quality average; they must be blocked/reviewed and rechecked outside the model. Unavailable optional binaries/providers are explicit skipped checks, not successful evaluations.
 
-**Acceptance criteria:** clean local setup reviews and commits both statement types with models/sync disabled; reimport leaves totals unchanged; spending/holdings reconcile; failure/cancel/retry are safe; OCR benchmark and privacy results are recorded; every persistent/job change has real DSQL evidence before cloud promotion.
+**Acceptance criteria:** clean local setup reviews and commits both statement types with models/sync disabled; reimport leaves totals unchanged; spending/holdings reconcile; failure/cancel/retry are safe; OCR benchmark and privacy results are recorded; every persistent/job change has real Neon evidence before cloud promotion.
 
 **Out of scope:** introducing Stage 3 calculations to compensate for missing statement data, and treating benchmark success as permission to remove review.
-
-**Implementation status (2026-10-02):** Pending. The parser fixture is synthetic and its expected extraction JSON is checked in, but no benchmark, browser journey, database migration run, or DSQL verification is claimed for this Stage 2 work.
 
 ## Stage 2 completion review
 
@@ -298,6 +288,9 @@ S2.5 is optional; no exit gate for the local document workflow depends on produc
 6. Are OCR/model results measured, with critical arithmetic independently validated?
 7. Are jobs leased/fenced/idempotent and cloud behavior tested on the actual chosen implementation?
 
-Only after local answers are yes should [Stage 3](stage-3-implementation-plan.md) rely on these records. Production adds the current real-DSQL and [Stage 4](stage-4-implementation-plan.md) security gates.
+Only after local answers are yes should [Stage 3](stage-3-implementation-plan.md) rely on these records. Production adds the current real-Neon and [Stage 4](stage-4-implementation-plan.md) security gates.
 
 **Implementation handoff:** record schema/client/parser versions, transaction sign/dedup and transfer policies, private-storage retention, review/cancel semantics, worker strategy, benchmark commands/results, optional connection review, and explicitly unverified cloud checks.
+
+
+Provider-specific dated delivery facts are preserved in [the pre-migration snapshot](history/pre-gcp-neon/stage-2-implementation-plan.md). [ADR 0002](adr/0002-gcp-neon.md) and the [migration record](gcp-neon-migration.md) define the current architecture; this plan does not claim additional product completion.

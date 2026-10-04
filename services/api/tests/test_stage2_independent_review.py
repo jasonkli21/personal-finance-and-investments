@@ -26,7 +26,7 @@ def test_pdf_parser_child_receives_no_parent_secrets(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("DATABASE_URL", "postgresql://synthetic-secret")
-    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "synthetic-secret")
+    monkeypatch.setenv("GCP_PRIVATE_TEST_SECRET", "synthetic-secret")
     captured: dict[str, Any] = {}
 
     def fake_run(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[bytes]:
@@ -46,7 +46,7 @@ def test_pdf_parser_child_receives_no_parent_secrets(
     child_environment = captured["env"]
     assert child_environment["PDF_MAX_PAGES"] == "17"
     assert "DATABASE_URL" not in child_environment
-    assert "AWS_SECRET_ACCESS_KEY" not in child_environment
+    assert "GCP_PRIVATE_TEST_SECRET" not in child_environment
 
 
 @pytest.mark.parametrize("attempt_status", ["published", "cancelled"])

@@ -22,3 +22,5 @@ infra/terraform/*_override.tf
 .pnpm-store/
 playwright-report/
 test-results/
+
+infra/terraform/firebase.json

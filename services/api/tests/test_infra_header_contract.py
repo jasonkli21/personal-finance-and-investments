@@ -1,4 +1,4 @@
-"""Keep API and browser headers reachable through the CloudFront API behavior."""
+"""Keep API and browser headers reachable through the Firebase API rewrite."""
 
 from __future__ import annotations
 
@@ -11,7 +11,6 @@ from sqlalchemy import create_engine
 from app.main import create_app
 
 ROOT = Path(__file__).resolve().parents[3]
-MANAGED_ALL_VIEWER_EXCEPT_HOST = "b689b0a8-53d0-40ab-baf2-68738e2966ac"
 
 
 def _api_headers() -> set[str]:
@@ -44,13 +43,15 @@ def _api_headers() -> set[str]:
     return headers
 
 
-def test_cloudfront_forwards_every_openapi_and_manually_read_header() -> None:
+def test_firebase_routes_preserved_api_headers_and_paths() -> None:
     terraform = (ROOT / "infra/terraform/main.tf").read_text()
-    api_behavior = terraform.split("ordered_cache_behavior {", 1)[1]
-    api_behavior = api_behavior.split("\n  }\n\n  restrictions", 1)[0]
-    assert re.search(r'path_pattern\s*=\s*"/api/\*"', api_behavior)
-    assert MANAGED_ALL_VIEWER_EXCEPT_HOST in api_behavior
-    assert "aws_cloudfront_origin_request_policy.api" not in api_behavior
+    assert 'source = "/api/**"' in terraform
+    assert "pinTag = true" in terraform
+    from fastapi.testclient import TestClient
+
+    client = TestClient(create_app(engine=create_engine("sqlite://")))
+    assert client.get("/api/health").status_code == 200
+    assert client.get("/api/v1/auth/session").status_code == 200
 
     headers = _api_headers()
     required_import_headers = {

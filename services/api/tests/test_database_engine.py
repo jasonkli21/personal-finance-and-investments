@@ -1,8 +1,14 @@
-"""Verify backend routing and DSQL security defaults without AWS access."""
+"""Standard psycopg engine, direct migration endpoint and bounded pool."""
+
+import os
+import subprocess
+import sys
+from dataclasses import replace
+from pathlib import Path
 
 import pytest
-from aurora_dsql_sqlalchemy import create_dsql_engine  # type: ignore[import-untyped]
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import create_engine
+from sqlalchemy.pool import QueuePool
 from sqlalchemy.schema import CreateIndex, CreateTable
 
 from app.config import load_settings
@@ -10,100 +16,67 @@ from app.db.engine import DatabaseEngineFactory
 from app.db.models import Base
 
 
-def test_dsql_engine_uses_official_builder_and_verified_tls(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("DATABASE_BACKEND", "aurora_dsql")
-    monkeypatch.setenv("AWS_REGION", "us-west-2")
-    monkeypatch.setenv("AURORA_DSQL_CLUSTER_ENDPOINT", "test.dsql.us-west-2.on.aws")
-    monkeypatch.setenv("AURORA_DSQL_DB_USER", "portfolio_app")
-    monkeypatch.setenv("AURORA_DSQL_MIGRATION_DB_USER", "portfolio_migrator")
-    settings = load_settings()
-    calls: list[dict[str, object]] = []
-
-    def builder(**kwargs: object) -> Engine:
-        calls.append(kwargs)
-        return create_engine("sqlite://")
-
-    engine = DatabaseEngineFactory.create(settings, dsql_engine_builder=builder)
-    engine.dispose()
-
-    assert calls == [
-        {
-            "host": "test.dsql.us-west-2.on.aws",
-            "user": "portfolio_app",
-            "driver": "psycopg",
-            "dbname": "postgres",
-            "sslmode": "verify-full",
-            "sslrootcert": "system",
-            "connect_args": {"region": "us-west-2", "connect_timeout": 3},
-            "pool_size": 5,
-            "max_overflow": 5,
-            "pool_pre_ping": True,
-            "pool_recycle": 3000,
-            "pool_timeout": 3,
-        }
-    ]
-
-
-def test_dsql_migrations_use_a_separate_database_role(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("DATABASE_BACKEND", "aurora_dsql")
-    monkeypatch.setenv("AWS_REGION", "us-east-1")
-    monkeypatch.setenv("AURORA_DSQL_CLUSTER_ENDPOINT", "test.dsql.us-east-1.on.aws")
-    monkeypatch.setenv("AURORA_DSQL_DB_USER", "portfolio_app")
-    monkeypatch.setenv("AURORA_DSQL_MIGRATION_DB_USER", "portfolio_migrator")
-    settings = load_settings()
-    calls: list[dict[str, object]] = []
-
-    def builder(**kwargs: object) -> Engine:
-        calls.append(kwargs)
-        return create_engine("sqlite://")
-
-    engine = DatabaseEngineFactory.create(
-        settings, purpose="migration", dsql_engine_builder=builder
+def test_runtime_and_migration_urls_use_psycopg_and_preserve_credentials() -> None:
+    settings = replace(
+        load_settings(),
+        database_url="postgresql://app:p%40ss@pooled.example/db",
+        migration_database_url="postgresql://migrator:direct@direct.example/db",
     )
-    engine.dispose()
-    assert calls[0]["user"] == "portfolio_migrator"
-
-
-def test_official_dsql_dialect_compiles_core_schema_without_connecting() -> None:
-    engine = create_dsql_engine(
-        host="compile-only.dsql.us-east-1.on.aws",
-        user="portfolio_app",
-        connect_args={"region": "us-east-1"},
-    )
+    app = DatabaseEngineFactory.create(settings)
+    migration = DatabaseEngineFactory.create(settings, purpose="migration")
     try:
-        assert engine.dialect.name == "auroradsql"
-        table_ddl = [
-            str(CreateTable(table).compile(dialect=engine.dialect))
-            for table in Base.metadata.sorted_tables
+        assert app.url.drivername == migration.url.drivername == "postgresql+psycopg"
+        assert app.url.password == "p@ss"
+        assert app.url.host == "pooled.example"
+        assert migration.url.username == "migrator"
+        assert migration.url.host == "direct.example"
+        assert isinstance(app.pool, QueuePool)
+        assert app.pool.size() == settings.database_pool_size
+        assert app.pool._pre_ping is True
+    finally:
+        app.dispose()
+        migration.dispose()
+
+
+def test_postgres_compiles_full_schema_without_connecting() -> None:
+    engine = create_engine("postgresql+psycopg://localhost/compile")
+    try:
+        tables = [
+            str(CreateTable(t).compile(dialect=engine.dialect))
+            for t in Base.metadata.sorted_tables
         ]
-        index_ddl = [
-            str(CreateIndex(index).compile(dialect=engine.dialect))
-            for table in Base.metadata.sorted_tables
-            for index in table.indexes
+        indexes = [
+            str(CreateIndex(i).compile(dialect=engine.dialect))
+            for t in Base.metadata.sorted_tables
+            for i in t.indexes
         ]
-        assert len(table_ddl) == 45
-        assert len(index_ddl) == 35
-        assert {
-            "research_documents",
-            "reported_facts",
-            "research_runs",
-            "research_results",
-            "research_run_contexts",
-            "research_thesis_notes",
-            "research_watchlist_events",
-        }.issubset({table.name for table in Base.metadata.sorted_tables})
-        assert all(
-            statement.lstrip().startswith("CREATE TABLE") for statement in table_ddl
-        )
-        assert all(
-            statement.startswith("CREATE INDEX ASYNC") for statement in index_ddl
-        )
-        assert any("JSONB" in statement for statement in table_ddl)
-        assert any("NUMERIC(28, 10)" in statement for statement in table_ddl)
-        assert any("ON DELETE CASCADE" in statement for statement in table_ddl)
+        assert len(tables) == 45
+        assert len(indexes) == 35
+        assert all(s.startswith("CREATE INDEX") for s in indexes)
+        assert any("JSONB" in s for s in tables)
+        assert any("NUMERIC(28, 10)" in s for s in tables)
     finally:
         engine.dispose()
+
+
+@pytest.mark.parametrize("url", ["", "postgresql://synthetic@localhost/db"])
+def test_alembic_production_never_falls_back_to_local_or_unverified_tls(
+    url: str,
+) -> None:
+    environment = dict(os.environ)
+    environment.update(
+        APP_ENV="Production", DATABASE_URL=url, MIGRATION_DATABASE_URL=""
+    )
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head", "--sql"],
+        cwd=Path(__file__).parents[1],
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "CREATE TABLE" not in result.stdout
+    assert (
+        "Production migrations require" if not url else "verify-full"
+    ) in result.stderr

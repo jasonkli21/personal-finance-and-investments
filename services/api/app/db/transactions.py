@@ -9,12 +9,10 @@ from sqlalchemy.orm import Session, sessionmaker
 
 
 def is_retryable_transaction_error(error: BaseException) -> bool:
-    """Recognize PostgreSQL serialization failures and DSQL OCC conflicts."""
+    """Recognize PostgreSQL serialization failures and deadlocks."""
     original = getattr(error, "orig", error)
     sqlstate = getattr(original, "sqlstate", None) or getattr(original, "pgcode", None)
-    if sqlstate == "40001":
-        return True
-    return "OC001" in str(original)
+    return sqlstate in {"40001", "40P01"}
 
 
 def run_database_unit[T](
@@ -27,7 +25,7 @@ def run_database_unit[T](
     sleep: Callable[[float], None] = time.sleep,
     jitter: Callable[[float, float], float] = random.uniform,
 ) -> T:
-    """Retry a complete DB-only unit in a new session after OCC conflicts.
+    """Retry a complete DB-only unit in a new session after transaction conflicts.
 
     Callers must finish provider, filesystem, and model work before entering
     this helper. The operation runs again on conflict, so it must contain only

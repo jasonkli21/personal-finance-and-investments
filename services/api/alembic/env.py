@@ -1,19 +1,12 @@
 from logging.config import fileConfig
 from os import environ
 
-from alembic.util import CommandError
 from sqlalchemy import engine_from_config, inspect, pool
 
 from alembic import context
 from app.db.models import Base
 
 config = context.config
-backend = environ.get("DATABASE_BACKEND", "postgres")
-if backend != "postgres":
-    raise CommandError(
-        "Alembic migrations support DATABASE_BACKEND=postgres only; "
-        "use `python -m app.db.migrate_dsql` for Aurora DSQL."
-    )
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
@@ -22,9 +15,19 @@ _ALEMBIC_VERSION_LENGTH = 128
 
 
 def database_url() -> str:
-    explicit_url = environ.get("DATABASE_URL")
+    explicit_url = environ.get("MIGRATION_DATABASE_URL") or environ.get("DATABASE_URL")
     if explicit_url:
-        return explicit_url
+        from app.db.urls import postgres_url
+
+        return postgres_url(
+            explicit_url,
+            production=environ.get("APP_ENV", "development").casefold() == "production",
+            setting="migration connection",
+        ).render_as_string(hide_password=False)
+    if environ.get("APP_ENV", "development").casefold() == "production":
+        raise ValueError(
+            "Production migrations require DATABASE_URL or MIGRATION_DATABASE_URL"
+        )
     host = environ.get("DATABASE_HOST", "127.0.0.1")
     port = environ.get("DATABASE_PORT", environ.get("POSTGRES_PORT", "5432"))
     user = environ.get("DATABASE_USER", environ.get("POSTGRES_USER", "portfolio"))

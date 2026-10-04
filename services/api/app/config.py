@@ -1,4 +1,4 @@
-"""Validated local/DSQL configuration and disabled personal-AI integration."""
+"""Validated PostgreSQL/GCP configuration and disabled personal-AI integration."""
 
 import re
 from dataclasses import dataclass
@@ -44,19 +44,16 @@ class Settings:
     database_user: str
     database_password: str
     database_name: str
-    aws_region: str | None
-    aurora_dsql_cluster_endpoint: str | None
-    aurora_dsql_db_user: str | None
-    aurora_dsql_migration_db_user: str | None
+    migration_database_url: str | None
+    gcp_project: str | None
+    cloud_run_job: str | None
     database_pool_size: int
     database_max_overflow: int
     database_pool_recycle_seconds: int
     database_connect_timeout_seconds: int
     private_file_dir: str
     file_storage_backend: str
-    private_s3_bucket: str | None
-    private_s3_kms_key_id: str | None
-    static_assets_bucket: str | None
+    private_gcs_bucket: str | None
     max_private_file_bytes: int
     max_import_file_bytes: int
     max_import_rows: int
@@ -93,11 +90,21 @@ def load_settings() -> Settings:
     auth_enabled = auth_raw == "true"
     public_origin = environ.get("APP_PUBLIC_ORIGIN") or None
     storage_backend = environ.get("FILE_STORAGE_BACKEND", "local").casefold()
-    if storage_backend not in {"local", "s3"}:
-        raise ValueError("FILE_STORAGE_BACKEND must be 'local' or 's3'")
-    private_bucket = environ.get("PRIVATE_S3_BUCKET") or None
-    kms_key_id = environ.get("PRIVATE_S3_KMS_KEY_ID") or None
-    static_bucket = environ.get("STATIC_ASSETS_BUCKET") or None
+    if storage_backend not in {"local", "gcs"}:
+        raise ValueError("FILE_STORAGE_BACKEND must be 'local' or 'gcs'")
+    private_bucket = environ.get("PRIVATE_GCS_BUCKET") or None
+    gcp_project = environ.get("GCP_PROJECT") or None
+    cloud_run_job = environ.get("CLOUD_RUN_JOB") or None
+    if storage_backend == "gcs" and (
+        not private_bucket
+        or not re.fullmatch(r"[a-z0-9][a-z0-9._-]{1,61}[a-z0-9]", private_bucket)
+    ):
+        raise ValueError("GCS storage requires a DNS-safe PRIVATE_GCS_BUCKET")
+    if cloud_run_job and not re.fullmatch(
+        r"projects/[a-z][a-z0-9-]{4,28}[a-z0-9]/locations/[a-z0-9-]+/jobs/[a-z][a-z0-9-]{0,62}",
+        cloud_run_job,
+    ):
+        raise ValueError("CLOUD_RUN_JOB must be a full job resource name")
     auth_issuer_url = environ.get("AUTH_ISSUER_URL") or None
     auth_client_id = environ.get("AUTH_CLIENT_ID") or None
     auth_client_secret = environ.get("AUTH_CLIENT_SECRET") or None
@@ -172,34 +179,12 @@ def load_settings() -> Settings:
             raise ValueError("Production requires an HTTPS APP_PUBLIC_ORIGIN")
         if not cookie_secure:
             raise ValueError("Production authentication cookies must be Secure")
-        if environ.get("DATABASE_BACKEND", "postgres") != "aurora_dsql":
-            raise ValueError("Production requires DATABASE_BACKEND=aurora_dsql")
-        if storage_backend != "s3" or not private_bucket:
-            raise ValueError("Production requires a private S3 file bucket")
-        if not static_bucket:
-            raise ValueError("Production requires a separate static assets bucket")
-        if not environ.get("AWS_REGION") or not environ.get(
-            "AURORA_DSQL_MIGRATION_DB_USER"
-        ):
-            raise ValueError(
-                "Production requires AWS_REGION and a separate DSQL migration role"
-            )
-        if private_bucket == static_bucket:
-            raise ValueError("Private file and static asset buckets must differ")
-        for bucket in (private_bucket, static_bucket):
-            if bucket is not None and not re.fullmatch(
-                r"[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]", bucket
-            ):
-                raise ValueError(
-                    "S3 bucket names must use the standard DNS-safe format"
-                )
+        if storage_backend != "gcs" or not private_bucket or not gcp_project:
+            raise ValueError("Production requires private GCS storage and GCP_PROJECT")
         if environ.get("DEMO_MODE", "false").casefold() == "true":
             raise ValueError("Production cannot run DEMO_MODE")
         if worker_raw == "true":
-            raise ValueError(
-                "Production job worker stays disabled until the live DSQL "
-                "lease gate passes"
-            )
+            raise ValueError("Production uses a bounded Cloud Run Job, not API polling")
     personal_ai_raw = environ.get("PERSONAL_AI_ENABLED", "false").casefold()
     if personal_ai_raw not in {"true", "false"}:
         raise ValueError("PERSONAL_AI_ENABLED must be 'true' or 'false'")
@@ -210,8 +195,8 @@ def load_settings() -> Settings:
             "are not implemented"
         )
     backend = environ.get("DATABASE_BACKEND", "postgres")
-    if backend not in {"postgres", "aurora_dsql"}:
-        raise ValueError("DATABASE_BACKEND must be 'postgres' or 'aurora_dsql'")
+    if backend != "postgres":
+        raise ValueError("DATABASE_BACKEND must be 'postgres'")
 
     database_url = environ.get("DATABASE_URL") or None
     demo_mode_raw = environ.get("DEMO_MODE", "false").casefold()
@@ -240,32 +225,17 @@ def load_settings() -> Settings:
             "DATABASE_POOL_SIZE plus DATABASE_MAX_OVERFLOW must not exceed 40"
         )
 
-    aws_region = environ.get("AWS_REGION") or None
-    cluster_endpoint = environ.get("AURORA_DSQL_CLUSTER_ENDPOINT") or None
-    dsql_user = environ.get("AURORA_DSQL_DB_USER") or None
-    migration_user = environ.get("AURORA_DSQL_MIGRATION_DB_USER") or None
-    if backend == "aurora_dsql":
-        if database_url is not None:
-            raise ValueError(
-                "DATABASE_URL is not supported for Aurora DSQL; "
-                "use IAM connector settings"
-            )
-        required = {
-            "AWS_REGION": aws_region,
-            "AURORA_DSQL_CLUSTER_ENDPOINT": cluster_endpoint,
-            "AURORA_DSQL_DB_USER": dsql_user,
-        }
-        missing = [name for name, value in required.items() if not value]
-        if missing:
-            raise ValueError(
-                f"Aurora DSQL configuration is missing: {', '.join(missing)}"
-            )
-        if dsql_user is not None and dsql_user.casefold() == "admin":
-            raise ValueError("AURORA_DSQL_DB_USER must be a scoped application role")
-        if migration_user is not None and migration_user == dsql_user:
-            raise ValueError(
-                "AURORA_DSQL_MIGRATION_DB_USER must differ from the application role"
-            )
+    migration_url = environ.get("MIGRATION_DATABASE_URL") or None
+    from app.db.urls import postgres_url
+
+    for name, value in (
+        ("DATABASE_URL", database_url),
+        ("MIGRATION_DATABASE_URL", migration_url),
+    ):
+        if value:
+            postgres_url(value, production=app_env == "production", setting=name)
+    if app_env == "production" and database_url is None:
+        raise ValueError("Production requires DATABASE_URL")
 
     pdf_timeout_seconds = _int_setting(
         "PDF_PARSER_TIMEOUT_SECONDS", 8, minimum=1, maximum=30
@@ -302,10 +272,9 @@ def load_settings() -> Settings:
         database_name=environ.get(
             "DATABASE_NAME", environ.get("POSTGRES_DB", "portfolio")
         ),
-        aws_region=aws_region,
-        aurora_dsql_cluster_endpoint=cluster_endpoint,
-        aurora_dsql_db_user=dsql_user,
-        aurora_dsql_migration_db_user=migration_user,
+        migration_database_url=migration_url,
+        gcp_project=gcp_project,
+        cloud_run_job=cloud_run_job,
         database_pool_size=pool_size,
         database_max_overflow=max_overflow,
         database_pool_recycle_seconds=_int_setting(
@@ -316,9 +285,7 @@ def load_settings() -> Settings:
         ),
         private_file_dir=environ.get("PRIVATE_FILE_DIR", "./.private"),
         file_storage_backend=storage_backend,
-        private_s3_bucket=private_bucket,
-        private_s3_kms_key_id=kms_key_id,
-        static_assets_bucket=static_bucket,
+        private_gcs_bucket=private_bucket,
         max_private_file_bytes=max_private_file_bytes,
         max_import_file_bytes=max_import_file_bytes,
         max_import_rows=_int_setting(
