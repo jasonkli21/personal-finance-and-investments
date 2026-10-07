@@ -8,7 +8,7 @@ Date: 2026-10-02
 
 ## Context and reconciliation
 
-The [integration handoff](../../personal-finance-ai-integration-handoff/README.md) proposes incremental service integration. Current finance code/OpenAPI and [Stage 1 release evidence](../stage-1-release.md) are authoritative for delivered behavior; handoff examples are intended direction, not verified upstream APIs.
+The one-time integration handoff referenced at that review is not retained in this checkout. Current finance code/OpenAPI and [Stage 1 release evidence](../stage-1-release.md) are authoritative for delivered behavior; see the [current shared-AI ADR](../../../adr/0001-shared-personal-ai.md) for the reconciled ownership decision. Handoff examples were intended direction, not verified upstream APIs.
 
 Reviewed baseline: `0874f21` (Stage 1.3), preceded by `f75e101` and `9053d1f`. The app has React/TypeScript/Vite, TanStack Query/Table, Tailwind, generated OpenAPI types, FastAPI/Pydantic, SQLAlchemy/Alembic, local PostgreSQL 16, a separate IAM/TLS DSQL engine/migration runner and private content-addressed files. Stage 1 includes reviewed position CSVs, generic/iShares fund CSVs and SPDR XLSX, manual/cached quotes, pure Decimal exposure and durable frozen report/drill-down/export. Live quote/issuer fetching, PDF/OCR, AI, research, memory, durable jobs, hosted authentication and S3 deployment are not delivered. shadcn/ui and ECharts remain optional planned additions, not installed components.
 

@@ -71,6 +71,8 @@ or private GCS in cloud
 
 Hosted infrastructure uses Cloud Run/Cloud Run Jobs, Neon Postgres, private GCS, Secret Manager, and Firebase Hosting.
 
+For the current delivery boundary and open gates, see [current state](docs/current-state.md). The [documentation router](docs/README.md) identifies authoritative sources and the smallest reading set for each task.
+
 ## Repository layout
 
 ```text
@@ -88,10 +90,15 @@ Hosted infrastructure uses Cloud Run/Cloud Run Jobs, Neon Postgres, private GCS,
 ├── infra/
 │   └── terraform/              # GCP/Neon deployment assets
 ├── docs/
+│   ├── README.md               # context router and source authority
+│   ├── current-state.md        # concise implementation status and open gates
 │   ├── 01-product-spec.md
 │   ├── 02-architecture.md
 │   ├── 03-data-sources.md
 │   ├── 04-ingestion-and-ai.md
+│   ├── 05-roadmap.md
+│   ├── adr/                    # accepted durable decisions
+│   ├── history/                # superseded provider context and handoffs
 │   ├── 06-security-and-deployment.md
 │   └── 07-postgres-neon.md
 ├── compose.yaml

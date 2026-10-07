@@ -59,7 +59,7 @@ The current published DSQL free tier is 100,000 DPUs plus 1 GB-month of storage 
 
 ## S4.2 — Declarative single-region infrastructure preparation
 
-[`infra/terraform`](../infra/terraform/README.md) selects one DSQL cluster,
+[`infra/terraform`](../../../infra/terraform/README.md) selects one DSQL cluster,
 private statement/export S3, separate private static S3 behind CloudFront OAC,
 an immutable ECR image, App Runner, and scoped runtime and operator migration
 roles. The API/edge resources default off. A first reviewed foundation apply

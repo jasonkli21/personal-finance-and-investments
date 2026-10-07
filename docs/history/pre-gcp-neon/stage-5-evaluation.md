@@ -4,7 +4,7 @@
 
 **Evaluation date:** 2026-10-03
 **Suite:** `stage5-offline-evaluation-v1`
-**Fixture:** [`fixtures/stage-5/synthetic-research-evaluation.json`](../fixtures/stage-5/synthetic-research-evaluation.json)
+**Fixture:** [`fixtures/stage-5/synthetic-research-evaluation.json`](../../../fixtures/stage-5/synthetic-research-evaluation.json)
 
 ## Subsequent repository review
 

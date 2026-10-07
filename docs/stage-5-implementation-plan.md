@@ -1,10 +1,10 @@
 # Stage 5 implementation plan
 
-**Status:** In progress: S5.1.1 offline SEC reference/fact slice implemented; S5.1.2 shared observations and remaining packages are deferred or pending
+**Current implementation status:** see [current state](current-state.md) and [Stage 5 release evidence](stage-5-release.md).
 **Updated:** 2026-10-03
 **Roadmap coverage:** Work packages 5.1–5.6
 
-This is the execution plan for source-grounded, portfolio-aware research. Read [the product specification](01-product-spec.md), [source policy](03-data-sources.md), [research/AI boundaries](04-ingestion-and-ai.md), [security](06-security-and-deployment.md), and [PostgreSQL/Neon contract](07-postgres-neon.md) first. Research consumes the reliable [Stage 1 exposure contract](stage-1-implementation-plan.md); optional history/lots come from Stage 3 only if implemented. Hosted execution additionally requires [Stage 4](stage-4-implementation-plan.md).
+This is the execution plan for source-grounded, portfolio-aware research. Use [the docs router](README.md) to load only the product, source, AI, security, or database contracts relevant to the selected package. Research consumes the reliable [Stage 1 exposure contract](stage-1-implementation-plan.md); optional history/lots come from Stage 3 only if implemented. Hosted execution additionally requires [Stage 4](stage-4-implementation-plan.md).
 
 ## Scope boundary
 

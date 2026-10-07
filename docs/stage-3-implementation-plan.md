@@ -1,10 +1,10 @@
 # Stage 3 implementation plan
 
-**Status:** S3.1–S3.5 and S3.R complete locally; live Neon PostgreSQL verification remains
+**Current implementation status:** see [current state](current-state.md) and [Stage 3 release evidence](stage-3-release.md).
 **Updated:** 2026-10-02
 **Roadmap coverage:** Work packages 3.1–3.5
 
-This is the execution plan for historical investment analysis, source-backed tax lots, and hypothetical decision support. It consumes reliable [Stage 1 portfolio](stage-1-implementation-plan.md) and [Stage 2 transaction](stage-2-implementation-plan.md) records. Read [the product specification](01-product-spec.md), [architecture](02-architecture.md), [source policy](03-data-sources.md), and [PostgreSQL/Neon contract](07-postgres-neon.md) first.
+This is the execution plan for historical investment analysis, source-backed tax lots, and hypothetical decision support. It consumes reliable [Stage 1 portfolio](stage-1-implementation-plan.md) and [Stage 2 transaction](stage-2-implementation-plan.md) records. Use [the docs router](README.md) to load only the contracts relevant to the selected package.
 
 ## Scope boundary
 

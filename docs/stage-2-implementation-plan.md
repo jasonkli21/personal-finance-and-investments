@@ -1,10 +1,10 @@
 # Stage 2 implementation plan
 
-**Status:** In progress; S2.1 local text-PDF preview slice, S2.3 local transaction workflow, S2.4 summary/balance views, and S2.6 PDF job workflow are partial; S2.2 gated; S2.5 evaluated and deferred
+**Current implementation status:** see [current state](current-state.md) and [Stage 2 release evidence](stage-2-release.md).
 **Updated:** 2026-10-02
 **Roadmap coverage:** Work packages 2.1–2.6
 
-This is the execution plan for reviewed document-assisted holdings and personal finance. It extends [Stage 1](stage-1-implementation-plan.md) without changing snapshot semantics or making AI/account connections mandatory. Read [ingestion and AI](04-ingestion-and-ai.md), [the product specification](01-product-spec.md), [source policy](03-data-sources.md), [security](06-security-and-deployment.md), and [PostgreSQL/Neon contract](07-postgres-neon.md) first.
+This is the execution plan for reviewed document-assisted holdings and personal finance. It extends [Stage 1](stage-1-implementation-plan.md) without changing snapshot semantics or making AI/account connections mandatory. Use [the docs router](README.md) to load only the contracts relevant to the selected package.
 
 ## Scope boundary
 

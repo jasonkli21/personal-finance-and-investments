@@ -16,7 +16,7 @@ A private tool to track stocks, ETFs, cash, and eventually broader personal fina
 
 | File | Audience / purpose |
 | --- | --- |
-| [`../AGENTS.md`](../AGENTS.md) | Codex's working rules and implementation guardrails |
+| [Root AGENTS.md](../../../AGENTS.md) | Current Codex working rules; not part of this historical snapshot |
 | [`01-product-spec.md`](01-product-spec.md) | Product goals, scope, journeys, requirements, acceptance criteria, non-goals |
 | [`02-architecture.md`](02-architecture.md) | TypeScript/Python stack, local PostgreSQL + production DSQL, conceptual schema, API and repo layout |
 | [`03-data-sources.md`](03-data-sources.md) | Free-first market, ETF, account, regulatory, and research data; provenance and current limits |

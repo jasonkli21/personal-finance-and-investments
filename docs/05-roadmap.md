@@ -1,7 +1,7 @@
 # Staged implementation plan
 
-**Status:** Stage 0–1 locally complete; Stage 2 partial; Stage 3 locally complete; Stage 4 tooling prepared; Stage 5 offline baseline; live Neon unverified | **Updated:** 2026-10-03
-**Sequencing:** Stage 0 → Stage 1 deliver the local MVP with the preserved PostgreSQL finance behavior. Stage 2 and Stage 3 enrich it. Stage 4 (GCP) may be scheduled after Stage 1, using the current Neon PostgreSQL target. Stage 5 (research) builds on reliable portfolio data behind the separately gated shared personal-AI boundary. See [`07-postgres-neon.md`](07-postgres-neon.md).
+**Current implementation status:** [docs/current-state.md](current-state.md) | **Roadmap updated:** 2026-10-03
+**Sequencing:** Stage 0 → Stage 1 establish the local MVP with PostgreSQL finance behavior. Stage 2 and Stage 3 enrich it. Stage 4 is an optional GCP deployment track using Neon PostgreSQL. Stage 5 builds on reliable portfolio data behind the separately gated shared personal-AI boundary. See [`07-postgres-neon.md`](07-postgres-neon.md).
 
 The [shared-AI ADR](adr/0001-shared-personal-ai.md) governs later AI work: finance owns deterministic financial state/workflows; personal-AI owns reusable models, generic extraction, research/search, evidence retrieval and memory. The current disabled extraction seam does not implement Stage 2/5 or authorize service calls.
 

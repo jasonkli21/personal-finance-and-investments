@@ -1,10 +1,10 @@
 # Stage 0 implementation plan
 
-**Status:** S0.1–S0.6 delivered; Stage 0 local exit gate passed on PostgreSQL 16.15; live Neon remains unverified
+**Current implementation status:** see [current state](current-state.md).
 **Updated:** 2026-10-03 (provider migration; original delivery dates retained)
 **Roadmap coverage:** Work packages 0.1–0.6
 
-This is the execution plan for the local foundation: a reproducible application with a persisted manual holding and an independently testable production database boundary. Read [the docs index](README.md), [product specification](01-product-spec.md), [architecture](02-architecture.md), and [PostgreSQL/Neon contract](07-postgres-neon.md) first. Those requirements take precedence over proposed implementation names here.
+This is the execution plan for the local foundation: a reproducible application with a persisted manual holding and an independently testable production database boundary. Use [the docs router](README.md) to load the product or database contracts relevant to the selected work package. Those requirements take precedence over proposed implementation names here.
 
 The structure follows the phase plans in `personal-ai-system/docs`: scope, contracts, dependency ordering, independently demonstrable tasks, and a completion review. It adapts their delivery discipline to this application's SQL, financial arithmetic, and privacy requirements.
 
@@ -178,7 +178,7 @@ S0.4 has a local contract/tooling deliverable and a separate credentialed execut
 
 ### S0.4 — PostgreSQL connection and transaction boundary
 
-**Status:** local boundary delivered; cloud verification required before promotion.
+**Gate:** cloud promotion requires real Neon verification; see [current state](current-state.md) for delivery evidence.
 **Modules:** config, db/engine.py, db/urls.py, db/transactions.py, Alembic.
 
 Use one standard psycopg engine with bounded pools, pre-ping, connect timeout and verified TLS for Neon. DATABASE_URL selects runtime; optional MIGRATION_DATABASE_URL selects a direct migration connection. Alembic is the only migration history. Never edit applied revisions. Test fresh and populated upgrades, Decimal/UUID/JSONB/FK behavior, immutable revisions and real concurrent publication. The retry helper repeats only bounded DB work after PostgreSQL serialization/deadlock failures; external work stays outside retries. Credentialed disposable Neon migration/reconnect/concurrency checks remain distinct from local evidence. See [the database contract](07-postgres-neon.md).

@@ -1,10 +1,10 @@
 # Stage 1 implementation plan
 
-**Status:** Local Stage 1 implemented; see [release evidence](stage-1-release.md). Live Neon remains unverified.
+**Current implementation status:** see [current state](current-state.md) and [release evidence](stage-1-release.md).
 **Updated:** 2026-10-02 — reviewed against Stage 0 commit `81b220e`
 **Roadmap coverage:** 1.1 Owned positions/valuation; 1.2 ETF composition; 1.3 Look-through/dashboard
 
-This is the execution plan for the first useful release: owned stocks, ETFs, and cash across accounts, plus a separate, reconciled company-exposure view. Read [the product specification](01-product-spec.md), [architecture](02-architecture.md), [data-source policy](03-data-sources.md), [ingestion rules](04-ingestion-and-ai.md), and [PostgreSQL/Neon contract](07-postgres-neon.md). [Stage 0](stage-0-implementation-plan.md) supplies the local foundation; its real-Neon gate remains required before production.
+This is the execution plan for the first useful release: owned stocks, ETFs, and cash across accounts, plus a separate, reconciled company-exposure view. Use [the docs router](README.md) to load only the product, architecture, source, ingestion, or database contracts relevant to the selected package. [Stage 0](stage-0-implementation-plan.md) supplies the local foundation.
 
 ## Scope boundary
 

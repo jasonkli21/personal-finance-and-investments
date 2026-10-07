@@ -3,7 +3,7 @@
 ## Live baseline and scope
 
 Audited checkout: `4e5f3e330a401a4df2f75781689a42300868bdbb`.
-The only pre-existing untracked content was `finance-gcp-neon-migration-handoff/`, preserved unchanged.
+At the audited checkout, the only pre-existing untracked content was `finance-gcp-neon-migration-handoff/`, preserved unchanged for that migration run. On 2026-10-07, the package was moved under `docs/history/` and labeled as historical; see the [archived handoff](history/gcp-neon-migration-handoff/README.md).
 Code and release evidence show Stage 0–1 delivered locally, Stage 2 partial (text PDF jobs, reviewed transactions and summaries), Stage 3 delivered locally, Stage 4 prepared deployment tooling, and Stage 5 an offline/manual research baseline. OCR, account sync, live retrieval/synthesis/monitoring and Personal AI transport/authorization remain gated.
 The release records explicitly report no provisioned cloud resources; no Terraform state or live target configuration is present in this checkout. This is repository evidence, not a remote account inventory. No cutover, dual write, or real-data migration is justified.
 

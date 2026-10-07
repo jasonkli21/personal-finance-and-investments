@@ -211,7 +211,9 @@ def test_review_correct_publish_and_historical_value_are_offline(
     current = client.get(f"/v1/accounts/{account_id}/positions").json()
     assert current["current_revision"] == 2
     assert current["snapshot"]["id"] == published.json()["id"]
-    owned = client.get(f"/v1/portfolio/owned/{account_id}").json()
+    owned = client.get(
+        f"/v1/portfolio/owned/{account_id}", params={"as_of": "2026-09-30"}
+    ).json()
     assert owned["total_usd"] == "26.0000000000"
     assert owned["percentages_available"] is True
     assert sum(

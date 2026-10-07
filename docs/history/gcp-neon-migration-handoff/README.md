@@ -1,3 +1,7 @@
+# Historical migration handoff
+
+This one-time package guided the 2026-10-03 AWS/Aurora DSQL to GCP/Neon repository rearchitecture. The code/documentation migration is complete in this checkout; cloud deployment remains unverified. The package is retained as historical planning context, not current implementation guidance. Use the [current documentation router](../../README.md), [current state](../../current-state.md), [ADR 0002](../../adr/0002-gcp-neon.md), and [migration record](../../gcp-neon-migration.md) for current decisions and evidence.
+
 # Finance Project: AWS/Aurora DSQL -> GCP/Neon Migration Handoff
 
 ## Purpose

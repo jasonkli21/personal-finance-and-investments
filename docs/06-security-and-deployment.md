@@ -1,6 +1,6 @@
 # Security, GCP deployment and portability
 
-Updated 2026-10-03. Tooling is prepared; actual hosted safety is unverified. See [Stage 4 release](stage-4-release.md) and [operations](stage-4-operations-runbook.md).
+Updated 2026-10-03. See [current state](current-state.md) for deployment readiness; this document specifies the security contract. See the [Stage 4 release](stage-4-release.md) and [operations](stage-4-operations-runbook.md) for dated evidence.
 
 ## Local and data ownership
 
