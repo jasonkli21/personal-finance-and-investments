@@ -31,7 +31,7 @@ Start with the [source policy](03-data-sources.md) and [ingestion/AI design](04-
 
 ### Personal AI
 
-Start with [ingestion/AI](04-ingestion-and-ai.md) and the [shared AI ADR](adr/0001-shared-personal-ai.md). Read the [Stage 2 gate](stage-2-ai-gate.md) or Stage 5 plan/evidence only for the capability being changed.
+Start with [ingestion/AI](04-ingestion-and-ai.md) and the [shared AI ADR](adr/0001-shared-personal-ai.md). For Phase 28 read context, use the [versioned read contract](personal-ai-context-read-v1.md) and [verification record](phase-28-personal-ai-integration-evidence.md); the separate `PersonalAIClient.extract` candidate seam remains disabled. Read the [Stage 2 gate](stage-2-ai-gate.md) or Stage 5 plan/evidence only for the capability being changed.
 
 ### Security and deployment
 

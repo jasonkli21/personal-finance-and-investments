@@ -326,13 +326,14 @@ Finance remains authoritative for:
 
 Reusable AI capabilities integrate through `personal-ai-system`.
 
-The integration is intentionally optional and disabled by default:
+Finance-to-Personal-AI integration is optional and disabled by default. The original extraction capability and the Phase 28 read-only context capability have separate gates:
 
 ```env
 PERSONAL_AI_ENABLED=false
+FINANCE_CONTEXT_READ_ENABLED=false
 ```
 
-Do not enable it until the upstream contract and data-handling/authentication boundary are configured.
+`PERSONAL_AI_ENABLED` remains the extraction-candidate gate and is not a read API switch. The separate `finance-context-read-v1` contract exposes only bounded selected projections; it does not expose statement originals or any Finance write. Its caller and user identity checks have synthetic coverage only. Keep both gates off until the relevant contract, deployed identity, authorization, provider data-use, and retention requirements are accepted. See [the shared AI ADR](docs/adr/0001-shared-personal-ai.md) and [read contract](docs/personal-ai-context-read-v1.md).
 
 ## Cloud deployment
 

@@ -1,6 +1,6 @@
 # Current implementation state
 
-Updated 2026-10-07. This page is the concise current status summary. The linked release/review records contain the detailed, dated evidence; this page does not copy their test counts or turn plans into delivery claims.
+Updated 2026-10-11. This page is the concise current status summary. The linked release/review records contain the detailed, dated evidence; this page does not copy their test counts or turn plans into delivery claims.
 
 ## Delivered and available locally
 
@@ -12,7 +12,7 @@ Updated 2026-10-07. This page is the concise current status summary. The linked 
 
 - **Stage 2 is partial.** Text-layer brokerage PDF previews, durable jobs, reviewed CSV/manual transactions, categories/splits/transfers, and source-labelled balances/summaries exist. OCR/shared extraction, account sync, recurring/month coverage, parsed-output reuse/cleanup, complete worker lifecycle, and benchmark acceptance remain open. See [Stage 2 release](stage-2-release.md) and [extraction gate](stage-2-ai-gate.md).
 - **Stage 4 tooling is prepared, not deployed.** No GCP resources, Firebase Hosting deployment, or Neon branch is evidenced. Real Neon migration/reconnect/concurrency, hosted HTTPS/OIDC and private-object access, worker lifecycle, cost alerts, operations rehearsal, and cloud recovery remain unverified. See [Stage 4 release](stage-4-release.md) and [migration validation](gcp-neon-migration.md).
-- **Personal AI remains disabled.** There is no Finance transport or verified service/user authorization and owner propagation. `PERSONAL_AI_ENABLED=true` is rejected. No real personal documents are sent to model providers.
+- **Personal AI remains disabled for Finance workflows.** The existing `PersonalAIClient.extract` candidate seam remains disabled and has no HTTP adapter. A separate read-only `finance-context-read-v1` projection is implemented behind `FINANCE_CONTEXT_READ_ENABLED=false` by default; its dual Google-token verification and principal binding have synthetic tests, but deployed identity, owner authorization, provider privacy, and live Finance API calls are unverified. The [Phase 28 verification record](phase-28-personal-ai-integration-evidence.md) records local check results and a pre-existing portfolio valuation test failure. No real personal documents or Finance data are sent to model providers.
 - **Stage 5 live capabilities remain gated.** Live retrieval/synthesis, verified source authenticity/semantic support, service authorization, list completeness, monitoring, and structured XBRL dimension/amendment equivalence are not delivered.
 
 ## Next scope and promotion boundary

@@ -1,6 +1,6 @@
 # ADR 0001 — Shared Personal AI, Finance authority
 
-Accepted ownership decision, 2026-10-02; live transport remains deferred. Deployment choices are superseded by [ADR 0002](0002-gcp-neon.md), 2026-10-03. The original baseline inspection and dated provider context remain in [the historical ADR](../history/pre-gcp-neon/adr/0001-shared-personal-ai.md).
+Accepted ownership decision, 2026-10-02; the separately versioned read-only Finance context boundary was added on 2026-10-11. Deployment choices are superseded by [ADR 0002](0002-gcp-neon.md), 2026-10-03. The original baseline inspection and dated provider context remain in [the historical ADR](../history/pre-gcp-neon/adr/0001-shared-personal-ai.md).
 
 ## Decision
 
@@ -19,7 +19,9 @@ Portfolio truth, AI preference memory and external evidence remain distinct. Fin
 - A disabled client with a stable safe error, and an explicit synthetic fake that checks source/schema/version and isolates returned payloads. No credentials, network, SQL access or publication methods.
 - A disabled client installed at `app.state.personal_ai_client` as a future dependency boundary. Stage 1 routes/domain services do not consume it.
 
-`PERSONAL_AI_ENABLED=false` is supported in host settings and Compose. True or malformed values fail startup. There is no HTTP adapter, base URL/timeout setting, trusted-local mode, research/memory/tool method or provider SDK. The handoff's minimum HTTP target is deliberately deferred: Stage 1 has no AI consumer, extraction transport is not agreed, and inventing endpoints/security configuration would be speculative. The fake demonstrates dependency substitution, not a functioning extraction feature or persistence safety test for an unimplemented workflow.
+The Phase 28 `finance-context-read-v1` contract is a separate Finance-owned, read-only projection at `POST /v1/integrations/personal-ai/context`. It returns bounded selected account, current security/position, user-authored thesis, or registered research-fact context with typed semantic labels, source fingerprints, and permission-version dependencies. It does not reuse or widen `PersonalAIClient.extract`; it has no mutation, private-original, transaction, tax-lot, or publication operation. The endpoint and Personal AI adapter have independent default-off gates. See the [read contract](../personal-ai-context-read-v1.md) for exact bounds and fields.
+
+`PERSONAL_AI_ENABLED=false` is supported in host settings and Compose. True or malformed values fail startup. The extraction client still has no HTTP adapter, base URL/timeout setting, trusted-local mode, research/memory/tool method or provider SDK. Its transport remains deferred because extraction has no reviewed consumer contract. The separate read API is gated by `FINANCE_CONTEXT_READ_ENABLED=false`; synthetic auth and projection tests do not establish deployed private-data readiness or enable any Finance workflow.
 
 Run finance normally with the existing README commands; no upstream service is required. Run boundary tests with `uv run --directory services/api --locked pytest -q tests/test_personal_ai.py tests/test_config.py`; use `pnpm check` for the aggregate gate. A candidate rejected by the existing `PositionInput` validator remains a candidate, never a position write.
 
@@ -32,12 +34,12 @@ Before one real extraction feature in Stage 2:
 3. For deployed private data, authenticate finance users and calling services; propagate only server-verified owner/scope and verify authorization upstream. Test absent/expired/wrong-audience credentials and wrong-owner denial. A fixed `local` owner or API key alone is insufficient.
 4. Keep candidate normalization/evidence/arithmetic validation, duplicate detection, user review and bounded atomic publication in finance. External extraction completes outside transactions; save reusable output so OCC retry cannot repeat AI calls.
 
-Current code enforces the disabled gate only; it does not implement or verify these future auth/transport/retention controls. Real-data deployment additionally requires the authenticated GCP/private-GCS and real-Neon gates in ADR 0002.
+The extraction boundary enforces its disabled gate. The Phase 28 read endpoint implements separate audience-bound Google service and user ID-token checks, fixed configured-subject/principal binding, bounded JSON, no-store responses, and a read-only PostgreSQL transaction. These controls have synthetic tests only; real identity issuance, IAM/private service invocation, authorization against a deployed Finance owner mapping, provider data-use and retention, and live endpoint behavior remain unverified. Keep the read gate off until those deployment controls are accepted. Real-data deployment also requires the authenticated GCP/private-GCS and real-Neon gates in ADR 0002.
 
 ## Consequences and deferred sequence
 
 This change preserves offline Stage 1 behavior and avoids duplicating infrastructure. Shared service outage must leave deterministic/manual finance workflows usable. Both apps retain their own deployability and data ownership.
 
-Next, only when requested: integrate one reviewed extraction slice after the contract/security review; then shared research in Stage 5. Memory integration and deterministic read-only finance tools require separate concrete use cases and authorization contracts. Do not add mutation tools, a generic agent/plugin framework, speculative migrations or AI memory backfills now. No direct-provider code was removed because none exists.
+The read-only contract is available for further integration work, but Phase 28 is incomplete while the accepted sidecar host contract, Phase 15 source/revocation prerequisites, Phase 21 workflow routing, and deployed identity/provider acceptance are open. The sidecar and any note/draft actions remain deferred; no authoritative Finance mutation is exposed. Extraction, shared research workflows, memory integration, and deterministic read-only tools still require their own concrete use cases and authorization contracts. Do not add mutation tools, a generic agent/plugin framework, speculative migrations or AI memory backfills. No direct-provider code was removed because none exists.
 
 Rejected alternatives: duplicate finance model/research/memory stack; moving deterministic arithmetic into prompts; sharing the AI database or replacing relational finance authority with Firestore; broad domain/repository rewrites; live adapters against guessed endpoints; treating AI candidates as approved records.

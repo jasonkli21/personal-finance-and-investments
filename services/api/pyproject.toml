@@ -10,6 +10,7 @@ dependencies = [
     "google-cloud-run>=0.11,<1",
     "cryptography>=45,<51",
     "fastapi>=0.115,<1",
+    "google-auth>=2.0,<3",
     "httpx2>=2.13,<3",
     "itsdangerous>=2.2,<3",
     "psycopg[binary,pool]>=3.2,<4",

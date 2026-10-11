@@ -18,6 +18,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import Response
 
+from app.api.finance_context_routes import router as finance_context_router
 from app.api.finance_routes import router as finance_router
 from app.api.fund_routes import router as fund_router
 from app.api.job_routes import router as job_router
@@ -37,6 +38,7 @@ from app.auth.routes import router as auth_router
 from app.auth.service import SESSION_COOKIE, PrincipalContext, get_principal
 from app.config import load_settings
 from app.db.engine import DatabaseEngineFactory
+from app.integrations.finance_context import FINANCE_CONTEXT_PATH
 from app.integrations.personal_ai import DisabledPersonalAIClient
 from app.storage.factory import create_file_store
 
@@ -136,6 +138,8 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
         stage3_tax_router,
     ):
         app.include_router(router)
+    if settings.finance_context_read_enabled:
+        app.include_router(finance_context_router)
 
     if settings.auth_enabled:
         signing_key = settings.auth_session_signing_key
@@ -159,8 +163,14 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
         started_at = time.monotonic()
         path = request.url.path
         response: Response | None = None
+        finance_context_identity_route = (
+            settings.finance_context_read_enabled and path == FINANCE_CONTEXT_PATH
+        )
         if settings.auth_enabled and path.startswith("/v1"):
-            if request.method not in {"GET", "HEAD", "OPTIONS"}:
+            if (
+                request.method not in {"GET", "HEAD", "OPTIONS"}
+                and not finance_context_identity_route
+            ):
                 origin = request.headers.get("origin")
                 if origin != settings.app_public_origin:
                     response = JSONResponse(
@@ -172,10 +182,15 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
                         status_code=403,
                         content={"detail": "Cross-site requests are not allowed"},
                     )
-            if response is None and path not in {
-                "/v1/auth/login",
-                "/v1/auth/callback",
-            }:
+            if (
+                response is None
+                and not finance_context_identity_route
+                and path
+                not in {
+                    "/v1/auth/login",
+                    "/v1/auth/callback",
+                }
+            ):
                 try:
                     principal: PrincipalContext | None = await run_in_threadpool(
                         get_principal,

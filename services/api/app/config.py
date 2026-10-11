@@ -64,6 +64,11 @@ class Settings:
     job_lease_seconds: int
     job_max_attempts: int
     personal_ai_enabled: bool
+    finance_context_read_enabled: bool
+    finance_context_service_audience: str
+    finance_context_service_account: str
+    finance_context_user_audience: str
+    finance_context_user_token_max_age_seconds: int
     auth_enabled: bool
     auth_issuer_url: str | None
     auth_client_id: str | None
@@ -194,6 +199,41 @@ def load_settings() -> Settings:
             "authentication/service authorization and data-handling review "
             "are not implemented"
         )
+    finance_context_raw = environ.get(
+        "FINANCE_CONTEXT_READ_ENABLED", "false"
+    ).casefold()
+    if finance_context_raw not in {"true", "false"}:
+        raise ValueError("FINANCE_CONTEXT_READ_ENABLED must be 'true' or 'false'")
+    finance_context_read_enabled = finance_context_raw == "true"
+    finance_context_service_audience = environ.get(
+        "FINANCE_CONTEXT_SERVICE_AUDIENCE", ""
+    ).strip()
+    finance_context_service_account = environ.get(
+        "FINANCE_CONTEXT_SERVICE_ACCOUNT", ""
+    ).strip()
+    finance_context_user_audience = environ.get(
+        "FINANCE_CONTEXT_USER_AUDIENCE", ""
+    ).strip()
+    finance_context_user_token_max_age_seconds = _int_setting(
+        "FINANCE_CONTEXT_USER_TOKEN_MAX_AGE_SECONDS", 300, minimum=60, maximum=600
+    )
+    if finance_context_read_enabled:
+        if (
+            not auth_enabled
+            or auth_issuer_url
+            not in {"https://accounts.google.com", "accounts.google.com"}
+            or not auth_subject
+            or not auth_scope_id
+            or not finance_context_service_audience.startswith("https://")
+            or len(finance_context_service_audience) > 500
+            or not re.fullmatch(
+                r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.iam\.gserviceaccount\.com",
+                finance_context_service_account,
+            )
+            or not finance_context_user_audience
+            or len(finance_context_user_audience) > 500
+        ):
+            raise ValueError("finance_context_identity_configuration_required")
     backend = environ.get("DATABASE_BACKEND", "postgres")
     if backend != "postgres":
         raise ValueError("DATABASE_BACKEND must be 'postgres'")
@@ -257,6 +297,11 @@ def load_settings() -> Settings:
         app_env=app_env,
         app_public_origin=public_origin,
         personal_ai_enabled=False,
+        finance_context_read_enabled=finance_context_read_enabled,
+        finance_context_service_audience=finance_context_service_audience,
+        finance_context_service_account=finance_context_service_account,
+        finance_context_user_audience=finance_context_user_audience,
+        finance_context_user_token_max_age_seconds=finance_context_user_token_max_age_seconds,
         database_backend=backend,
         demo_mode=demo_mode,
         database_url=database_url,
