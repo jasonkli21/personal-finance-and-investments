@@ -102,6 +102,37 @@ class Account(TimestampMixin, Base):
     )
 
 
+class MonthlyDiscretionaryBudget(TimestampMixin, Base):
+    """Finance-owned monthly discretionary limit with explicit Shopping consent."""
+
+    __tablename__ = "monthly_discretionary_budgets"
+    __table_args__ = (
+        UniqueConstraint("period", name="uq_monthly_discretionary_budget_period"),
+        CheckConstraint(
+            "amount >= 0", name="ck_monthly_discretionary_budget_nonnegative"
+        ),
+        CheckConstraint(
+            "revision >= 1", name="ck_monthly_discretionary_budget_revision"
+        ),
+        CheckConstraint(
+            "length(period) = 7 AND substr(period, 5, 1) = '-'",
+            name="ck_monthly_discretionary_budget_period",
+        ),
+        Index("ix_monthly_discretionary_budgets_period", "period"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    period: Mapped[str] = mapped_column(String(7), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    share_with_shopping: Mapped[bool] = mapped_column(
+        nullable=False, default=False, server_default="false"
+    )
+    revision: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1"
+    )
+
+
 class AccountBalanceObservation(TimestampMixin, Base):
     """Dated source observation for accounts without a holdings snapshot."""
 

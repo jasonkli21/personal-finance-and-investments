@@ -21,7 +21,12 @@ from pydantic import (
 FINANCE_CONTEXT_SCHEMA: Literal["finance-context-read-v1"] = "finance-context-read-v1"
 FINANCE_CONTEXT_PATH = "/v1/integrations/personal-ai/context"
 type FinanceContextRecordEntityType = Literal[
-    "account", "security", "position", "research_thesis", "research_fact"
+    "account",
+    "security",
+    "position",
+    "research_thesis",
+    "research_fact",
+    "discretionary_budget",
 ]
 type FinanceContextSourceClass = Literal["domain_current", "external_research"]
 type FinanceContextAuthority = Literal[
@@ -40,6 +45,9 @@ FINANCE_CONTEXT_FIELDS = frozenset(
         "research_thesis",
         "research_fact",
         "permission_version",
+        "amount",
+        "currency",
+        "period",
     }
 )
 
@@ -55,6 +63,7 @@ class FinanceContextEntityReference(BaseModel):
         "research_thesis",
         "research_fact",
         "portfolio",
+        "discretionary_budget",
     ]
     entity_id: str = Field(min_length=1, max_length=64)
 
@@ -80,6 +89,10 @@ class FinanceContextReadRequest(BaseModel):
     application_id: Literal["finance"] = "finance"
     workspace_id: None = None
     operation: Literal["current", "verify"]
+    purpose: Literal["personal_ai_context", "shopping_discretionary_budget"] = (
+        "personal_ai_context"
+    )
+    destination_application_id: Literal["shopping"] | None = None
     entity_refs: tuple[FinanceContextEntityReference, ...] = Field(
         min_length=1, max_length=16
     )
@@ -98,6 +111,30 @@ class FinanceContextReadRequest(BaseModel):
         ):
             raise ValueError("finance_context_fields_invalid")
         portfolios = [ref for ref in self.entity_refs if ref.entity_type == "portfolio"]
+        budget_refs = [
+            ref for ref in self.entity_refs if ref.entity_type == "discretionary_budget"
+        ]
+        budget_fields = {"amount", "currency", "period"}
+        if budget_refs or set(self.fields) & budget_fields:
+            expected_fields = (
+                ("permission_version",)
+                if self.operation == "verify"
+                else ("amount", "currency", "period")
+            )
+            if (
+                len(budget_refs) != 1
+                or len(self.entity_refs) != 1
+                or self.fields != expected_fields
+                or self.purpose != "shopping_discretionary_budget"
+                or self.destination_application_id != "shopping"
+                or self.include_broader_context
+            ):
+                raise ValueError("finance_context_budget_export_scope_invalid")
+        elif (
+            self.purpose != "personal_ai_context"
+            or self.destination_application_id is not None
+        ):
+            raise ValueError("finance_context_destination_scope_invalid")
         if self.include_broader_context != bool(portfolios):
             raise ValueError(
                 "finance_context_broader_scope_requires_explicit_selection"
@@ -123,6 +160,8 @@ class FinanceContextReadRequest(BaseModel):
                     raise ValueError("finance_context_broad_scope_invalid")
             else:
                 expected_types: set[str] = set()
+                if set(self.fields) & {"amount", "currency", "period"}:
+                    expected_types.add("discretionary_budget")
                 if set(self.fields) & {"account_summary", "balance_summary"}:
                     expected_types.add("account")
                 if "security_summary" in self.fields:

@@ -18,6 +18,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import Response
 
+from app.api.discretionary_budget_routes import router as discretionary_budget_router
 from app.api.finance_context_routes import router as finance_context_router
 from app.api.finance_routes import router as finance_router
 from app.api.fund_routes import router as fund_router
@@ -128,6 +129,7 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
         research_router,
         transaction_router,
         finance_router,
+        discretionary_budget_router,
         job_router,
         fund_router,
         report_router,

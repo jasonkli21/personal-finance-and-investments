@@ -17,6 +17,7 @@ from app.db.models import (
     Account,
     AccountBalanceObservation,
     Issuer,
+    MonthlyDiscretionaryBudget,
     PositionSnapshot,
     PositionSnapshotLine,
     ReportedFact,
@@ -64,7 +65,7 @@ def read_finance_context(
     if not principal_scope_id:
         raise FinanceContextNotFound
     if request.operation == "verify":
-        items = _verify_selected_entities(session, request.entity_refs)
+        items = _verify_selected_entities(session, request)
     else:
         items = _read_selected_entities(session, request)
     if len(items) > request.max_results:
@@ -95,6 +96,68 @@ def _read_selected_entities(
         session, refs_by_type.get("security", ()), accounts, broad, request
     )
     items: list[FinanceContextRecord] = []
+
+    if set(request.fields) == {"amount", "currency", "period"}:
+        if (
+            request.purpose != "shopping_discretionary_budget"
+            or request.destination_application_id != "shopping"
+        ):
+            raise FinanceContextSelectionError(
+                "finance_context_budget_export_scope_invalid"
+            )
+        for reference in refs_by_type.get("discretionary_budget", ()):
+            budget = session.get(MonthlyDiscretionaryBudget, UUID(reference.entity_id))
+            if budget is None or not budget.share_with_shopping:
+                raise FinanceContextNotFound
+            version = _monthly_budget_source_version(budget)
+            source_id = f"finance:monthly_discretionary_budget:{budget.id}"
+            values = {
+                "amount": _value(
+                    format(budget.amount, ".2f"),
+                    source_identity="finance.monthly_discretionary_budget",
+                    source_version=version,
+                    quality="owner_entered",
+                    authority="user_asserted",
+                    as_of=budget.period,
+                    unit="currency_amount",
+                    currency=budget.currency,
+                    evidence_refs=(str(budget.id),),
+                ),
+                "currency": _value(
+                    budget.currency,
+                    source_identity="finance.monthly_discretionary_budget",
+                    source_version=version,
+                    quality="owner_entered",
+                    authority="user_asserted",
+                    as_of=budget.period,
+                    evidence_refs=(str(budget.id),),
+                ),
+                "period": _value(
+                    budget.period,
+                    source_identity="finance.monthly_discretionary_budget",
+                    source_version=version,
+                    quality="owner_entered",
+                    authority="user_asserted",
+                    as_of=budget.period,
+                    evidence_refs=(str(budget.id),),
+                ),
+            }
+            items.append(
+                _record(
+                    "discretionary_budget",
+                    str(budget.id),
+                    source_id=source_id,
+                    source_version=version,
+                    source_class="domain_current",
+                    authority="user_asserted",
+                    payload={"discretionary_budget": values},
+                    refs=(str(budget.id),),
+                    observed_at=_iso(budget.updated_at),
+                    effective_at=f"{budget.period}-01",
+                    permission_version=version,
+                    permission_purpose="shopping_discretionary_budget",
+                )
+            )
 
     if "account_summary" in request.fields or "balance_summary" in request.fields:
         if not accounts:
@@ -662,12 +725,27 @@ def _research_fact_records(
     return records
 
 
+def _monthly_budget_source_version(budget: MonthlyDiscretionaryBudget) -> str:
+    material = "|".join(
+        (
+            str(budget.id),
+            budget.period,
+            format(budget.amount, ".2f"),
+            budget.currency,
+            str(budget.revision),
+            str(int(budget.share_with_shopping)),
+            _iso(budget.updated_at) or "",
+        )
+    )
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
 def _verify_selected_entities(
     session: Session,
-    refs: tuple[FinanceContextEntityReference, ...],
+    request: FinanceContextReadRequest,
 ) -> list[FinanceContextRecord]:
     records: list[FinanceContextRecord] = []
-    for reference in refs:
+    for reference in request.entity_refs:
         entity_id = reference.entity_id
         source_class: FinanceContextSourceClass = "domain_current"
         authority: FinanceContextAuthority = "authoritative"
@@ -734,6 +812,13 @@ def _verify_selected_entities(
             entity_type = "research_fact"
             source_class = "external_research"
             authority = "user_asserted"
+        elif reference.entity_type == "discretionary_budget":
+            budget = session.get(MonthlyDiscretionaryBudget, UUID(entity_id))
+            if budget is None or not budget.share_with_shopping:
+                raise FinanceContextNotFound
+            version = _monthly_budget_source_version(budget)
+            entity_type = "discretionary_budget"
+            authority = "user_asserted"
         elif reference.entity_type == "issuer":
             raise FinanceContextSelectionError(
                 "finance_context_verify_entity_unsupported"
@@ -753,6 +838,11 @@ def _verify_selected_entities(
                 payload={},
                 refs=(entity_id,),
                 permission_version=version,
+                permission_purpose=(
+                    request.purpose
+                    if reference.entity_type == "discretionary_budget"
+                    else "Recheck current Finance source and version."
+                ),
             )
         )
     return records
@@ -771,17 +861,23 @@ def _record(
     observed_at: str | None = None,
     effective_at: str | None = None,
     permission_version: str | None = None,
+    permission_purpose: str = "Recheck current Finance source and version.",
 ) -> FinanceContextRecord:
     fingerprint = _version(source_id, source_version)
     dependency_version = permission_version or source_version
     permission = FinanceContextPermissionDependency(
         permission_id=f"finance_context_read:{entity_type}:{entity_id}",
         version=dependency_version,
-        purpose="Recheck the selected Finance entity and current source version.",
+        purpose=permission_purpose,
+    )
+    sensitivity_fields = (
+        tuple(next(iter(payload.values())))
+        if entity_type == "discretionary_budget" and payload
+        else tuple(payload)
     )
     field_sensitivity = tuple(
         FinanceContextFieldSensitivity(field=field, sensitivity="restricted")
-        for field in payload
+        for field in sensitivity_fields
     )
     return FinanceContextRecord(
         entity_type=entity_type,
