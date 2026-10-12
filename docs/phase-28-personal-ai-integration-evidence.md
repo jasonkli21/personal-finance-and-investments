@@ -34,3 +34,9 @@ The read endpoint is omitted from default OpenAPI and is not registered unless `
 Real Google token issuance, IAM/private service invocation, deployed owner mapping, database read-only behavior on the deployed PostgreSQL service, model/provider data-use and retention eligibility, and cloud recovery remain unverified. Keep the gate off until those controls are accepted. No private Finance data was sent to an external provider during verification.
 
 The Phase 28 sidecar is deferred because Finance has no accepted embed/host contract for the current frontend. The required Phase 15 source-revocation and Phase 21 workflow-routing prerequisites also remain open. No parallel embed mechanism or domain action path was added; Copy/save-as-draft/research-note integration remains unavailable. These are material plan gaps, so this evidence does not mark Phase 28 complete.
+
+## Post-implementation review follow-up — 2026-10-11
+
+The cross-repository review found no additional Finance-local contract defect requiring a code change. Finance continues to own the bounded, read-only `finance-context-read-v1` projection, while the Personal AI extraction seam and context gate remain disabled. The targeted route smoke test passed: `tests/test_finance_context.py` — **9 passed**.
+
+Phase 28 remains incomplete. Sensitive-workflow routing and the shared sidecar remain gated on the common Phase 15 source-revocation and Phase 21 workflow-routing prerequisites; no Finance-specific routing or embed path was added. The smoke test does not establish PostgreSQL, deployed identity, provider privacy, cloud, or sidecar behavior.
