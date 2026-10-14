@@ -600,3 +600,78 @@ def parse_authorization(client: TestClient) -> tuple[str, str]:
     response = client.get("/v1/auth/login", follow_redirects=False)
     values = parse_qs(urlparse(response.headers["location"]).query)
     return values["state"][0], values["nonce"][0]
+
+
+def test_verified_upstream_authentication_time_is_preserved_without_fabrication(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    configure_auth(monkeypatch, tmp_path)
+    settings = load_settings()
+    claims = {
+        "iss": ISSUER,
+        "sub": SUBJECT,
+        "aud": CLIENT_ID,
+        "exp": 2_000_000_000,
+        "auth_time": 1_899_999_900,
+    }
+    identity = validate_verified_identity(claims, settings, now=1_900_000_000)
+    assert identity.authenticated_at == claims["auth_time"]
+    unknown = validate_verified_identity(
+        {key: value for key, value in claims.items() if key != "auth_time"},
+        settings,
+        now=1_900_000_000,
+    )
+    assert unknown.authenticated_at is None
+    for invalid in (True, -1, "1899999900", 1_900_000_031):
+        with pytest.raises(ValueError, match="authentication time"):
+            validate_verified_identity(
+                {**claims, "auth_time": invalid}, settings, now=1_900_000_000
+            )
+
+
+def test_session_retains_upstream_time_and_legacy_session_remains_unknown(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    configure_auth(monkeypatch, tmp_path)
+    settings = load_settings()
+    engine = create_engine("sqlite://", poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(engine, expire_on_commit=False)
+    with factory() as session, session.begin():
+        bind_principal(
+            session,
+            issuer=ISSUER,
+            subject=SUBJECT,
+            scope_id=SCOPE_ID,
+        )
+    verified_time = int(time.time()) - 120
+    known = auth_service.create_session(
+        factory,
+        settings,
+        issuer=ISSUER,
+        subject=SUBJECT,
+        scope_id=SCOPE_ID,
+        correlation_id="known-login",
+        authenticated_at=verified_time,
+    )
+    unknown = auth_service.create_session(
+        factory,
+        settings,
+        issuer=ISSUER,
+        subject=SUBJECT,
+        scope_id=SCOPE_ID,
+        correlation_id="legacy-login",
+    )
+    assert known is not None and unknown is not None
+    loaded_known = get_principal(factory, settings, known[0])
+    loaded_unknown = get_principal(factory, settings, unknown[0])
+    assert loaded_known is not None and loaded_unknown is not None
+    assert loaded_known.authenticated_at == verified_time
+    assert loaded_unknown.authenticated_at is None
+    with factory() as session:
+        row_known = session.get(AuthSession, known[1].session_id)
+        row_unknown = session.get(AuthSession, unknown[1].session_id)
+        assert row_known is not None and row_unknown is not None
+        assert row_known.upstream_auth_time == verified_time
+        assert row_unknown.upstream_auth_time is None
+    engine.dispose()

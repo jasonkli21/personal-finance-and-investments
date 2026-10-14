@@ -33,6 +33,7 @@ from app.api.stage3_portfolio_scenario_routes import (
 )
 from app.api.stage3_sales_routes import router as stage3_sales_router
 from app.api.stage3_tax_routes import router as stage3_tax_router
+from app.api.task_routes import router as task_router
 from app.api.transaction_routes import router as transaction_router
 from app.auth.oidc import OIDC_TRANSACTION_COOKIE, create_oidc_client
 from app.auth.routes import router as auth_router
@@ -130,6 +131,7 @@ def create_app(*, engine: Engine | None = None) -> FastAPI:
         transaction_router,
         finance_router,
         discretionary_budget_router,
+        task_router,
         job_router,
         fund_router,
         report_router,

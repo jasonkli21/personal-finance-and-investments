@@ -89,6 +89,7 @@ async def callback(request: Request) -> Response:
         settings,
         issuer=identity.issuer,
         subject=identity.subject,
+        authenticated_at=identity.authenticated_at,
         scope_id=settings.auth_personal_scope_id or "",
         correlation_id=request.state.correlation_id,
     )

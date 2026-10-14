@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from os import environ
 from urllib.parse import urlsplit
 
+from app.integrations.task_settings import TaskSettings, load_task_settings
+
 
 def _int_setting(
     name: str,
@@ -78,6 +80,7 @@ class Settings:
     auth_personal_scope_id: str | None
     auth_session_ttl_seconds: int
     auth_cookie_secure: bool
+    task_settings: TaskSettings | None = None
 
 
 def load_settings() -> Settings:
@@ -293,7 +296,18 @@ def load_settings() -> Settings:
     if max_import_file_bytes > max_private_file_bytes:
         raise ValueError("MAX_IMPORT_FILE_BYTES cannot exceed MAX_PRIVATE_FILE_BYTES")
 
+    task_settings = load_task_settings()
+    if task_settings is not None and (
+        not auth_enabled
+        or not finance_context_read_enabled
+        or auth_issuer_url != "https://accounts.google.com"
+    ):
+        raise ValueError(
+            "Finance tasks require verified Google identity and context configuration"
+        )
+
     return Settings(
+        task_settings=task_settings,
         app_env=app_env,
         app_public_origin=public_origin,
         personal_ai_enabled=False,

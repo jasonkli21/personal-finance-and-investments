@@ -31,7 +31,8 @@ def _valid_period(period: str) -> bool:
 
 
 def _session_factory(request: Request) -> sessionmaker[Session]:
-    return request.app.state.session_factory
+    factory: sessionmaker[Session] = request.app.state.session_factory
+    return factory
 
 
 @router.put(

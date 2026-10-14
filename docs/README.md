@@ -1,5 +1,9 @@
 # Personal Finance & Portfolio Intelligence — Docs
 
+Stabilization and delegated tasks: [current state](current-state.md),
+[dated evidence](stabilization-2026-10-14.md), then the
+[suite review handoff](../../personal-ai-system/stabilization/REVIEW-HANDOFF.md).
+
 This is the stable context router and document index. For the concise implementation boundary, authorized scope, and open gates, see [current state](current-state.md). For human-facing product behavior, setup, and commands, see the [root README](../README.md).
 
 ## Authority and precedence
@@ -20,6 +24,10 @@ Security and privacy rules override convenience. A current user request may auth
 ### Portfolio and UI
 
 Start with [product scope](01-product-spec.md), [architecture](02-architecture.md), and relevant release evidence. Add source policy for provider behavior or the database contract for schema/API changes.
+
+### API contracts and generated client
+
+For route or schema changes, treat FastAPI routes and Pydantic contracts as source. Follow [API contract ownership](02-architecture.md#api-contract-ownership), regenerate with `pnpm api:generate`, and verify freshness with `pnpm api:check`.
 
 ### Persistence and migrations
 

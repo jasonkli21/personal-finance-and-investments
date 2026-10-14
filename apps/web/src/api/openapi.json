@@ -254,6 +254,52 @@
         "title": "AccountRead",
         "type": "object"
       },
+      "BudgetTaskChoice": {
+        "additionalProperties": false,
+        "properties": {
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "context_choice_id": {
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "title": "Context Choice Id",
+            "type": "string"
+          },
+          "expected_budget_revision": {
+            "minimum": 1.0,
+            "title": "Expected Budget Revision",
+            "type": "integer"
+          },
+          "expected_project_revision": {
+            "maximum": 1e+18,
+            "minimum": 1.0,
+            "title": "Expected Project Revision",
+            "type": "integer"
+          },
+          "period": {
+            "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$",
+            "title": "Period",
+            "type": "string"
+          },
+          "shopping_project_id": {
+            "format": "uuid",
+            "title": "Shopping Project Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command_id",
+          "period",
+          "expected_budget_revision",
+          "context_choice_id",
+          "shopping_project_id",
+          "expected_project_revision"
+        ],
+        "title": "BudgetTaskChoice",
+        "type": "object"
+      },
       "CategoryRuleCreate": {
         "properties": {
           "category_id": {
@@ -325,6 +371,133 @@
           "active"
         ],
         "title": "CategoryRuleRead",
+        "type": "object"
+      },
+      "DelegatedSourceCommand": {
+        "additionalProperties": false,
+        "description": "Immutable, source-owned user choice. Grant handles are selectors, not proofs.",
+        "properties": {
+          "command_id": {
+            "format": "uuid",
+            "title": "Command Id",
+            "type": "string"
+          },
+          "context_choice_id": {
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "title": "Context Choice Id",
+            "type": "string"
+          },
+          "destination_application_id": {
+            "const": "shopping",
+            "default": "shopping",
+            "title": "Destination Application Id",
+            "type": "string"
+          },
+          "expected_domain_version": {
+            "pattern": "^[1-9][0-9]{0,17}$",
+            "title": "Expected Domain Version",
+            "type": "string"
+          },
+          "expected_source_version": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Expected Source Version",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "title": "Expires At",
+            "type": "string"
+          },
+          "operation_contract_fingerprint": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Operation Contract Fingerprint",
+            "type": "string"
+          },
+          "operation_id": {
+            "pattern": "^[a-z][a-z0-9_.-]{1,80}$",
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "operation_version": {
+            "minimum": 1.0,
+            "title": "Operation Version",
+            "type": "integer"
+          },
+          "payload": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Payload",
+            "type": "object"
+          },
+          "payload_schema_id": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Payload Schema Id",
+            "type": "string"
+          },
+          "rationale": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Rationale",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "suite-source-command-v1",
+            "default": "suite-source-command-v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "source_application_id": {
+            "enum": [
+              "finance",
+              "travel",
+              "health"
+            ],
+            "title": "Source Application Id",
+            "type": "string"
+          },
+          "source_entity_id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source Entity Id",
+            "type": "string"
+          },
+          "source_entity_type": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Source Entity Type",
+            "type": "string"
+          },
+          "target_entity_id": {
+            "format": "uuid",
+            "title": "Target Entity Id",
+            "type": "string"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "null"
+          }
+        },
+        "required": [
+          "source_application_id",
+          "command_id",
+          "context_choice_id",
+          "source_entity_type",
+          "source_entity_id",
+          "expected_source_version",
+          "target_entity_id",
+          "expected_domain_version",
+          "operation_id",
+          "operation_version",
+          "operation_contract_fingerprint",
+          "payload_schema_id",
+          "payload",
+          "rationale",
+          "expires_at"
+        ],
+        "title": "DelegatedSourceCommand",
         "type": "object"
       },
       "DocumentImportRead": {
@@ -1905,6 +2078,87 @@
           "updated_at"
         ],
         "title": "JobRead",
+        "type": "object"
+      },
+      "JsonValue": {},
+      "MonthlyDiscretionaryBudgetRead": {
+        "properties": {
+          "amount": {
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Amount",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "period": {
+            "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+            "title": "Period",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "share_with_shopping": {
+            "title": "Share With Shopping",
+            "type": "boolean"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "period",
+          "amount",
+          "currency",
+          "share_with_shopping",
+          "revision",
+          "updated_at"
+        ],
+        "title": "MonthlyDiscretionaryBudgetRead",
+        "type": "object"
+      },
+      "MonthlyDiscretionaryBudgetWrite": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "maxLength": 18,
+            "pattern": "^\\d{1,12}(?:\\.\\d{1,2})?$",
+            "title": "Amount",
+            "type": "string"
+          },
+          "currency": {
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency",
+            "type": "string"
+          },
+          "expected_revision": {
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "share_with_shopping": {
+            "default": false,
+            "title": "Share With Shopping",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "amount",
+          "currency"
+        ],
+        "title": "MonthlyDiscretionaryBudgetWrite",
         "type": "object"
       },
       "NetWorthCurrencyTotal": {
@@ -7619,6 +7873,103 @@
         "title": "SessionRead",
         "type": "object"
       },
+      "SourceTaskStatus": {
+        "additionalProperties": false,
+        "description": "Small source-facing status; private orchestration metadata is excluded.",
+        "properties": {
+          "apply_available": {
+            "title": "Apply Available",
+            "type": "boolean"
+          },
+          "binding": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Binding",
+            "type": "string"
+          },
+          "confirmation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmation Id"
+          },
+          "domain_version": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain Version"
+          },
+          "outcome_code": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z][a-z0-9_]{0,99}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome Code"
+          },
+          "preview": {
+            "anyOf": [
+              {
+                "maxLength": 4000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview"
+          },
+          "proposal_id": {
+            "format": "uuid",
+            "title": "Proposal Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "suite-source-task-status-v1",
+            "default": "suite-source-task-status-v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "proposed",
+              "validated",
+              "confirmed",
+              "executing",
+              "reconciling",
+              "applied",
+              "rejected",
+              "uncertain",
+              "expired"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "proposal_id",
+          "state",
+          "binding",
+          "apply_available"
+        ],
+        "title": "SourceTaskStatus",
+        "type": "object"
+      },
       "SpendingCategoryCreate": {
         "properties": {
           "display_name": {
@@ -7662,6 +8013,27 @@
           "display_name"
         ],
         "title": "SpendingCategoryRead",
+        "type": "object"
+      },
+      "TaskConfirmation": {
+        "additionalProperties": false,
+        "properties": {
+          "binding": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Binding",
+            "type": "string"
+          },
+          "confirmation_id": {
+            "format": "uuid",
+            "title": "Confirmation Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirmation_id",
+          "binding"
+        ],
+        "title": "TaskConfirmation",
         "type": "object"
       },
       "TaxLotAdjustmentCreate": {
@@ -10473,6 +10845,351 @@
           }
         },
         "summary": "Post Balance Observation"
+      }
+    },
+    "/v1/finance/discretionary-budgets/{period}": {
+      "get": {
+        "operationId": "get_monthly_discretionary_budget_v1_finance_discretionary_budgets__period__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "period",
+            "required": true,
+            "schema": {
+              "title": "Period",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonthlyDiscretionaryBudgetRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Budget not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Monthly Discretionary Budget",
+        "tags": [
+          "Finance budgets"
+        ]
+      },
+      "put": {
+        "operationId": "put_monthly_discretionary_budget_v1_finance_discretionary_budgets__period__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "period",
+            "required": true,
+            "schema": {
+              "title": "Period",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MonthlyDiscretionaryBudgetWrite"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MonthlyDiscretionaryBudgetRead"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Monthly Discretionary Budget",
+        "tags": [
+          "Finance budgets"
+        ]
+      }
+    },
+    "/v1/finance/shopping-tasks/capabilities": {
+      "get": {
+        "operationId": "capabilities_v1_finance_shopping_tasks_capabilities_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Capabilities V1 Finance Shopping Tasks Capabilities Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Capabilities",
+        "tags": [
+          "Delegated Shopping tasks"
+        ]
+      }
+    },
+    "/v1/finance/shopping-tasks/choices": {
+      "get": {
+        "operationId": "choices_v1_finance_shopping_tasks_choices_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Choices V1 Finance Shopping Tasks Choices Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Choices",
+        "tags": [
+          "Delegated Shopping tasks"
+        ]
+      }
+    },
+    "/v1/finance/shopping-tasks/commands": {
+      "post": {
+        "operationId": "create_command_v1_finance_shopping_tasks_commands_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BudgetTaskChoice"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DelegatedSourceCommand"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Command",
+        "tags": [
+          "Delegated Shopping tasks"
+        ]
+      }
+    },
+    "/v1/finance/shopping-tasks/commands/{command_id}": {
+      "get": {
+        "operationId": "status_v1_finance_shopping_tasks_commands__command_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "command_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Command Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceTaskStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Status",
+        "tags": [
+          "Delegated Shopping tasks"
+        ]
+      }
+    },
+    "/v1/finance/shopping-tasks/commands/{command_id}/submit": {
+      "post": {
+        "operationId": "submit_v1_finance_shopping_tasks_commands__command_id__submit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "command_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Command Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceTaskStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit",
+        "tags": [
+          "Delegated Shopping tasks"
+        ]
+      }
+    },
+    "/v1/finance/shopping-tasks/commands/{command_id}/{action}": {
+      "post": {
+        "operationId": "control_v1_finance_shopping_tasks_commands__command_id___action__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "command_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Command Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "action",
+            "required": true,
+            "schema": {
+              "enum": [
+                "validate",
+                "confirm",
+                "apply",
+                "reconcile"
+              ],
+              "title": "Action",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/TaskConfirmation"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Confirmation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceTaskStatus"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Control",
+        "tags": [
+          "Delegated Shopping tasks"
+        ]
       }
     },
     "/v1/finance/summary": {

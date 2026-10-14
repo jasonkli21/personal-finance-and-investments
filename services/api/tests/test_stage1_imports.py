@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, cast
@@ -315,7 +315,12 @@ def test_import_batches_are_row_and_byte_bounded_and_cancelled_work_cannot_publi
 
 def test_cached_quote_asof_precedence_and_signed_percentages(
     stage1_context: tuple[TestClient, UUID, Engine],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(
+        "app.domains.portfolio.utc_now",
+        lambda: datetime(2026, 10, 2, 12, tzinfo=UTC),
+    )
     client, security_id, engine = stage1_context
     account = _account(client)
     saved = client.put(

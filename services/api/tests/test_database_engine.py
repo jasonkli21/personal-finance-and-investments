@@ -50,8 +50,8 @@ def test_postgres_compiles_full_schema_without_connecting() -> None:
             for t in Base.metadata.sorted_tables
             for i in t.indexes
         ]
-        assert len(tables) == 45
-        assert len(indexes) == 35
+        assert len(tables) == 47
+        assert len(indexes) == 36
         assert all(s.startswith("CREATE INDEX") for s in indexes)
         assert any("JSONB" in s for s in tables)
         assert any("NUMERIC(28, 10)" in s for s in tables)

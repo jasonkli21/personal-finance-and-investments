@@ -21,6 +21,7 @@ OIDC_CALLBACK_PATH = "/api/v1/auth/callback"
 class VerifiedIdentity:
     issuer: str
     subject: str
+    authenticated_at: int | None = None
 
 
 def create_oidc_client(settings: Settings) -> Any | None:
@@ -88,7 +89,15 @@ def validate_verified_identity(
         raise ValueError("Identity authorized party is not allowed")
     if len(audiences) > 1 and authorized_party != expected_audience:
         raise ValueError("Multiple identity audiences require the allowed party")
-    return VerifiedIdentity(expected_issuer, subject)
+    authenticated_at = claims.get("auth_time")
+    current = time.time() if now is None else now
+    if authenticated_at is not None and (
+        type(authenticated_at) is not int
+        or authenticated_at < 0
+        or authenticated_at > current + 30
+    ):
+        raise ValueError("Identity authentication time is invalid")
+    return VerifiedIdentity(expected_issuer, subject, authenticated_at)
 
 
 async def load_provider_metadata(client: Any, settings: Settings) -> Mapping[str, Any]:

@@ -212,6 +212,126 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/finance/discretionary-budgets/{period}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Get Monthly Discretionary Budget */
+    get: operations['get_monthly_discretionary_budget_v1_finance_discretionary_budgets__period__get']
+    /** Put Monthly Discretionary Budget */
+    put: operations['put_monthly_discretionary_budget_v1_finance_discretionary_budgets__period__put']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/finance/shopping-tasks/capabilities': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Capabilities */
+    get: operations['capabilities_v1_finance_shopping_tasks_capabilities_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/finance/shopping-tasks/choices': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Choices */
+    get: operations['choices_v1_finance_shopping_tasks_choices_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/finance/shopping-tasks/commands': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Create Command */
+    post: operations['create_command_v1_finance_shopping_tasks_commands_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/finance/shopping-tasks/commands/{command_id}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** Status */
+    get: operations['status_v1_finance_shopping_tasks_commands__command_id__get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/finance/shopping-tasks/commands/{command_id}/submit': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Submit */
+    post: operations['submit_v1_finance_shopping_tasks_commands__command_id__submit_post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/finance/shopping-tasks/commands/{command_id}/{action}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Control */
+    post: operations['control_v1_finance_shopping_tasks_commands__command_id___action__post']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/finance/summary': {
     parameters: {
       query?: never
@@ -1396,6 +1516,27 @@ export interface components {
       /** Source Type */
       source_type: string
     }
+    /** BudgetTaskChoice */
+    BudgetTaskChoice: {
+      /**
+       * Command Id
+       * Format: uuid
+       */
+      command_id: string
+      /** Context Choice Id */
+      context_choice_id: string
+      /** Expected Budget Revision */
+      expected_budget_revision: number
+      /** Expected Project Revision */
+      expected_project_revision: number
+      /** Period */
+      period: string
+      /**
+       * Shopping Project Id
+       * Format: uuid
+       */
+      shopping_project_id: string
+    }
     /** CategoryRuleCreate */
     CategoryRuleCreate: {
       /**
@@ -1433,6 +1574,70 @@ export interface components {
       priority: number
       /** Version */
       version: number
+    }
+    /**
+     * DelegatedSourceCommand
+     * @description Immutable, source-owned user choice. Grant handles are selectors, not proofs.
+     */
+    DelegatedSourceCommand: {
+      /**
+       * Command Id
+       * Format: uuid
+       */
+      command_id: string
+      /** Context Choice Id */
+      context_choice_id: string
+      /**
+       * Destination Application Id
+       * @default shopping
+       * @constant
+       */
+      destination_application_id: 'shopping'
+      /** Expected Domain Version */
+      expected_domain_version: string
+      /** Expected Source Version */
+      expected_source_version: string
+      /**
+       * Expires At
+       * Format: date-time
+       */
+      expires_at: string
+      /** Operation Contract Fingerprint */
+      operation_contract_fingerprint: string
+      /** Operation Id */
+      operation_id: string
+      /** Operation Version */
+      operation_version: number
+      /** Payload */
+      payload: {
+        [key: string]: components['schemas']['JsonValue']
+      }
+      /** Payload Schema Id */
+      payload_schema_id: string
+      /** Rationale */
+      rationale: string
+      /**
+       * Schema Version
+       * @default suite-source-command-v1
+       * @constant
+       */
+      schema_version: 'suite-source-command-v1'
+      /**
+       * Source Application Id
+       * @enum {string}
+       */
+      source_application_id: 'finance' | 'travel' | 'health'
+      /** Source Entity Id */
+      source_entity_id: string
+      /** Source Entity Type */
+      source_entity_type: string
+      /**
+       * Target Entity Id
+       * Format: uuid
+       */
+      target_entity_id: string
+      /** Workspace Id */
+      workspace_id?: null
     }
     /** DocumentImportRead */
     DocumentImportRead: {
@@ -2014,6 +2219,44 @@ export interface components {
        * Format: date-time
        */
       updated_at: string
+    }
+    JsonValue: unknown
+    /** MonthlyDiscretionaryBudgetRead */
+    MonthlyDiscretionaryBudgetRead: {
+      /** Amount */
+      amount: string
+      /** Currency */
+      currency: string
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string
+      /** Period */
+      period: string
+      /** Revision */
+      revision: number
+      /** Share With Shopping */
+      share_with_shopping: boolean
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string
+    }
+    /** MonthlyDiscretionaryBudgetWrite */
+    MonthlyDiscretionaryBudgetWrite: {
+      /** Amount */
+      amount: string
+      /** Currency */
+      currency: string
+      /** Expected Revision */
+      expected_revision: number
+      /**
+       * Share With Shopping
+       * @default false
+       */
+      share_with_shopping: boolean
     }
     /** NetWorthCurrencyTotal */
     NetWorthCurrencyTotal: {
@@ -4156,6 +4399,49 @@ export interface components {
       /** Subject */
       subject?: string | null
     }
+    /**
+     * SourceTaskStatus
+     * @description Small source-facing status; private orchestration metadata is excluded.
+     */
+    SourceTaskStatus: {
+      /** Apply Available */
+      apply_available: boolean
+      /** Binding */
+      binding: string
+      /** Confirmation Id */
+      confirmation_id?: string | null
+      /** Domain Version */
+      domain_version?: string | null
+      /** Outcome Code */
+      outcome_code?: string | null
+      /** Preview */
+      preview?: string | null
+      /**
+       * Proposal Id
+       * Format: uuid
+       */
+      proposal_id: string
+      /**
+       * Schema Version
+       * @default suite-source-task-status-v1
+       * @constant
+       */
+      schema_version: 'suite-source-task-status-v1'
+      /**
+       * State
+       * @enum {string}
+       */
+      state:
+        | 'proposed'
+        | 'validated'
+        | 'confirmed'
+        | 'executing'
+        | 'reconciling'
+        | 'applied'
+        | 'rejected'
+        | 'uncertain'
+        | 'expired'
+    }
     /** SpendingCategoryCreate */
     SpendingCategoryCreate: {
       /** Display Name */
@@ -4174,6 +4460,16 @@ export interface components {
       id: string
       /** Slug */
       slug: string
+    }
+    /** TaskConfirmation */
+    TaskConfirmation: {
+      /** Binding */
+      binding: string
+      /**
+       * Confirmation Id
+       * Format: uuid
+       */
+      confirmation_id: string
     }
     /** TaxLotAdjustmentCreate */
     TaxLotAdjustmentCreate: {
@@ -5552,6 +5848,254 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  get_monthly_discretionary_budget_v1_finance_discretionary_budgets__period__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        period: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MonthlyDiscretionaryBudgetRead']
+        }
+      }
+      /** @description Budget not found */
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  put_monthly_discretionary_budget_v1_finance_discretionary_budgets__period__put: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        period: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['MonthlyDiscretionaryBudgetWrite']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MonthlyDiscretionaryBudgetRead']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  capabilities_v1_finance_shopping_tasks_capabilities_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: boolean
+          }
+        }
+      }
+    }
+  }
+  choices_v1_finance_shopping_tasks_choices_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            [key: string]: unknown
+          }
+        }
+      }
+    }
+  }
+  create_command_v1_finance_shopping_tasks_commands_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BudgetTaskChoice']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DelegatedSourceCommand']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  status_v1_finance_shopping_tasks_commands__command_id__get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        command_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SourceTaskStatus']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  submit_v1_finance_shopping_tasks_commands__command_id__submit_post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        command_id: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SourceTaskStatus']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  control_v1_finance_shopping_tasks_commands__command_id___action__post: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        command_id: string
+        action: 'validate' | 'confirm' | 'apply' | 'reconcile'
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['TaskConfirmation'] | null
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['SourceTaskStatus']
+        }
+      }
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HTTPValidationError']
         }
       }
     }

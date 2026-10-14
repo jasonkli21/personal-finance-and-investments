@@ -22,6 +22,7 @@ from app.integrations.finance_context import (
 from app.integrations.finance_context_auth import (
     FinanceContextAuthorizationError,
     FinanceContextIdentityVerifier,
+    VerifiedFinanceContextIdentity,
 )
 
 router = APIRouter(tags=["Personal AI Finance context"])
@@ -48,7 +49,8 @@ async def read_personal_ai_context(request: Request) -> Response:
 
     authorization = request.headers.getlist("authorization")
     user_tokens = request.headers.getlist("x-user-id-token")
-    if len(authorization) != 1 or len(user_tokens) != 1:
+    signed_task = bool(request.headers.get("x-user-delegation"))
+    if len(authorization) != 1 or (not signed_task and len(user_tokens) != 1):
         raise HTTPException(status_code=401, detail="Authentication required")
     scheme, separator, service_token = authorization[0].partition(" ")
     if scheme.casefold() != "bearer" or not separator or not service_token.strip():
@@ -70,12 +72,27 @@ async def read_personal_ai_context(request: Request) -> Response:
         FinanceContextIdentityVerifier(),
     )
     try:
-        identity = await run_in_threadpool(
-            verifier.verify,
-            service_token=service_token.strip(),
-            user_token=user_tokens[0],
-            settings=settings,
-        )
+        if signed_task:
+            if (
+                body.purpose != "shopping_discretionary_budget"
+                or body.destination_application_id != "shopping"
+            ):
+                raise FinanceContextAuthorizationError("task_context_scope_denied")
+            from app.integrations.task_auth import verify_task_user
+
+            verified = await run_in_threadpool(
+                verify_task_user, request, body.model_dump(mode="json")
+            )
+            identity = VerifiedFinanceContextIdentity(
+                issuer=verified.issuer, subject=verified.subject
+            )
+        else:
+            identity = await run_in_threadpool(
+                verifier.verify,
+                service_token=service_token.strip(),
+                user_token=user_tokens[0],
+                settings=settings,
+            )
     except FinanceContextAuthorizationError as error:
         raise HTTPException(
             status_code=401, detail="Authentication required"

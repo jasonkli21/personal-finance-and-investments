@@ -7,6 +7,7 @@ from uuid import UUID
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     CheckConstraint,
     Date,
     DateTime,
@@ -911,12 +912,29 @@ class AuthPrincipal(Base):
     )
 
 
+class DelegatedSourceCommand(Base):
+    """Immutable source command; no identity token or upstream result is retained."""
+
+    __tablename__ = "delegated_source_commands"
+    command_id: Mapped[UUID] = mapped_column(primary_key=True)
+    principal_id: Mapped[UUID] = mapped_column(
+        ForeignKey("auth_principals.id", ondelete="CASCADE")
+    )
+    command: Mapped[dict[str, Any]] = mapped_column(JSON)
+    proposal_id: Mapped[UUID | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class AuthSession(Base):
     """Revocable opaque browser session; only its SHA-256 digest is persisted."""
 
     __tablename__ = "auth_sessions"
     __table_args__ = (
         UniqueConstraint("token_hash", name="uq_auth_sessions_token_hash"),
+        CheckConstraint(
+            "upstream_auth_time IS NULL OR upstream_auth_time >= 0",
+            name="ck_auth_session_upstream_time",
+        ),
         Index("ix_auth_sessions_expiry", "expires_at"),
     )
 
@@ -933,6 +951,9 @@ class AuthSession(Base):
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
+    # Exact verified upstream auth_time claim, not local session creation time.
+    # Existing sessions intentionally remain unknown until a new verified login.
+    upstream_auth_time: Mapped[int | None] = mapped_column(BigInteger)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 

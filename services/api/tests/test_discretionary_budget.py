@@ -40,7 +40,9 @@ def budget_client(
     engine.dispose()
 
 
-def test_monthly_budget_write_and_read_keep_consent_explicit(budget_client: TestClient):
+def test_monthly_budget_write_and_read_keep_consent_explicit(
+    budget_client: TestClient,
+) -> None:
     response = budget_client.put(
         "/v1/finance/discretionary-budgets/2026-11",
         json={
@@ -76,7 +78,7 @@ def test_monthly_budget_write_and_read_keep_consent_explicit(budget_client: Test
 
 def test_monthly_budget_api_rejects_stale_revision_and_invalid_period(
     budget_client: TestClient,
-):
+) -> None:
     created = budget_client.put(
         "/v1/finance/discretionary-budgets/2026-11",
         json={
@@ -112,7 +114,7 @@ def test_monthly_budget_api_rejects_stale_revision_and_invalid_period(
     )
 
 
-def test_budget_contract_requires_strict_amount_currency_and_consent():
+def test_budget_contract_requires_strict_amount_currency_and_consent() -> None:
     with pytest.raises(ValueError):
         MonthlyDiscretionaryBudgetWrite.model_validate(
             {"expected_revision": 0, "amount": "-1", "currency": "USD"}
@@ -131,7 +133,7 @@ def test_budget_contract_requires_strict_amount_currency_and_consent():
     assert default.share_with_shopping is False
 
 
-def test_budget_revision_is_checked_under_domain_transaction():
+def test_budget_revision_is_checked_under_domain_transaction() -> None:
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
@@ -166,7 +168,7 @@ def test_budget_revision_is_checked_under_domain_transaction():
         engine.dispose()
 
 
-def test_budget_context_export_is_narrow_and_rechecks_sharing_consent():
+def test_budget_context_export_is_narrow_and_rechecks_sharing_consent() -> None:
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
@@ -238,7 +240,7 @@ def test_budget_context_export_is_narrow_and_rechecks_sharing_consent():
         engine.dispose()
 
 
-def test_budget_export_contract_rejects_other_fields_and_destination():
+def test_budget_export_contract_rejects_other_fields_and_destination() -> None:
     reference = FinanceContextEntityReference(
         entity_type="discretionary_budget",
         entity_id="d3a1f491-a9d7-4c95-b2a4-6d85b7568186",

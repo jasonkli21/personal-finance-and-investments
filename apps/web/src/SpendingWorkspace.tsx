@@ -1,3 +1,4 @@
+import ShoppingBudgetTask from './ShoppingBudgetTask'
 import { useRevisionDraft } from './use-revision-draft'
 import { parseCsvHeader } from './csv-headers'
 import { useRef, useState } from 'react'
@@ -443,6 +444,7 @@ export default function SpendingWorkspace() {
 
   return (
     <section className="mx-auto flex max-w-6xl flex-col gap-6 px-5 pb-12 sm:px-8">
+      <ShoppingBudgetTask />
       <header className="border-b border-slate-200 pb-6">
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">
           Stage 2 • Spending

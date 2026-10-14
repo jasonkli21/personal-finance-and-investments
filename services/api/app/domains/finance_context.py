@@ -831,7 +831,11 @@ def _verify_selected_entities(
             _record(
                 entity_type,
                 entity_id,
-                source_id=f"finance:{entity_type}:{entity_id}",
+                source_id=(
+                    f"finance:monthly_discretionary_budget:{entity_id}"
+                    if entity_type == "discretionary_budget"
+                    else f"finance:{entity_type}:{entity_id}"
+                ),
                 source_version=version,
                 source_class=source_class,
                 authority=authority,

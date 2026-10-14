@@ -42,6 +42,10 @@ Provider-neutral OIDC/PKCE and server-side revocable sessions remain the auth ar
 - app/recovery: encrypted portable archive/isolated restore; app/release: Neon evidence and fail-closed Stage 4 gate.
 - infra/terraform: prepared GCP infrastructure and Firebase configuration output; tests/infra: offline guardrails. fixtures: synthetic only.
 
+### API contract ownership
+
+FastAPI routes and Pydantic request/response models under `services/api/app/api` are the API source. `pnpm api:generate` exports that schema through `services/api/app/export_openapi.py` to `apps/web/src/api/openapi.json`, then generates `apps/web/src/api/schema.d.ts` with `openapi-typescript`. Do not hand-edit either generated artifact. `pnpm api:check` independently regenerates both files in a temporary directory and compares them with the checked-in outputs. CI runs this freshness check through `pnpm check`.
+
 Existing shared quote selection, revision-bound drafts, atomic reviewed publication and flat domain ownership remain useful. Broader Stage 2 lifecycle, OCR/sync and live research work stays partial/gated.
 
 ## 4. Conceptual relational schema

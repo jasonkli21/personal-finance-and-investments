@@ -163,6 +163,7 @@ def test_configuration_fingerprint_hmac_binds_owner_scope_without_recording_it(
 ) -> None:
     for key in CONFIG_KEYS:
         monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("EVIDENCE_CONFIGURATION_KEY", "synthetic-evidence-key-" * 3)
     monkeypatch.setenv("AUTH_ENABLED", "true")
     monkeypatch.setenv("AUTH_SESSION_SIGNING_KEY", "s" * 48)
     monkeypatch.setenv("AUTH_CLIENT_SECRET", "private-client-secret")
@@ -192,6 +193,7 @@ def test_configuration_fingerprint_binds_neon_target_and_runtime_limits(
 ) -> None:
     for key in CONFIG_KEYS:
         monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("EVIDENCE_CONFIGURATION_KEY", "synthetic-evidence-key-" * 3)
     original = _configuration_fingerprint()
 
     monkeypatch.setenv("GCP_PROJECT", "synthetic-target")

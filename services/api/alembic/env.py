@@ -1,7 +1,7 @@
 from logging.config import fileConfig
 from os import environ
 
-from sqlalchemy import engine_from_config, inspect, pool
+from sqlalchemy import Connection, engine_from_config, inspect, pool
 
 from alembic import context
 from app.db.models import Base
@@ -59,43 +59,50 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+def _migrate_connection(connection: Connection) -> None:
+    """Use the caller's connection/search path; never substitute its database."""
+    # Descriptive revision IDs exceed Alembic's default VARCHAR(32).
+    inspector = inspect(connection)
+    if inspector.has_table("alembic_version"):
+        column = next(
+            column
+            for column in inspector.get_columns("alembic_version")
+            if column["name"] == "version_num"
+        )
+        length = getattr(column["type"], "length", None)
+        if length is not None and length < _ALEMBIC_VERSION_LENGTH:
+            connection.exec_driver_sql(
+                "ALTER TABLE alembic_version "
+                f"ALTER COLUMN version_num TYPE VARCHAR({_ALEMBIC_VERSION_LENGTH})"
+            )
+    else:
+        connection.exec_driver_sql(
+            "CREATE TABLE alembic_version ("
+            f"version_num VARCHAR({_ALEMBIC_VERSION_LENGTH}) NOT NULL, "
+            "CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num))"
+        )
+    context.configure(
+        connection=connection, target_metadata=target_metadata, compare_type=True
+    )
+    with context.begin_transaction():
+        context.run_migrations()
+
+
 def run_migrations_online() -> None:
+    supplied = config.attributes.get("connection")
+    if supplied is not None:
+        _migrate_connection(supplied)
+        return
     section = config.get_section(config.config_ini_section, {})
     section["sqlalchemy.url"] = database_url()
     connectable = engine_from_config(
         section, prefix="sqlalchemy.", poolclass=pool.NullPool
     )
-    # Alembic's default version table uses VARCHAR(32), which is too short for
-    # the descriptive revision identifiers in this repository. Create or widen
-    # the PostgreSQL bookkeeping table before Alembic applies any migrations.
-    with connectable.begin() as connection:
-        inspector = inspect(connection)
-        if inspector.has_table("alembic_version"):
-            version_column = next(
-                column
-                for column in inspector.get_columns("alembic_version")
-                if column["name"] == "version_num"
-            )
-            current_length = getattr(version_column["type"], "length", None)
-            if current_length is not None and current_length < _ALEMBIC_VERSION_LENGTH:
-                connection.exec_driver_sql(
-                    "ALTER TABLE alembic_version "
-                    f"ALTER COLUMN version_num TYPE VARCHAR({_ALEMBIC_VERSION_LENGTH})"
-                )
-        else:
-            connection.exec_driver_sql(
-                "CREATE TABLE alembic_version ("
-                f"version_num VARCHAR({_ALEMBIC_VERSION_LENGTH}) NOT NULL, "
-                "CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num))"
-            )
-    with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            compare_type=True,
-        )
-        with context.begin_transaction():
-            context.run_migrations()
+    try:
+        with connectable.begin() as connection:
+            _migrate_connection(connection)
+    finally:
+        connectable.dispose()
 
 
 if context.is_offline_mode():

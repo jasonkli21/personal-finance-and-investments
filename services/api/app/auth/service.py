@@ -24,6 +24,7 @@ class PrincipalContext:
     subject: str
     scope_id: str
     session_id: UUID
+    authenticated_at: int | None = None
 
 
 def token_digest(token: str) -> str:
@@ -38,6 +39,7 @@ def create_session(
     subject: str,
     scope_id: str,
     correlation_id: str,
+    authenticated_at: int | None = None,
 ) -> tuple[str, PrincipalContext] | None:
     token = secrets.token_urlsafe(32)
     now = utc_now()
@@ -73,6 +75,7 @@ def create_session(
             token_hash=token_digest(token),
             created_at=now,
             expires_at=now + timedelta(seconds=settings.auth_session_ttl_seconds),
+            upstream_auth_time=authenticated_at,
         )
         session.add(auth_session)
         session.add(
@@ -88,7 +91,11 @@ def create_session(
             )
         )
         return token, PrincipalContext(
-            principal.issuer, principal.subject, principal.scope_id, auth_session.id
+            principal.issuer,
+            principal.subject,
+            principal.scope_id,
+            auth_session.id,
+            auth_session.upstream_auth_time,
         )
 
     return run_database_unit(session_factory, create)
@@ -121,7 +128,11 @@ def get_principal(
             return None
         auth_session, principal = row
         return PrincipalContext(
-            principal.issuer, principal.subject, principal.scope_id, auth_session.id
+            principal.issuer,
+            principal.subject,
+            principal.scope_id,
+            auth_session.id,
+            auth_session.upstream_auth_time,
         )
 
 
