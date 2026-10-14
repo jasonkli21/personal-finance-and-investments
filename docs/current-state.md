@@ -32,7 +32,7 @@ No personal Finance data was sent to a model provider.
 ## Verification and release boundary
 
 Read [the local stabilization evidence](stabilization-2026-10-14.md) and
-[suite verification](../../personal-ai-system/stabilization/VERIFICATION.md).
+[suite verification](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/VERIFICATION.md).
 The all-five synthetic PostgreSQL/loopback HTTPS paths do not prove real IAM,
 provider, cloud, browser or native-device behavior. Feature gates remain off by
 default. No cloud deployment or live-provider operation was run. The user
@@ -41,9 +41,9 @@ authorized commits and pushes to remote main; hosted CI is separate evidence.
 ## Minimum context
 
 Read [the router](README.md), the owning module/contract and focused tests.
-[Suite contracts](../../personal-ai-system/stabilization/CROSS-REPO-CONTRACTS.md),
-[operations](../../personal-ai-system/stabilization/OPERATIONS.md) and the
-[review handoff](../../personal-ai-system/stabilization/REVIEW-HANDOFF.md) explain
+[Suite contracts](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/CROSS-REPO-CONTRACTS.md),
+[operations](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/OPERATIONS.md) and the
+[review handoff](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/REVIEW-HANDOFF.md) explain
 cross-app assumptions and remaining acceptance. The
 [previous status](history/stabilization/current-state-before-2026-10-14.md)
 preserves detailed predecessor phase evidence and unresolved gates. This status

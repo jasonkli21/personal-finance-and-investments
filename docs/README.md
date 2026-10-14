@@ -2,7 +2,7 @@
 
 Stabilization and delegated tasks: [current state](current-state.md),
 [dated evidence](stabilization-2026-10-14.md), then the
-[suite review handoff](../../personal-ai-system/stabilization/REVIEW-HANDOFF.md).
+[suite review handoff](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/REVIEW-HANDOFF.md).
 
 This is the stable context router and document index. For the concise implementation boundary, authorized scope, and open gates, see [current state](current-state.md). For human-facing product behavior, setup, and commands, see the [root README](../README.md).
 

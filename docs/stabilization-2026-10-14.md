@@ -27,9 +27,9 @@ No personal Finance data was sent to a model provider.
 
 ## Evidence authority
 
-[Exact commands/counts/source identity](../../personal-ai-system/stabilization/VERIFICATION.md),
-[transition verification](../../personal-ai-system/stabilization/LUNA-TRANSITION-VERIFICATION.md)
-and [review priorities](../../personal-ai-system/stabilization/REVIEW-HANDOFF.md)
+[Exact commands/counts/source identity](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/VERIFICATION.md),
+[transition verification](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/LUNA-TRANSITION-VERIFICATION.md)
+and [review priorities](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/REVIEW-HANDOFF.md)
 are the suite evidence index. Earlier records retain their original date/results;
 newer local evidence supersedes their unrun-local-check statements only.
 
