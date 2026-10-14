@@ -25,6 +25,12 @@ synthetic and independent of environment files. Native migration/recovery and
 full local package checks are recorded separately from Neon/GCP/real-data gates.
 No personal Finance data was sent to a model provider.
 
+Fresh browser CI exposed the fixed October 1 manual-price fixture being valued
+after its seven-day freshness window. The journey now explicitly selects a
+historical valuation on the fixture date, retaining every NAV, percentage,
+breakdown, CSV and reload assertion. Production financial/freshness rules remain
+unchanged.
+
 ## Evidence authority
 
 [Exact commands/counts/source identity](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/VERIFICATION.md),

@@ -140,6 +140,9 @@ test('offline reviewed positions → ETF compositions → frozen NVDA drill-down
   await report
     .getByRole('checkbox', { name: 'Retirement', exact: true })
     .check()
+  // Value the fixed dated fixtures while their prices are fresh, independently
+  // of the runner's wall clock. Keep the actual NAV/breakdown assertions intact.
+  await report.getByLabel('Historical valuation').fill('2026-10-01T12:00')
   await report.getByRole('button', { name: 'Create / refresh report' }).click()
   await expect(
     report.getByText('Total portfolio NAV: USD 200,000.00', { exact: true }),
