@@ -7,7 +7,7 @@ import time
 from typing import Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
@@ -29,6 +29,7 @@ from app.integrations.task_wire import (
     COMMAND_READ_FINGERPRINT,
     DelegatedCommandRead,
     DelegatedSourceCommand,
+    DelegatedTargetChoicesResult,
 )
 
 router = APIRouter(tags=["Delegated Shopping tasks"])
@@ -180,6 +181,17 @@ def _relay(
 @router.get("/v1/finance/shopping-tasks/choices")
 def choices(request: Request) -> dict[str, Any]:
     return _relay(request, _principal(request), "GET", "/v1/federation/grants/choices")
+
+
+@router.get(
+    "/v1/finance/shopping-tasks/projects",
+    response_model=DelegatedTargetChoicesResult,
+)
+def project_choices(request: Request, response: Response) -> dict[str, Any]:
+    """Relay Shopping's minimal owner-scoped project choices through PAI."""
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    return _relay(request, _principal(request), "GET", "/v1/mutations/target-choices")
 
 
 @router.post(

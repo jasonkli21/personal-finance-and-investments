@@ -34,9 +34,8 @@ unchanged.
 ## Evidence authority
 
 [Exact commands/counts/source identity](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/VERIFICATION.md),
-[transition verification](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/LUNA-TRANSITION-VERIFICATION.md)
-and [review priorities](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/REVIEW-HANDOFF.md)
-are the suite evidence index. Earlier records retain their original date/results;
+[fresh re-review handoff](https://github.com/jasonkli21/personal-ai-agent/blob/main/stabilization/FRESH-REVIEW-HANDOFF.md)
+is the suite evidence index. Earlier records retain their original date/results;
 newer local evidence supersedes their unrun-local-check statements only.
 
 No personal records were used or deleted. Local tests created disposable databases

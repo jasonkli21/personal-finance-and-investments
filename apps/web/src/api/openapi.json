@@ -500,6 +500,30 @@
         "title": "DelegatedSourceCommand",
         "type": "object"
       },
+      "DelegatedTargetChoicesResult": {
+        "additionalProperties": false,
+        "properties": {
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/ShoppingTargetChoice"
+            },
+            "maxItems": 32,
+            "title": "Choices",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": "suite-task-target-choices-v1",
+            "default": "suite-task-target-choices-v1",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "choices"
+        ],
+        "title": "DelegatedTargetChoicesResult",
+        "type": "object"
+      },
       "DocumentImportRead": {
         "properties": {
           "account_id": {
@@ -7873,6 +7897,36 @@
         "title": "SessionRead",
         "type": "object"
       },
+      "ShoppingTargetChoice": {
+        "additionalProperties": false,
+        "description": "The minimal Shopping-owned information needed to confirm a target.",
+        "properties": {
+          "label": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Label",
+            "type": "string"
+          },
+          "project_id": {
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "revision": {
+            "maximum": 2147483647.0,
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "project_id",
+          "label",
+          "revision"
+        ],
+        "title": "ShoppingTargetChoice",
+        "type": "object"
+      },
       "SourceTaskStatus": {
         "additionalProperties": false,
         "description": "Small source-facing status; private orchestration metadata is excluded.",
@@ -11187,6 +11241,28 @@
           }
         },
         "summary": "Control",
+        "tags": [
+          "Delegated Shopping tasks"
+        ]
+      }
+    },
+    "/v1/finance/shopping-tasks/projects": {
+      "get": {
+        "description": "Relay Shopping's minimal owner-scoped project choices through PAI.",
+        "operationId": "project_choices_v1_finance_shopping_tasks_projects_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DelegatedTargetChoicesResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Project Choices",
         "tags": [
           "Delegated Shopping tasks"
         ]

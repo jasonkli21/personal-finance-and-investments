@@ -332,6 +332,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/v1/finance/shopping-tasks/projects': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Project Choices
+     * @description Relay Shopping's minimal owner-scoped project choices through PAI.
+     */
+    get: operations['project_choices_v1_finance_shopping_tasks_projects_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/finance/summary': {
     parameters: {
       query?: never
@@ -1638,6 +1658,17 @@ export interface components {
       target_entity_id: string
       /** Workspace Id */
       workspace_id?: null
+    }
+    /** DelegatedTargetChoicesResult */
+    DelegatedTargetChoicesResult: {
+      /** Choices */
+      choices: components['schemas']['ShoppingTargetChoice'][]
+      /**
+       * Schema Version
+       * @default suite-task-target-choices-v1
+       * @constant
+       */
+      schema_version: 'suite-task-target-choices-v1'
     }
     /** DocumentImportRead */
     DocumentImportRead: {
@@ -4400,6 +4431,21 @@ export interface components {
       subject?: string | null
     }
     /**
+     * ShoppingTargetChoice
+     * @description The minimal Shopping-owned information needed to confirm a target.
+     */
+    ShoppingTargetChoice: {
+      /** Label */
+      label: string
+      /**
+       * Project Id
+       * Format: uuid
+       */
+      project_id: string
+      /** Revision */
+      revision: number
+    }
+    /**
      * SourceTaskStatus
      * @description Small source-facing status; private orchestration metadata is excluded.
      */
@@ -6096,6 +6142,26 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['HTTPValidationError']
+        }
+      }
+    }
+  }
+  project_choices_v1_finance_shopping_tasks_projects_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['DelegatedTargetChoicesResult']
         }
       }
     }

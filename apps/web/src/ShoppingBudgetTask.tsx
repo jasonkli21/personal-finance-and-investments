@@ -2,10 +2,12 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { readJsonResponse } from './api/response'
 import type { components } from './api/schema'
+import { ShoppingProjectSelect } from './ShoppingProjectSelect'
 
 type Budget = components['schemas']['MonthlyDiscretionaryBudgetRead']
 type Status = components['schemas']['SourceTaskStatus']
-type Choices = { choices: { id: string; category_label: string }[] }
+type GrantChoices = { choices: { id: string; category_label: string }[] }
+type ProjectChoices = components['schemas']['DelegatedTargetChoicesResult']
 
 async function request<T>(
   path: string,
@@ -60,8 +62,7 @@ function BudgetTaskForm() {
   const [consent, setConsent] = useState(false)
   const [budget, setBudget] = useState<Budget | null>(null)
   const [choice, setChoice] = useState('')
-  const [project, setProject] = useState('')
-  const [revision, setRevision] = useState('')
+  const [projectId, setProjectId] = useState('')
   const [status, setStatus] = useState<Status | null>(null)
   const [created, setCreated] = useState(false)
   const [clientUncertain, setClientUncertain] = useState(false)
@@ -71,11 +72,19 @@ function BudgetTaskForm() {
   const [confirmationId, setConfirmationId] = useState(() =>
     crypto.randomUUID(),
   )
-  const choices = useQuery({
-    queryKey: ['shopping-task-choices'],
-    queryFn: () => request<Choices>('/v1/finance/shopping-tasks/choices'),
+  const grants = useQuery({
+    queryKey: ['shopping-task-grants'],
+    queryFn: () => request<GrantChoices>('/v1/finance/shopping-tasks/choices'),
     retry: false,
   })
+  const projects = useQuery({
+    queryKey: ['shopping-task-projects'],
+    queryFn: () => request<ProjectChoices>('/v1/finance/shopping-tasks/projects'),
+    retry: false,
+  })
+  const selectedProject = projects.data?.choices.find(
+    (item) => item.project_id === projectId,
+  )
   const base = `/v1/finance/shopping-tasks/commands/${commandId}`
   async function run(action: () => Promise<void>) {
     if (busy) return
@@ -191,30 +200,29 @@ function BudgetTaskForm() {
           Grant{' '}
           <select value={choice} onChange={(e) => setChoice(e.target.value)}>
             <option value="">Select an explicitly granted source</option>
-            {(choices.data?.choices ?? []).map((item) => (
+            {(grants.data?.choices ?? []).map((item) => (
               <option key={item.id} value={item.id}>
                 {item.category_label}
               </option>
             ))}
           </select>
         </label>
-        <label>
-          Shopping project{' '}
-          <input value={project} onChange={(e) => setProject(e.target.value)} />
-        </label>
-        <label>
-          Project revision{' '}
-          <input
-            inputMode="numeric"
-            value={revision}
-            onChange={(e) => setRevision(e.target.value)}
-          />
-        </label>
+        <ShoppingProjectSelect
+          choices={projects.data?.choices ?? []}
+          selectedId={projectId}
+          onSelect={setProjectId}
+        />
       </fieldset>
-      {choices.isError && (
+      {grants.isError && (
         <p role="alert">
           Grants are unavailable. Check Personal AI authentication and
           permissions.
+        </p>
+      )}
+      {projects.isError && (
+        <p role="alert">
+          Shopping projects are unavailable. Check Personal AI authentication
+          and linked Shopping access.
         </p>
       )}
       <div className="flex flex-wrap gap-3">
@@ -224,21 +232,20 @@ function BudgetTaskForm() {
             busy ||
             !budget?.share_with_shopping ||
             !choice ||
-            !project ||
-            !/^[1-9][0-9]{0,15}$/.test(revision) ||
-            !Number.isSafeInteger(Number(revision)) ||
+            !selectedProject ||
             (status !== null && status.state !== 'proposed')
           }
           onClick={() =>
             void run(async () => {
               if (!budget) return
+              if (!selectedProject) return
               await request('/v1/finance/shopping-tasks/commands', 'POST', {
                 command_id: commandId,
                 period,
                 expected_budget_revision: budget.revision,
                 context_choice_id: choice,
-                shopping_project_id: project,
-                expected_project_revision: Number(revision),
+                shopping_project_id: selectedProject.project_id,
+                expected_project_revision: selectedProject.revision,
               })
               setCreated(true)
               const proposed = await request<Status>(`${base}/submit`, 'POST')
